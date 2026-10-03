@@ -48,6 +48,7 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
     status, _ = s.state(live)
     cost, estimated = s.cost()
     models = s.models()
+    cache_hit, cache_saved = s.cache_stats()
     search = " ".join([s.title(), *(p["text"][:300] for p in s.prompts)])[:SEARCH_TEXT_LIMIT]
     return {
         "id": s.session_id,
@@ -65,6 +66,8 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "tokens": s.tokens(),
         "cost": round(cost, 4),
         "cost_estimated": estimated,
+        "cache_hit": cache_hit,
+        "cache_saved": round(cache_saved, 4),
         "model": models[0] if models else None,
         "continued_in": s.continued_in,
         "continued_from": continued_from,

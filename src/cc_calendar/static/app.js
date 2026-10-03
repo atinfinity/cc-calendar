@@ -3,8 +3,8 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
-  STATUS_HINTS, STATUS_LABELS, addDays, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h,
-  matchSnippet, paletteColor,
+  CACHE_LOW, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h,
+  fmtPct, matchSnippet, paletteColor,
   prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
 
@@ -240,6 +240,7 @@ const LIST_COLUMNS = [
   ["prompts", "Prompts", (s) => s.prompt_count, "desc", true],
   ["tokens", "Tokens", (s) => s.tokens, "desc", true],
   ["cost", "Cost", (s) => s.cost, "desc", true],
+  ["cache", "Cache", (s) => s.cache_hit, "asc", true],
 ];
 
 function sortRows(rows) {
@@ -275,7 +276,7 @@ function renderList(visible) {
     const sorted = state.sort.key === key;
     return h("th", {
       class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
-      title: key === "status" ? "Sort by status" : `Sort by ${label.toLowerCase()}`,
+      title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : `Sort by ${label.toLowerCase()}`,
       onclick: () => setSort(key),
     }, label, sorted ? (state.sort.dir === "asc" ? " ▲" : " ▼") : "");
   });
@@ -297,6 +298,8 @@ function renderList(visible) {
           h("td", { class: "num" }, s.prompt_count),
           h("td", { class: "num" }, fmtTokens(s.tokens)),
           h("td", { class: "num" }, fmtCost(s.cost, s.cost_estimated)),
+          h("td", { class: "num" + (s.cache_hit != null && s.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(s.cache_hit, s.cache_saved) },
+            fmtPct(s.cache_hit)),
         ))),
     ),
   );

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from .pricing import context_window, estimate_cost
+from .pricing import cache_hit_rate, cache_savings, context_window, estimate_cost
 
 INTERRUPT_PREFIX = "[Request interrupted"
 GIT_COMMIT_RE = re.compile(r"\bgit\b(?:\s+-[cC]\s+\S+)*[^|;&\n]*?\bcommit\b")
@@ -465,13 +465,23 @@ class SessionAcc:
         Lets the UI split a session's cost across days; only the proportions are used.
         """
         out: Counter = Counter()
-        usages = [*self.usages.values()]
-        for sa in self.subagents.values():
-            usages.extend(sa.usages.values())
-        for u in usages:
+        for u in self.all_usages():
             if u.ts is not None:
                 out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
         return {b: round(c, 6) for b, c in out.items() if c}
+
+    def all_usages(self) -> list[Usage]:
+        """API usage of the session and its subagents."""
+        out = [*self.usages.values()]
+        for sa in self.subagents.values():
+            out.extend(sa.usages.values())
+        return out
+
+    def cache_stats(self) -> tuple[float | None, float]:
+        """(cache hit rate, estimated USD saved by caching), subagents included."""
+        usages = self.all_usages()
+        saved = sum(cache_savings(u.model, u.usage) for u in usages)
+        return cache_hit_rate([u.usage for u in usages]), saved
 
     def tokens(self) -> int:
         return sum(u.total for u in self.usages.values()) + sum(

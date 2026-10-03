@@ -237,3 +237,18 @@ def test_project_is_launch_directory():
     b.prompt(0, "start")
     b.prompt(1, "later")["cwd"] = "/work/demo/sub/dir"
     assert feed(b).cwd == "/work/demo"
+
+
+def test_cache_stats():
+    b = LogBuilder("s")
+    usage = {
+        "input_tokens": 100,
+        "cache_creation_input_tokens": 100,
+        "cache_read_input_tokens": 800,
+    }
+    b.assistant(0, [], msg_id="m1", model="claude-sonnet-5-5", usage=usage)
+    hit, saved = feed(b).cache_stats()
+    assert hit == 0.8
+    # 800 reads at $2.00 - $0.20, minus 100 writes at the $0.50 premium, per million tokens.
+    assert saved == pytest.approx((800 * 1.8 - 100 * 0.5) / 1e6)
+    assert SessionAcc(session_id="e", path="x", project_dir="p").cache_stats() == (None, 0)

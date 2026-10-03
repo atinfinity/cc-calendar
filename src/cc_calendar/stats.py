@@ -9,7 +9,7 @@ from typing import Any
 
 from .logview import iter_records
 from .parser import classify_user, parse_ts
-from .pricing import estimate_cost
+from .pricing import cache_hit_rate, cache_savings, estimate_cost
 
 IDLE_MS = 5 * 60_000  # gaps longer than this do not count as active time
 TOKEN_KEYS = {
@@ -114,6 +114,8 @@ def _compute(path: Path, session_id: str | None) -> dict:
         "requests": len(usages),
         "tokens": totals,
         "cost": round(sum(m["cost"] for m in models), 4),
+        "cache_hit": cache_hit_rate([u for _, u in usages.values()]),
+        "cache_saved": round(sum(cache_savings(m, u) for m, u in usages.values()), 4),
         "models": models,
         "tools": [
             {"name": name, "calls": n, "errors": tool_errors.get(name, 0)}

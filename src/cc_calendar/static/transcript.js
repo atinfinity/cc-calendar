@@ -1,6 +1,7 @@
 // Modal transcript viewer with lazy loading and subagent drill-down.
 import {
-  fmtCost, fmtDateTime, fmtDuration, fmtTime, fmtTokens, h, prefs, renderMarkdown, shortModel,
+  cacheTitle, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
+  shortModel,
 } from "./util.js";
 
 const PAGE = 300;
@@ -130,6 +131,9 @@ function renderStats(panel, st) {
     tile("Output", fmtTokens(t.output), "tok"),
     tile("Cache read", fmtTokens(t.cache_read), "tok"),
     tile("Cache write", fmtTokens(t.cache_write), "tok"),
+    st.cache_hit == null ? null : tile("Cache hit", fmtPct(st.cache_hit),
+      st.cache_saved >= 0 ? `saved ${fmtCost(st.cache_saved, true)}` : `${fmtCost(-st.cache_saved, true)} extra`,
+      cacheTitle(st.cache_hit, st.cache_saved)),
     tile(main && subs.length ? "Cost (this log)" : "Cost", fmtCost(st.cost, true), "", "Estimated from token usage"),
     main && subs.length ? tile("Subagents", subs.length, `${fmtTokens(subTokens)} tok · ${fmtCost(subCost, true)}`) : null,
     main ? tile("Session total", fmtCost(d.cost, d.cost_estimated), "", d.cost_estimated ? "Estimated, including subagents" : "From Claude Code's cost record") : null,

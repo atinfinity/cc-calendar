@@ -188,6 +188,8 @@ a { color: var(--accent); }
 }
 .stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .stat { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+.stat.warn { border-color: var(--interrupted); color: var(--interrupted); }
+.list td.warn { color: var(--interrupted); }
 .ctx { display: inline-block; width: 50px; height: 6px; border-radius: 3px; background: var(--border); vertical-align: middle; overflow: hidden; }
 .ctx > i { display: block; height: 100%; background: var(--accent); }
 .card { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; }
