@@ -13,7 +13,7 @@ requests — in a local web UI that updates live while sessions run.
 Requires [uv](https://docs.astral.sh/uv/) (Python 3.12+ is fetched automatically).
 
 ```sh
-uv tool install git+https://github.com/atinfinity/cc-calendar
+uv tool install git+https://github.com/atinfinity/cc-calendar@v0.1.0
 cc-calendar
 ```
 
