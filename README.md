@@ -31,18 +31,20 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 
 ## Features
 
-- **Week calendar** — each session is drawn as bars covering its active periods; a session is
+- **Week and day calendar** — each session is drawn as bars covering its active periods; a session is
   split wherever it sat idle longer than the chosen threshold (15 minutes by default). Overlapping
-  sessions sit side by side. Zoom with the − / + buttons or Ctrl + mouse wheel.
+  sessions sit side by side. Click a date in the week view to open that day on its own. Zoom with
+  the − / + buttons or Ctrl + mouse wheel.
 - **Activity density** — a heat strip behind each day shows prompts and responses per 10 minutes.
-- **Colors** by project, status or model.
+- **Colors** by project, status, model or cost (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
 - **Status** — Running and Waiting for live sessions, Done or Interrupted for finished ones, with
   the underlying checks (turn ended, no background work left, clean exit, working tree clean).
 - **Detail pane** — tokens, cost, context usage, every request you made with the commits that
   followed it, files changed, pull requests, subagents and background tasks, and links between
   a session and the one it was continued in.
 - **Transcript viewer** — Markdown rendering, collapsible tool calls, optional thinking and
-  metadata, and drill-down into subagent transcripts.
+  metadata, drill-down into subagent transcripts, and a stats panel per transcript (active time,
+  requests, tokens and cost by model, tool calls and errors by tool).
 - **List view** with search over titles and prompts, project and status filters, and sorting.
 - **Live updates** — new log lines are picked up within a second.
 

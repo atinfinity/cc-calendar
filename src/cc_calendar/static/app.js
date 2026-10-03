@@ -4,7 +4,7 @@ import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
   STATUS_LABELS, addDays, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, paletteColor,
-  prefs, shortModel, startOfWeek, statusColor,
+  prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,8 @@ export const state = {
   sessions: [],
   byId: new Map(),
   view: prefs.get("view", "calendar"),
-  weekStart: startOfWeek(new Date()),
+  span: prefs.get("span", "week"), // "week" | "day"
+  anchor: startOfDay(new Date()), // any day inside the displayed range
   hourPx: prefs.get("hourPx", DEFAULT_HOUR_PX),
   colorBy: prefs.get("colorBy", "project"),
   gap: prefs.get("gap", 15),
@@ -54,7 +55,21 @@ function assignColors() {
   state.modelColors = new Map(count("model").map((m, i) => [m, paletteColor(i + 2)]));
 }
 
+// Fixed thresholds so a color means the same amount in every week.
+const COST_BANDS = [
+  { max: 1, label: "< $1", color: "#7d8ea3" },
+  { max: 5, label: "$1–5", color: "#d4b02a" },
+  { max: 20, label: "$5–20", color: "#e8801a" },
+  { max: 50, label: "$20–50", color: "#d63a2f" },
+  { max: Infinity, label: "≥ $50", color: "#8e1b5e" },
+];
+
+function costBand(s) {
+  return COST_BANDS.findIndex((b) => (s.cost || 0) < b.max);
+}
+
 export function colorFor(s) {
+  if (state.colorBy === "cost") return COST_BANDS[costBand(s)].color;
   if (state.colorBy === "status") return statusColor(s.status);
   if (state.colorBy === "model") return state.modelColors.get(s.model) || "#888";
   return state.projectColors.get(s.project) || "#888";
@@ -64,7 +79,9 @@ export function legendItems(visible) {
   const counts = new Map();
   for (const s of visible) {
     let key, label, color;
-    if (state.colorBy === "status") {
+    if (state.colorBy === "cost") {
+      key = costBand(s); label = COST_BANDS[key].label; color = COST_BANDS[key].color;
+    } else if (state.colorBy === "status") {
       key = s.status; label = STATUS_LABELS[s.status]; color = statusColor(s.status);
     } else if (state.colorBy === "model") {
       key = s.model; label = shortModel(s.model); color = colorFor(s);
@@ -74,6 +91,9 @@ export function legendItems(visible) {
     const e = counts.get(key) || { label, color, n: 0, title: key };
     e.n++;
     counts.set(key, e);
+  }
+  if (state.colorBy === "cost") {
+    return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([, e]) => ({ ...e, title: "" }));
   }
   return [...counts.values()].sort((a, b) => b.n - a.n);
 }
@@ -146,6 +166,9 @@ function renderToolbar() {
     b.classList.toggle("active", b.dataset.view === state.view));
   document.querySelectorAll("#color-by button").forEach((b) =>
     b.classList.toggle("active", b.dataset.color === state.colorBy));
+  document.querySelectorAll("#span-toggle button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.span === state.span));
+  $("go-today").textContent = state.span === "day" ? "Today" : "This week";
   $("gap").value = String(state.gap);
   $("sort").value = state.sort;
   $("hide-noprompt").checked = state.hideNoPrompt;
@@ -235,6 +258,23 @@ function renderList(visible) {
 
 // ------------------------------------------------------------------ controls
 
+export function rangeDays() {
+  if (state.span === "day") return [startOfDay(state.anchor)];
+  const start = startOfWeek(state.anchor);
+  return [...Array(7)].map((_, i) => addDays(start, i));
+}
+
+function setSpan(span, day) {
+  state.span = span;
+  if (day) state.anchor = startOfDay(day);
+  prefs.set("span", span);
+  renderAll();
+}
+
+export function openDay(day) {
+  setSpan("day", day);
+}
+
 function setHourPx(px) {
   state.hourPx = Math.max(12, Math.min(240, Math.round(px)));
   prefs.set("hourPx", state.hourPx);
@@ -254,9 +294,12 @@ function bind() {
       prefs.set("colorBy", state.colorBy);
       renderAll();
     }));
-  $("this-week").onclick = () => { state.weekStart = startOfWeek(new Date()); renderMain(); };
-  $("prev-week").onclick = () => { state.weekStart = addDays(state.weekStart, -7); renderMain(); };
-  $("next-week").onclick = () => { state.weekStart = addDays(state.weekStart, 7); renderMain(); };
+  document.querySelectorAll("#span-toggle button").forEach((b) =>
+    b.addEventListener("click", () => setSpan(b.dataset.span)));
+  const step = () => (state.span === "day" ? 1 : 7);
+  $("go-today").onclick = () => { state.anchor = startOfDay(new Date()); renderMain(); };
+  $("go-prev").onclick = () => { state.anchor = addDays(state.anchor, -step()); renderMain(); };
+  $("go-next").onclick = () => { state.anchor = addDays(state.anchor, step()); renderMain(); };
   $("zoom-in").onclick = () => setHourPx(state.hourPx * 1.25);
   $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);
   $("zoom-reset").onclick = () => setHourPx(DEFAULT_HOUR_PX);
