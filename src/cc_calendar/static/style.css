@@ -171,6 +171,9 @@ a { color: var(--accent); }
 .list tr.selected td { background: var(--accent-soft); }
 .list td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .list .title-cell { max-width: 520px; }
+.snippet { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.snippet mark { background: var(--accent-soft); color: var(--text); border-radius: 2px; padding: 0 1px; }
+.tooltip .snippet { margin-top: 4px; }
 
 /* ---------------------------------------------------------------- detail */
 .detail-pane {

@@ -3,7 +3,7 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
-  STATUS_LABELS, addDays, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, paletteColor,
+  STATUS_LABELS, addDays, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, matchSnippet, paletteColor,
   prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
 
@@ -288,7 +288,7 @@ function renderList(visible) {
           onclick: () => select(s.id),
         },
           h("td", {}, h("span", { class: "dot", title: STATUS_LABELS[s.status], style: { background: statusColor(s.status) } })),
-          h("td", { class: "title-cell" }, s.title),
+          h("td", { class: "title-cell" }, s.title, matchSnippet(s, state.search)),
           h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }), s.project_name),
           h("td", { class: "num" }, fmtDateTime(s.start)),
           h("td", { class: "num", title: fmtDateTime(s.end) }, fmtAgo(s.end)),

@@ -50,7 +50,7 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 - **Transcript viewer** — Markdown rendering, collapsible tool calls, optional thinking and
   metadata, drill-down into subagent transcripts, and a stats panel per transcript (active time,
   requests, tokens and cost by model, tool calls and errors by tool).
-- **List view** with search over titles and prompts, project and status filters, and sorting by
+- **List view** with search over titles and prompts (a match inside a prompt is shown under the title), project and status filters, and sorting by
   any column (click a header; click again to reverse).
 - **Live updates** — new log lines are picked up within a second.
 

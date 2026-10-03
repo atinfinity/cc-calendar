@@ -1,7 +1,7 @@
 // Week or day calendar: activity segments as bars, laid out in lanes like Google Calendar.
 import { colorFor, legendItems, openDay, rangeDays, state } from "./app.js";
 import { dayTotalLabel, renderSummary, summarize } from "./summary.js";
-import { STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h } from "./util.js";
+import { STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, matchSnippet } from "./util.js";
 
 const HOUR_MS = 3600_000;
 const BUCKET_MS = 600_000;
@@ -178,6 +178,7 @@ function showTip(e, s, p) {
     h("div", { class: "muted" }, `${s.project_name}${s.branch ? " · " + s.branch : ""}`),
     h("div", {}, `${fmtTime(p.segStart)} – ${fmtTime(p.segEnd)} (${fmtDuration(p.segEnd - p.segStart)})`),
     h("div", { class: "muted" }, `${STATUS_LABELS[s.status]} · ${s.prompt_count} prompts · ${fmtCost(s.cost, s.cost_estimated)}`),
+    matchSnippet(s, state.search),
   );
   t.hidden = false;
   moveTip(e);
