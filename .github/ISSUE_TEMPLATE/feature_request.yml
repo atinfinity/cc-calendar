@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest something cc-calendar could show or do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to find out or do?
+      description: Describe the question you are trying to answer about your sessions, not only the UI you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you have tried
