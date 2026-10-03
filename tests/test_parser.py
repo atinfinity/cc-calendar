@@ -222,3 +222,10 @@ def test_context_pct():
     b = LogBuilder("s")
     b.assistant(0, [], msg_id="m1", usage={"input_tokens": 0, "cache_read_input_tokens": 100_000})
     assert feed(b).context_pct() == 10.0  # 1M-token window
+
+
+def test_project_is_launch_directory():
+    b = LogBuilder("s")
+    b.prompt(0, "start")
+    b.prompt(1, "later")["cwd"] = "/work/demo/sub/dir"
+    assert feed(b).cwd == "/work/demo"
