@@ -194,7 +194,7 @@ a { color: var(--accent); }
 .card > h3 { margin: 0; padding: 7px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--bg-soft); border-radius: 8px 8px 0 0; }
 .card > .card-body { padding: 8px 10px; }
 .checks { display: flex; flex-wrap: wrap; gap: 6px; }
-.check-pill { border-radius: 999px; padding: 2px 9px; font-size: 12px; border: 1px solid var(--border); }
+.check-pill { border-radius: 999px; padding: 2px 9px; font-size: 12px; border: 1px solid var(--border); cursor: help; }
 .check-pill.ok { border-color: var(--done); color: var(--done); }
 .check-pill.ng { border-color: var(--interrupted); color: var(--interrupted); }
 .check-pill.na { color: var(--muted); border-style: dashed; }

@@ -3,7 +3,8 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
-  STATUS_LABELS, addDays, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, matchSnippet, paletteColor,
+  STATUS_HINTS, STATUS_LABELS, addDays, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h,
+  matchSnippet, paletteColor,
   prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
 
@@ -184,7 +185,7 @@ function renderToolbar() {
     ...Object.entries(STATUS_LABELS).map(([key, label]) =>
       h("button", {
         class: "chip" + (state.statuses.has(key) ? "" : " off"),
-        title: `Toggle ${label}`,
+        title: `${STATUS_HINTS[key]}. Click to toggle.`,
         onclick: () => {
           state.statuses.has(key) ? state.statuses.delete(key) : state.statuses.add(key);
           prefs.set("statuses", [...state.statuses]);
