@@ -1,5 +1,1 @@
 blank_issues_enabled: true
-contact_links:
-  - name: Report a security vulnerability
-    url: https://github.com/atinfinity/cc-calendar/security/advisories/new
-    about: Please report vulnerabilities privately, not in a public issue. See SECURITY.md.
