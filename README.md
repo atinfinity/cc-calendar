@@ -60,6 +60,11 @@ Screenshots show fictional demo data.
 Cost comes from Claude Code's own cost record when the session wrote one. Otherwise it is estimated
 from token usage and a built-in price table, and shown with a `~` prefix.
 
+Treat all costs as rough figures, not billing data. The price table in
+`src/cc_calendar/pricing.py` uses Anthropic API list prices as of when it was last updated. It does
+not know about subscription plans, discounts or price changes. Models missing from the table count
+as $0, so it needs updating when new models ship.
+
 ## Privacy
 
 Everything stays on your machine. The server listens only on localhost, reads your logs read-only,
@@ -83,6 +88,11 @@ your installed Google Chrome:
 ```sh
 uv run --with playwright python scripts/screenshots.py
 ```
+
+## Acknowledgements
+
+Inspired by the tool shown in [this post by @tokkyo](https://x.com/tokkyo/status/2106240136778575897).
+This is an independent reimplementation and is not affiliated with the original.
 
 ## License
 
