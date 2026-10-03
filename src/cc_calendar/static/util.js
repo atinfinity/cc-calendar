@@ -59,6 +59,19 @@ export function fmtCost(cost, estimated) {
   return estimated ? "~" + s : s;
 }
 
+// Below this cache hit rate a session is flagged as reusing its cache poorly.
+export const CACHE_LOW = 0.9;
+
+export function fmtPct(ratio) {
+  return ratio == null ? "–" : `${Math.round(ratio * 100)}%`;
+}
+
+export function cacheTitle(hit, saved) {
+  if (hit == null) return "No input tokens";
+  const effect = saved >= 0 ? `saved ${fmtCost(saved, true)}` : `cost ${fmtCost(-saved, true)} extra`;
+  return `Cache reads are ${fmtPct(hit)} of input tokens. Caching ${effect} compared with no caching (cache write premium included).`;
+}
+
 export function fmtDuration(ms) {
   if (ms == null || ms < 0) return "–";
   const m = Math.round(ms / 60000);

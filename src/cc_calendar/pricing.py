@@ -70,6 +70,29 @@ def estimate_cost(model: str | None, usage: dict) -> float:
     ) / 1_000_000
 
 
+def cache_savings(model: str | None, usage: dict) -> float:
+    """What caching saved versus sending every cached token as plain input.
+
+    Cache reads are cheaper than input; cache writes cost extra, so they count against it.
+    """
+    price = price_for(model)
+    if price is None:
+        return 0.0
+    return (
+        usage.get("cache_read_input_tokens", 0) * (price.input - price.cache_read_rate)
+        - usage.get("cache_creation_input_tokens", 0) * (price.cache_write - price.input)
+    ) / 1_000_000
+
+
+def cache_hit_rate(usages: list[dict]) -> float | None:
+    """Cache reads as a share of all input-side tokens, or None without any input."""
+    read = sum(u.get("cache_read_input_tokens", 0) for u in usages)
+    total = read + sum(
+        u.get("input_tokens", 0) + u.get("cache_creation_input_tokens", 0) for u in usages
+    )
+    return round(read / total, 4) if total else None
+
+
 def context_window(model: str | None) -> int:
     price = price_for(model)
     return price.context if price else 200_000
