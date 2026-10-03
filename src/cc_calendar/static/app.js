@@ -24,6 +24,7 @@ export const state = {
   statuses: new Set(prefs.get("statuses", Object.keys(STATUS_LABELS))),
   hideNoPrompt: prefs.get("hideNoPrompt", true),
   sort: prefs.get("listSort", { key: "start", dir: "desc" }),
+  showSummary: prefs.get("summary", false),
   selectedId: null,
   projectColors: new Map(),
   modelColors: new Map(),
@@ -155,6 +156,7 @@ function renderMain() {
       legend: $("legend"),
       rangeLabel: $("range-label"),
       rangeCount: $("range-count"),
+      summaryPane: $("summary"),
     });
   } else {
     renderList(visible);
@@ -169,6 +171,7 @@ function renderToolbar() {
   document.querySelectorAll("#span-toggle button").forEach((b) =>
     b.classList.toggle("active", b.dataset.span === state.span));
   $("go-today").textContent = state.span === "day" ? "Today" : "This week";
+  $("summary-toggle").classList.toggle("active", state.showSummary);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
 
@@ -342,6 +345,11 @@ function bind() {
   $("go-today").onclick = () => { state.anchor = startOfDay(new Date()); renderMain(); };
   $("go-prev").onclick = () => { state.anchor = addDays(state.anchor, -step()); renderMain(); };
   $("go-next").onclick = () => { state.anchor = addDays(state.anchor, step()); renderMain(); };
+  $("summary-toggle").onclick = () => {
+    state.showSummary = !state.showSummary;
+    prefs.set("summary", state.showSummary);
+    renderAll();
+  };
   $("zoom-in").onclick = () => setHourPx(state.hourPx * 1.25);
   $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);
   $("zoom-reset").onclick = () => setHourPx(DEFAULT_HOUR_PX);

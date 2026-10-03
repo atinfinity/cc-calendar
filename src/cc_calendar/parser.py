@@ -459,6 +459,20 @@ class SessionAcc:
             out[t // DENSITY_BUCKET_MS] += 1
         return dict(out)
 
+    def cost_density(self) -> dict[int, float]:
+        """Estimated cost per DENSITY_BUCKET_MS bucket, subagents included.
+
+        Lets the UI split a session's cost across days; only the proportions are used.
+        """
+        out: Counter = Counter()
+        usages = [*self.usages.values()]
+        for sa in self.subagents.values():
+            usages.extend(sa.usages.values())
+        for u in usages:
+            if u.ts is not None:
+                out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
+        return {b: round(c, 6) for b, c in out.items() if c}
+
     def tokens(self) -> int:
         return sum(u.total for u in self.usages.values()) + sum(
             s.tokens() for s in self.subagents.values()

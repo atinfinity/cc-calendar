@@ -1,3 +1,4 @@
+import pytest
 from conftest import BASE, LogBuilder, basic_session
 
 from cc_calendar.parser import (
@@ -189,6 +190,13 @@ def test_segments_and_density():
     assert len(s.segments(1 * MIN)) == 5
     bucket = T0 // DENSITY_BUCKET_MS
     assert s.density() == {bucket: 2, bucket + 1: 1, bucket + 6: 2}
+
+
+def test_cost_density_sums_to_estimate():
+    s = feed(basic_session())
+    density = s.cost_density()
+    assert density and all(b == int(b) for b in density)
+    assert sum(density.values()) == pytest.approx(s.cost()[0], abs=1e-5)
 
 
 def test_title_fallbacks():
