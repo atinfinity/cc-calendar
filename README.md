@@ -37,6 +37,9 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   split wherever it sat idle longer than the chosen threshold (15 minutes by default). Overlapping
   sessions sit side by side. Click a date in the week view to open that day on its own. Zoom with
   the − / + buttons or Ctrl + mouse wheel.
+- **Time and cost totals** — each date shows that day's active time and cost, and the Summary
+  table breaks the week (or day) down by project. Active time is the drawn bars; a session's cost
+  is split across days by when its requests ran. Totals follow the current filters.
 - **Activity density** — a heat strip behind each day shows prompts and responses per 10 minutes.
 - **Colors** by project, status, model or cost (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
 - **Status** — Running and Waiting for live sessions, Done or Interrupted for finished ones, with

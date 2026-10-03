@@ -60,6 +60,7 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "end": s.end,
         "segments": s.segments(gap_ms),
         "density": s.density(),
+        "cost_density": s.cost_density(),
         "prompt_count": len(s.prompts),
         "tokens": s.tokens(),
         "cost": round(cost, 4),

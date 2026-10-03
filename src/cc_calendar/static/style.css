@@ -120,6 +120,17 @@ a { color: var(--accent); }
 .cal-head div.today { color: var(--accent); font-weight: 700; }
 .cal-head div.link { cursor: pointer; }
 .cal-head div.link:hover { color: var(--text); text-decoration: underline; }
+.cal-head .day-total { display: block; font-size: 11px; font-weight: 400; color: var(--muted); min-height: 1.3em; }
+
+.summary { padding: 0 14px 10px; max-height: 40vh; overflow: auto; font-size: 12px; }
+.summary table { border-collapse: collapse; min-width: 50%; }
+.summary th, .summary td { padding: 4px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.summary th { color: var(--muted); font-weight: 600; background: var(--bg-soft); }
+.summary .num { text-align: right; font-variant-numeric: tabular-nums; }
+.summary .strong { font-weight: 600; }
+.summary tfoot td { font-weight: 600; border-bottom: none; border-top: 1px solid var(--border-strong); }
+.summary .dot { margin-right: 6px; }
+.summary .note { margin-top: 6px; }
 .cal-body { display: grid; position: relative; }
 .gutter { position: relative; }
 .gutter span {

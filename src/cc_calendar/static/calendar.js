@@ -1,5 +1,6 @@
 // Week or day calendar: activity segments as bars, laid out in lanes like Google Calendar.
 import { colorFor, legendItems, openDay, rangeDays, state } from "./app.js";
+import { dayTotalLabel, renderSummary, summarize } from "./summary.js";
 import { STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h } from "./util.js";
 
 const HOUR_MS = 3600_000;
@@ -7,7 +8,7 @@ const BUCKET_MS = 600_000;
 const MIN_BAR_PX = 4;
 let scrolledOnce = false;
 
-export function renderCalendar(container, visible, { onSelect, legend, rangeLabel, rangeCount }) {
+export function renderCalendar(container, visible, { onSelect, legend, rangeLabel, rangeCount, summaryPane }) {
   const prevScroll = container.scrollTop;
   hideTip();
   const days = rangeDays();
@@ -25,7 +26,15 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
   rangeLabel.textContent = days.length === 1
     ? first
     : `${first} – ${days[days.length - 1].toLocaleDateString([], { month: "short", day: "numeric" })}`;
-  rangeCount.textContent = `${inWeek.length} sessions`;
+  const bounds = days.map((d) => [d.getTime(), addDays(d, 1).getTime()]);
+  const summary = summarize(inWeek, bounds);
+  rangeCount.textContent = `${inWeek.length} sessions` + (summary.total.ms || summary.total.cost
+    ? ` · ${fmtDuration(summary.total.ms)} · ${fmtCost(summary.total.cost, summary.total.estimated)}`
+    : "");
+  summaryPane.hidden = !state.showSummary;
+  if (state.showSummary) {
+    renderSummary(summaryPane, summary, days.map((d) => `${d.toLocaleDateString([], { weekday: "short" })} ${d.getDate()}`));
+  }
   legend.replaceChildren(...legendItems(inWeek).map((e) =>
     h("span", { title: e.title || "" }, h("span", { class: "dot", style: { background: e.color } }), `${e.label} ${e.n}`)));
 
@@ -47,11 +56,11 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
   const isWeek = days.length > 1;
   const head = h("div", { class: "cal-head", style: { gridTemplateColumns: cols } },
     h("div", {}),
-    ...days.map((d) => h("div", {
+    ...days.map((d, i) => h("div", {
       class: [d.toDateString() === todayKey ? "today" : "", isWeek ? "link" : ""].join(" ").trim(),
       title: isWeek ? "Show this day" : "",
       onclick: isWeek ? () => openDay(d) : null,
-    }, fmtDay(d))));
+    }, fmtDay(d), h("span", { class: "day-total" }, dayTotalLabel(summary.days[i])))));
 
   const body = h("div", { class: "cal-body", style: { gridTemplateColumns: cols, height: `${24 * hourPx}px` } });
   const gutter = h("div", { class: "gutter" });
