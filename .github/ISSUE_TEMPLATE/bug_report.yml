@@ -1,0 +1,48 @@
+name: Bug report
+description: Something is shown wrong, missing, or the app does not start
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste real transcripts.** Claude Code logs contain your prompts, code and file
+        paths. If a log line is needed to reproduce the problem, cut it down and replace anything
+        private with placeholder text.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `cc-calendar`
+        2. Open the week of ...
+        3. Click ...
+  - type: input
+    id: version
+    attributes:
+      label: cc-calendar version
+      description: Output of `cc-calendar --version`
+    validations:
+      required: true
+  - type: input
+    id: claude-code
+    attributes:
+      label: Claude Code version
+      description: Output of `claude --version`
+  - type: input
+    id: env
+    attributes:
+      label: OS and browser
+      placeholder: macOS 26, Chrome 141
+  - type: textarea
+    id: log
+    attributes:
+      label: Redacted log excerpt (optional)
+      description: The smallest set of JSONL lines that shows the problem, with private content replaced.
+      render: json
