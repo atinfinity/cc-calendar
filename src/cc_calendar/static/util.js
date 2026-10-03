@@ -7,6 +7,13 @@ export const STATUS_LABELS = {
   interrupted: "Interrupted",
 };
 
+export const STATUS_HINTS = {
+  running: "Claude Code is working on this session right now",
+  waiting: "Claude Code is open and waiting for your input",
+  done: "The last turn finished and nothing was left running",
+  interrupted: "The session ended mid-turn, was stopped with Esc, or left background work unfinished",
+};
+
 export function statusColor(status) {
   return getComputedStyle(document.documentElement).getPropertyValue(`--${status}`).trim() || "#888";
 }

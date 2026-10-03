@@ -1,14 +1,15 @@
 // Right-hand detail pane for one session.
 import {
-  STATUS_LABELS, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTime, fmtTokens, h,
+  STATUS_HINTS, STATUS_LABELS, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTime, fmtTokens, h,
   shortModel, statusColor,
 } from "./util.js";
 
 const CHECKS = [
-  ["turn_ended", "Turn ended"],
-  ["no_background", "No background work"],
-  ["clean_exit", "Clean exit"],
-  ["committed", "Working tree clean"],
+  ["turn_ended", "Turn ended", "Claude finished its last reply and was not interrupted with Esc"],
+  ["no_background", "No background work", "No background shells or agents were left running"],
+  ["clean_exit", "Clean exit", "Claude Code was exited normally (e.g. /exit), which records the final cost"],
+  ["committed", "Working tree clean",
+    "The repository has no uncommitted changes. This is its current state, not the state when the session ended"],
 ];
 
 function card(title, ...body) {
@@ -22,7 +23,7 @@ function shaTag(ref) {
 }
 
 export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
-  const statusBadge = h("span", { class: "badge", style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
+  const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
   const ctx = d.context_pct == null ? null : h("span", { class: "stat", title: "Context used by the latest response" },
     "ctx ", h("span", { class: "ctx" }, h("i", { style: { width: `${Math.min(100, d.context_pct)}%` } })), ` ${d.context_pct}%`);
 
@@ -53,11 +54,11 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
       d.continued_in ? h("a", { href: "#", onclick: (e) => { e.preventDefault(); onSelect(d.continued_in); } }, "Continued in →") : null));
   }
 
-  parts.push(card("Session state", h("div", { class: "checks" }, CHECKS.map(([key, label]) => {
+  parts.push(card("Session state", h("div", { class: "checks" }, CHECKS.map(([key, label, hint]) => {
     const v = d.checks[key];
     const cls = v === true ? "ok" : v === false ? "ng" : "na";
     const mark = v === true ? "✓" : v === false ? "✗" : "–";
-    const title = key === "committed" ? "Current state of the repository, not of this session" : "";
+    const title = v == null ? `${hint} (unknown)` : hint;
     return h("span", { class: `check-pill ${cls}`, title }, `${mark} ${label}`);
   }))));
 
