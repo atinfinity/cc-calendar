@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import OrderedDict
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -28,15 +29,9 @@ def _input_summary(name: str, inp: dict) -> str:
     return ""
 
 
-def build_entries(path: Path, session_id: str | None) -> list[dict]:
-    st = path.stat()
-    key = (str(path), st.st_mtime, st.st_size)
-    if key in _cache:
-        _cache.move_to_end(key)
-        return _cache[key]
-    entries: list[dict] = []
+def iter_records(path: Path, session_id: str | None) -> Iterator[dict]:
+    """Records of one transcript, skipping copied predecessors and duplicate uuids."""
     seen: set[str] = set()
-    tool_names: dict[str, str] = {}
     with open(path, "rb") as f:
         for line in f:
             try:
@@ -52,7 +47,19 @@ def build_entries(path: Path, session_id: str | None) -> list[dict]:
                 if uuid in seen:
                     continue
                 seen.add(uuid)
-            entries.extend(_entries_for(rec, tool_names))
+            yield rec
+
+
+def build_entries(path: Path, session_id: str | None) -> list[dict]:
+    st = path.stat()
+    key = (str(path), st.st_mtime, st.st_size)
+    if key in _cache:
+        _cache.move_to_end(key)
+        return _cache[key]
+    entries: list[dict] = []
+    tool_names: dict[str, str] = {}
+    for rec in iter_records(path, session_id):
+        entries.extend(_entries_for(rec, tool_names))
     for i, e in enumerate(entries):
         e["i"] = i
     _cache[key] = entries

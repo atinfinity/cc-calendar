@@ -3,8 +3,8 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
-  STATUS_LABELS, addDays, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, paletteColor,
-  prefs, shortModel, startOfWeek, statusColor,
+  STATUS_LABELS, addDays, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, paletteColor,
+  prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,8 @@ export const state = {
   sessions: [],
   byId: new Map(),
   view: prefs.get("view", "calendar"),
-  weekStart: startOfWeek(new Date()),
+  span: prefs.get("span", "week"), // "week" | "day"
+  anchor: startOfDay(new Date()), // any day inside the displayed range
   hourPx: prefs.get("hourPx", DEFAULT_HOUR_PX),
   colorBy: prefs.get("colorBy", "project"),
   gap: prefs.get("gap", 15),
@@ -22,7 +23,7 @@ export const state = {
   projects: new Set(prefs.get("projects", [])), // empty = all
   statuses: new Set(prefs.get("statuses", Object.keys(STATUS_LABELS))),
   hideNoPrompt: prefs.get("hideNoPrompt", true),
-  sort: prefs.get("sort", "start"),
+  sort: prefs.get("listSort", { key: "start", dir: "desc" }),
   selectedId: null,
   projectColors: new Map(),
   modelColors: new Map(),
@@ -54,7 +55,21 @@ function assignColors() {
   state.modelColors = new Map(count("model").map((m, i) => [m, paletteColor(i + 2)]));
 }
 
+// Fixed thresholds so a color means the same amount in every week.
+const COST_BANDS = [
+  { max: 1, label: "< $1", color: "#7d8ea3" },
+  { max: 5, label: "$1–5", color: "#d4b02a" },
+  { max: 20, label: "$5–20", color: "#e8801a" },
+  { max: 50, label: "$20–50", color: "#d63a2f" },
+  { max: Infinity, label: "≥ $50", color: "#8e1b5e" },
+];
+
+function costBand(s) {
+  return COST_BANDS.findIndex((b) => (s.cost || 0) < b.max);
+}
+
 export function colorFor(s) {
+  if (state.colorBy === "cost") return COST_BANDS[costBand(s)].color;
   if (state.colorBy === "status") return statusColor(s.status);
   if (state.colorBy === "model") return state.modelColors.get(s.model) || "#888";
   return state.projectColors.get(s.project) || "#888";
@@ -64,7 +79,9 @@ export function legendItems(visible) {
   const counts = new Map();
   for (const s of visible) {
     let key, label, color;
-    if (state.colorBy === "status") {
+    if (state.colorBy === "cost") {
+      key = costBand(s); label = COST_BANDS[key].label; color = COST_BANDS[key].color;
+    } else if (state.colorBy === "status") {
       key = s.status; label = STATUS_LABELS[s.status]; color = statusColor(s.status);
     } else if (state.colorBy === "model") {
       key = s.model; label = shortModel(s.model); color = colorFor(s);
@@ -74,6 +91,9 @@ export function legendItems(visible) {
     const e = counts.get(key) || { label, color, n: 0, title: key };
     e.n++;
     counts.set(key, e);
+  }
+  if (state.colorBy === "cost") {
+    return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([, e]) => ({ ...e, title: "" }));
   }
   return [...counts.values()].sort((a, b) => b.n - a.n);
 }
@@ -146,8 +166,10 @@ function renderToolbar() {
     b.classList.toggle("active", b.dataset.view === state.view));
   document.querySelectorAll("#color-by button").forEach((b) =>
     b.classList.toggle("active", b.dataset.color === state.colorBy));
+  document.querySelectorAll("#span-toggle button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.span === state.span));
+  $("go-today").textContent = state.span === "day" ? "Today" : "This week";
   $("gap").value = String(state.gap);
-  $("sort").value = state.sort;
   $("hide-noprompt").checked = state.hideNoPrompt;
 
   const counts = {};
@@ -201,19 +223,61 @@ function renderProjectMenu() {
   );
 }
 
+const STATUS_ORDER = Object.keys(STATUS_LABELS);
+
+// [key, header, sort value, first direction when clicked, numeric column?]
+const LIST_COLUMNS = [
+  ["status", "", (s) => STATUS_ORDER.indexOf(s.status), "asc", false],
+  ["title", "Title", (s) => s.title.toLowerCase(), "asc", false],
+  ["project", "Project", (s) => s.project_name.toLowerCase(), "asc", false],
+  ["start", "Started", (s) => s.start, "desc", true],
+  ["end", "Last activity", (s) => s.end, "desc", true],
+  ["length", "Length", (s) => s.end - s.start, "desc", true],
+  ["prompts", "Prompts", (s) => s.prompt_count, "desc", true],
+  ["tokens", "Tokens", (s) => s.tokens, "desc", true],
+  ["cost", "Cost", (s) => s.cost, "desc", true],
+];
+
+function sortRows(rows) {
+  const col = LIST_COLUMNS.find((c) => c[0] === state.sort.key) || LIST_COLUMNS[3];
+  const value = col[2];
+  const sign = state.sort.dir === "asc" ? 1 : -1;
+  const start = (s) => s.start || 0;
+  return [...rows].sort((a, b) => {
+    const x = value(a);
+    const y = value(b);
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1; // missing values last
+    const c = typeof x === "string" ? x.localeCompare(y) : x - y;
+    return sign * c || start(b) - start(a);
+  });
+}
+
+function setSort(key) {
+  const col = LIST_COLUMNS.find((c) => c[0] === key);
+  const dir = state.sort.key === key ? (state.sort.dir === "asc" ? "desc" : "asc") : col[3];
+  state.sort = { key, dir };
+  prefs.set("listSort", state.sort);
+  renderMain();
+}
+
 function renderList(visible) {
-  const key = { start: "start", end: "end", cost: "cost" }[state.sort];
-  const rows = [...visible].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+  const rows = sortRows(visible);
   $("list-count").textContent = `${rows.length} sessions`;
   if (!rows.length) {
     $("list").replaceChildren(h("div", { class: "empty" }, "No sessions match the filters."));
     return;
   }
+  const header = LIST_COLUMNS.map(([key, label, , , numeric]) => {
+    const sorted = state.sort.key === key;
+    return h("th", {
+      class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
+      title: key === "status" ? "Sort by status" : `Sort by ${label.toLowerCase()}`,
+      onclick: () => setSort(key),
+    }, label, sorted ? (state.sort.dir === "asc" ? " ▲" : " ▼") : "");
+  });
   $("list").replaceChildren(
     h("table", {},
-      h("thead", {}, h("tr", {},
-        h("th", {}, ""), h("th", {}, "Title"), h("th", {}, "Project"), h("th", {}, "Started"),
-        h("th", {}, "Length"), h("th", {}, "Prompts"), h("th", {}, "Tokens"), h("th", {}, "Cost"))),
+      h("thead", {}, h("tr", {}, ...header)),
       h("tbody", {}, rows.map((s) =>
         h("tr", {
           "data-sid": s.id,
@@ -224,6 +288,7 @@ function renderList(visible) {
           h("td", { class: "title-cell" }, s.title),
           h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }), s.project_name),
           h("td", { class: "num" }, fmtDateTime(s.start)),
+          h("td", { class: "num", title: fmtDateTime(s.end) }, fmtAgo(s.end)),
           h("td", { class: "num" }, fmtDuration(s.end - s.start)),
           h("td", { class: "num" }, s.prompt_count),
           h("td", { class: "num" }, fmtTokens(s.tokens)),
@@ -234,6 +299,23 @@ function renderList(visible) {
 }
 
 // ------------------------------------------------------------------ controls
+
+export function rangeDays() {
+  if (state.span === "day") return [startOfDay(state.anchor)];
+  const start = startOfWeek(state.anchor);
+  return [...Array(7)].map((_, i) => addDays(start, i));
+}
+
+function setSpan(span, day) {
+  state.span = span;
+  if (day) state.anchor = startOfDay(day);
+  prefs.set("span", span);
+  renderAll();
+}
+
+export function openDay(day) {
+  setSpan("day", day);
+}
 
 function setHourPx(px) {
   state.hourPx = Math.max(12, Math.min(240, Math.round(px)));
@@ -254,9 +336,12 @@ function bind() {
       prefs.set("colorBy", state.colorBy);
       renderAll();
     }));
-  $("this-week").onclick = () => { state.weekStart = startOfWeek(new Date()); renderMain(); };
-  $("prev-week").onclick = () => { state.weekStart = addDays(state.weekStart, -7); renderMain(); };
-  $("next-week").onclick = () => { state.weekStart = addDays(state.weekStart, 7); renderMain(); };
+  document.querySelectorAll("#span-toggle button").forEach((b) =>
+    b.addEventListener("click", () => setSpan(b.dataset.span)));
+  const step = () => (state.span === "day" ? 1 : 7);
+  $("go-today").onclick = () => { state.anchor = startOfDay(new Date()); renderMain(); };
+  $("go-prev").onclick = () => { state.anchor = addDays(state.anchor, -step()); renderMain(); };
+  $("go-next").onclick = () => { state.anchor = addDays(state.anchor, step()); renderMain(); };
   $("zoom-in").onclick = () => setHourPx(state.hourPx * 1.25);
   $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);
   $("zoom-reset").onclick = () => setHourPx(DEFAULT_HOUR_PX);
@@ -270,7 +355,6 @@ function bind() {
     prefs.set("gap", state.gap);
     loadSessions();
   };
-  $("sort").onchange = (e) => { state.sort = e.target.value; prefs.set("sort", state.sort); renderMain(); };
   $("hide-noprompt").onchange = (e) => {
     state.hideNoPrompt = e.target.checked;
     prefs.set("hideNoPrompt", state.hideNoPrompt);

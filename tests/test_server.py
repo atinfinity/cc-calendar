@@ -62,3 +62,17 @@ def test_log(client):
     agent = client.get("/api/sessions/s-sub/log", params={"agent": "a1"}).json()
     assert [e["text"] for e in agent["entries"]] == ["searching", "found it"]
     assert client.get("/api/sessions/s-sub/log", params={"agent": "zzz"}).status_code == 404
+
+
+def test_stats(client):
+    st = client.get("/api/sessions/s-basic/stats").json()
+    assert st["prompts"] == 1 and st["requests"] == 3
+    assert {t["name"]: t["calls"] for t in st["tools"]} == {"Write": 1, "Bash": 1}
+    assert st["tokens"]["output"] == 50 + 10 + 10  # the split message m1 counts once
+    assert st["thinking_blocks"] == 1
+    assert [m["model"] for m in st["models"]] == ["claude-sonnet-5-5"]
+    assert st["end"] - st["start"] == 5 * 60_000 and st["active_ms"] == 5 * 60_000
+
+    agent = client.get("/api/sessions/s-sub/stats", params={"agent": "a1"}).json()
+    assert agent["requests"] == 2 and agent["models"][0]["model"] == "claude-haiku-4-5"
+    assert client.get("/api/sessions/s-sub/stats", params={"agent": "zzz"}).status_code == 404

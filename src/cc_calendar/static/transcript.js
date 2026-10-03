@@ -1,5 +1,7 @@
 // Modal transcript viewer with lazy loading and subagent drill-down.
-import { fmtDateTime, fmtTime, h, prefs, renderMarkdown } from "./util.js";
+import {
+  fmtCost, fmtDateTime, fmtDuration, fmtTime, fmtTokens, h, prefs, renderMarkdown, shortModel,
+} from "./util.js";
 
 const PAGE = 300;
 const $ = (id) => document.getElementById(id);
@@ -26,6 +28,12 @@ function bind() {
       rerender();
     });
   }
+  const statsToggle = $("log-stats-toggle");
+  statsToggle.checked = prefs.get("logStats", false);
+  statsToggle.addEventListener("change", () => {
+    prefs.set("logStats", statsToggle.checked);
+    loadStats();
+  });
   $("log-close").addEventListener("click", closeLog);
   $("log-back").addEventListener("click", () => openLog(view.detail, null));
   $("log-modal").addEventListener("click", (e) => {
@@ -60,7 +68,96 @@ export function openLog(detail, agentId) {
   $("log-body").replaceChildren(h("div", { class: "load-more" }, "Loading…"));
   $("log-body").scrollTop = 0;
   $("log-modal").hidden = false;
+  $("log-stats").replaceChildren();
+  loadStats();
   loadMore();
+}
+
+// ------------------------------------------------------------------ stats
+
+async function loadStats() {
+  const panel = $("log-stats");
+  panel.hidden = !$("log-stats-toggle").checked;
+  if (panel.hidden || panel.dataset.token === String(view.token)) return;
+  const token = view.token;
+  panel.dataset.token = String(token);
+  panel.replaceChildren(h("div", { class: "muted" }, "Loading stats…"));
+  const params = new URLSearchParams();
+  if (view.agent) params.set("agent", view.agent);
+  try {
+    const res = await fetch(`/api/sessions/${encodeURIComponent(view.detail.id)}/stats?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const st = await res.json();
+    if (token === view.token) renderStats(panel, st);
+  } catch (err) {
+    if (token === view.token) panel.replaceChildren(h("div", { class: "muted" }, `Failed to load stats: ${err.message}`));
+  }
+}
+
+// "mcp__claude-in-chrome__computer" → "claude-in-chrome › computer"
+function toolLabel(name) {
+  const m = /^mcp__(.+?)__(.+)$/.exec(name);
+  return m ? `${m[1]} › ${m[2]}` : name;
+}
+
+function tile(label, value, sub, title) {
+  return h("div", { class: "tile", title: title || "" },
+    h("div", { class: "k" }, label),
+    h("div", { class: "v" }, value, sub ? h("small", {}, ` ${sub}`) : null));
+}
+
+function renderStats(panel, st) {
+  const d = view.detail;
+  const main = !view.agent;
+  const t = st.tokens;
+  const toolCalls = st.tools.reduce((n, x) => n + x.calls, 0);
+  const toolErrors = st.tools.reduce((n, x) => n + x.errors, 0);
+  // The main log's own cost excludes subagents; the session total comes from the detail.
+  const subs = main ? d.subagents : [];
+  const subCost = subs.reduce((n, a) => n + (a.cost || 0), 0);
+  const subTokens = subs.reduce((n, a) => n + (a.tokens || 0), 0);
+
+  const tiles = [
+    tile("Span", fmtDuration(st.end - st.start), st.start ? `${fmtTime(st.start)}–${fmtTime(st.end)}` : "", st.start ? `${fmtDateTime(st.start)} – ${fmtDateTime(st.end)}` : ""),
+    tile("Active time", fmtDuration(st.active_ms), "", `Gaps over ${st.idle_threshold_ms / 60000} minutes are not counted`),
+    main ? tile("Prompts", st.prompts, st.commands ? `+ ${st.commands} commands` : "") : null,
+    tile("API requests", st.requests, st.api_errors ? `${st.api_errors} errors` : ""),
+    tile("Tool calls", toolCalls, toolErrors ? `${toolErrors} errors` : ""),
+    st.interrupts ? tile("Interrupts", st.interrupts) : null,
+    st.compactions ? tile("Compactions", st.compactions) : null,
+    st.thinking_blocks ? tile("Thinking blocks", st.thinking_blocks) : null,
+    tile("Input", fmtTokens(t.input), "tok"),
+    tile("Output", fmtTokens(t.output), "tok"),
+    tile("Cache read", fmtTokens(t.cache_read), "tok"),
+    tile("Cache write", fmtTokens(t.cache_write), "tok"),
+    tile(main && subs.length ? "Cost (this log)" : "Cost", fmtCost(st.cost, true), "", "Estimated from token usage"),
+    main && subs.length ? tile("Subagents", subs.length, `${fmtTokens(subTokens)} tok · ${fmtCost(subCost, true)}`) : null,
+    main ? tile("Session total", fmtCost(d.cost, d.cost_estimated), "", d.cost_estimated ? "Estimated, including subagents" : "From Claude Code's cost record") : null,
+    main && d.cost_state && (d.cost_state.totalLinesAdded || d.cost_state.totalLinesRemoved)
+      ? tile("Lines", `+${d.cost_state.totalLinesAdded} / −${d.cost_state.totalLinesRemoved}`) : null,
+  ];
+
+  const maxCalls = Math.max(1, ...st.tools.map((x) => x.calls));
+  const num = (v) => h("td", { class: "num" }, v);
+  const modelTable = h("div", {},
+    h("table", {},
+      h("thead", {}, h("tr", {}, ...["Model", "Requests", "Input", "Output", "Cache read", "Cache write", "Cost"].map((c, i) =>
+        h("th", { class: i ? "num" : "" }, c)))),
+      h("tbody", {}, ...st.models.map((m) => h("tr", {},
+        h("td", { title: m.model }, shortModel(m.model)), num(m.requests), num(fmtTokens(m.input)), num(fmtTokens(m.output)),
+        num(fmtTokens(m.cache_read)), num(fmtTokens(m.cache_write)), num(fmtCost(m.cost, true)))))));
+  const toolTable = h("div", {},
+    h("table", {},
+      h("thead", {}, h("tr", {}, h("th", {}, "Tool"), h("th", { class: "num" }, "Calls"), h("th", { class: "num" }, "Errors"), h("th", {}))),
+      h("tbody", {}, ...st.tools.map((x) => h("tr", {},
+        h("td", { title: x.name }, toolLabel(x.name)), num(x.calls), h("td", { class: "num" + (x.errors ? " err" : "") }, x.errors || ""),
+        h("td", { class: "bar-cell" }, h("div", { class: "hbar", style: { width: `${(100 * x.calls) / maxCalls}%` } })))))));
+
+  panel.replaceChildren(
+    h("div", { class: "tiles" }, ...tiles.filter(Boolean)),
+    h("div", { class: "stats-tables" },
+      st.models.length ? modelTable : null,
+      st.tools.length ? toolTable : null));
 }
 
 function closeLog() {

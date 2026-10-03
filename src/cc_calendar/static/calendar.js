@@ -1,5 +1,5 @@
-// Weekly calendar: activity segments as bars, laid out in lanes like Google Calendar.
-import { colorFor, legendItems, state } from "./app.js";
+// Week or day calendar: activity segments as bars, laid out in lanes like Google Calendar.
+import { colorFor, legendItems, openDay, rangeDays, state } from "./app.js";
 import { STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h } from "./util.js";
 
 const HOUR_MS = 3600_000;
@@ -10,9 +10,9 @@ let scrolledOnce = false;
 export function renderCalendar(container, visible, { onSelect, legend, rangeLabel, rangeCount }) {
   const prevScroll = container.scrollTop;
   hideTip();
-  const days = [...Array(7)].map((_, i) => addDays(state.weekStart, i));
+  const days = rangeDays();
   const weekStartMs = days[0].getTime();
-  const weekEndMs = addDays(state.weekStart, 7).getTime();
+  const weekEndMs = addDays(days[days.length - 1], 1).getTime();
   const hourPx = state.hourPx;
   const now = Date.now();
   const todayKey = new Date().toDateString();
@@ -21,7 +21,10 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
     s.segments.some(([a, b]) => b >= weekStartMs && a < weekEndMs));
 
   const fmtDay = (d) => d.toLocaleDateString([], { weekday: "short", month: "numeric", day: "numeric" });
-  rangeLabel.textContent = `${days[0].toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" })} – ${days[6].toLocaleDateString([], { month: "short", day: "numeric" })}`;
+  const first = days[0].toLocaleDateString([], { year: "numeric", month: "short", day: "numeric", weekday: days.length === 1 ? "short" : undefined });
+  rangeLabel.textContent = days.length === 1
+    ? first
+    : `${first} – ${days[days.length - 1].toLocaleDateString([], { month: "short", day: "numeric" })}`;
   rangeCount.textContent = `${inWeek.length} sessions`;
   legend.replaceChildren(...legendItems(inWeek).map((e) =>
     h("span", { title: e.title || "" }, h("span", { class: "dot", style: { background: e.color } }), `${e.label} ${e.n}`)));
@@ -40,10 +43,15 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
     if (t >= weekStartMs && t < weekEndMs) maxDensity = Math.max(maxDensity, n);
   }
 
-  const cols = "56px repeat(7, minmax(90px, 1fr))";
+  const cols = `56px repeat(${days.length}, minmax(90px, 1fr))`;
+  const isWeek = days.length > 1;
   const head = h("div", { class: "cal-head", style: { gridTemplateColumns: cols } },
     h("div", {}),
-    ...days.map((d) => h("div", { class: d.toDateString() === todayKey ? "today" : "" }, fmtDay(d))));
+    ...days.map((d) => h("div", {
+      class: [d.toDateString() === todayKey ? "today" : "", isWeek ? "link" : ""].join(" ").trim(),
+      title: isWeek ? "Show this day" : "",
+      onclick: isWeek ? () => openDay(d) : null,
+    }, fmtDay(d))));
 
   const body = h("div", { class: "cal-body", style: { gridTemplateColumns: cols, height: `${24 * hourPx}px` } });
   const gutter = h("div", { class: "gutter" });

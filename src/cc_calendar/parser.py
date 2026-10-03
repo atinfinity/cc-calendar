@@ -221,7 +221,8 @@ class SessionAcc:
 
         rtype = rec.get("type")
         ts = parse_ts(rec.get("timestamp"))
-        if rec.get("cwd"):
+        # The launch directory identifies the project; later `cd`s inside it do not.
+        if rec.get("cwd") and self.cwd is None:
             self.cwd = rec["cwd"]
         if rec.get("gitBranch"):
             self.git_branch = rec["gitBranch"]

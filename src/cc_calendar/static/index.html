@@ -33,9 +33,13 @@
     <section class="main-pane">
       <div id="calendar-view">
         <div class="toolbar">
-          <button id="this-week">This week</button>
-          <button id="prev-week" aria-label="Previous week">◀</button>
-          <button id="next-week" aria-label="Next week">▶</button>
+          <div class="seg small" id="span-toggle">
+            <button data-span="day">Day</button>
+            <button data-span="week">Week</button>
+          </div>
+          <button id="go-today">This week</button>
+          <button id="go-prev" aria-label="Previous">◀</button>
+          <button id="go-next" aria-label="Next">▶</button>
           <span class="range" id="range-label"></span>
           <span class="muted" id="range-count"></span>
           <div class="seg small">
@@ -48,6 +52,7 @@
             <button data-color="project">Project</button>
             <button data-color="status">Status</button>
             <button data-color="model">Model</button>
+            <button data-color="cost">Cost</button>
           </div>
           <label class="muted">Split after
             <select id="gap">
@@ -65,13 +70,7 @@
       <div id="list-view" hidden>
         <div class="toolbar">
           <span class="muted" id="list-count"></span>
-          <label class="muted">Sort
-            <select id="sort">
-              <option value="start">Newest start</option>
-              <option value="end">Latest activity</option>
-              <option value="cost">Highest cost</option>
-            </select>
-          </label>
+          <span class="muted">Click a column header to sort</span>
         </div>
         <div class="list" id="list"></div>
       </div>
@@ -85,11 +84,13 @@
         <button id="log-back" hidden>← Parent session</button>
         <strong id="log-title"></strong>
         <div class="spacer"></div>
+        <label class="check"><input type="checkbox" id="log-stats-toggle"> Stats</label>
         <label class="check"><input type="checkbox" id="log-thinking"> Thinking</label>
         <label class="check"><input type="checkbox" id="log-meta"> Meta &amp; attachments</label>
         <label class="check"><input type="checkbox" id="log-expand"> Expand tools</label>
         <button id="log-close" aria-label="Close">✕</button>
       </div>
+      <div class="log-stats" id="log-stats" hidden></div>
       <div class="log-body" id="log-body"></div>
     </div>
   </div>

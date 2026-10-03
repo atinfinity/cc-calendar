@@ -82,6 +82,12 @@ export function fmtAgo(ms) {
   return fmtDateTime(ms);
 }
 
+export function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export function startOfWeek(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);

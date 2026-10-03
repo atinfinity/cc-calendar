@@ -16,6 +16,7 @@ from watchfiles import awatch
 from . import __version__, gitinfo
 from .logview import build_entries
 from .parser import SessionAcc
+from .stats import log_stats
 from .store import Store
 
 log = logging.getLogger(__name__)
@@ -174,6 +175,23 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
             s = get_session(sid)
             return detail(s, live.get(sid), gap * 60_000, store.continued_from().get(sid))
 
+    def log_path(sid: str, agent: str | None) -> tuple[Path, str | None]:
+        s = get_session(sid)
+        if not agent:
+            return Path(s.path), sid
+        sa = s.subagents.get(agent)
+        if sa is None or sa.path is None:
+            raise HTTPException(404, "subagent log not found")
+        return Path(sa.path), None
+
+    @app.get("/api/sessions/{sid}/stats")
+    def session_stats(sid: str, agent: str | None = None) -> dict:
+        path, filter_sid = log_path(sid, agent)
+        try:
+            return log_stats(path, filter_sid)
+        except OSError as e:
+            raise HTTPException(404, "log file not readable") from e
+
     @app.get("/api/sessions/{sid}/log")
     def session_log(
         sid: str,
@@ -181,14 +199,7 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
         offset: int = Query(0, ge=0),
         limit: int = Query(300, ge=1, le=2000),
     ) -> dict:
-        s = get_session(sid)
-        if agent:
-            sa = s.subagents.get(agent)
-            if sa is None or sa.path is None:
-                raise HTTPException(404, "subagent log not found")
-            path, filter_sid = Path(sa.path), None
-        else:
-            path, filter_sid = Path(s.path), sid
+        path, filter_sid = log_path(sid, agent)
         try:
             entries = build_entries(path, filter_sid)
         except OSError as e:
