@@ -6,8 +6,13 @@ from cc_calendar.server import create_app
 
 @pytest.fixture
 def client(claude_dir):
-    with TestClient(create_app(claude_dir, watch=False)) as c:
+    with TestClient(create_app(claude_dir, watch=False), base_url="http://127.0.0.1") as c:
         yield c
+
+
+def test_rejects_foreign_host(client):
+    assert client.get("/api/sessions", headers={"Host": "localhost:8000"}).status_code == 200
+    assert client.get("/api/sessions", headers={"Host": "evil.example:8000"}).status_code == 400
 
 
 def test_index_and_static(client):
