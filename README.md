@@ -43,6 +43,9 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).
+- **Event marks** — ticks on each bar show when prompts, commits, compactions and API errors
+  happened, and the tooltip counts them for that block. Click the key next to the legend to hide
+  them.
 - **Activity density** — a heat strip behind each day shows prompts and responses per 10 minutes.
 - **Colors** by project, status, model or cost (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
 - **Status** — Running and Waiting for live sessions, Done or Interrupted for finished ones, with

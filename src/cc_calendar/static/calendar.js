@@ -1,14 +1,17 @@
 // Week or day calendar: activity segments as bars, laid out in lanes like Google Calendar.
 import { colorFor, legendItems, openDay, rangeDays, state } from "./app.js";
 import { dayTotalLabel, renderSummary, summarize } from "./summary.js";
-import { STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, matchSnippet } from "./util.js";
+import { MIN_HOUR_PX, STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, matchSnippet } from "./util.js";
 
 const HOUR_MS = 3600_000;
 const BUCKET_MS = 600_000;
 const MIN_BAR_PX = 4;
+// Lanes treat every bar as at least this long: its minimum height at the smallest zoom.
+// Using the current zoom instead would make bars swap sides when zooming.
+const MIN_LANE_MS = (MIN_BAR_PX / MIN_HOUR_PX) * HOUR_MS;
 let scrolledOnce = false;
 
-export function renderCalendar(container, visible, { onSelect, legend, rangeLabel, rangeCount, summaryPane }) {
+export function renderCalendar(container, visible, { onSelect, onToggleMarks, legend, rangeLabel, rangeCount, summaryPane }) {
   const prevScroll = container.scrollTop;
   hideTip();
   const days = rangeDays();
@@ -36,7 +39,12 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
     renderSummary(summaryPane, summary, days.map((d) => `${d.toLocaleDateString([], { weekday: "short" })} ${d.getDate()}`));
   }
   legend.replaceChildren(...legendItems(inWeek).map((e) =>
-    h("span", { title: e.title || "" }, h("span", { class: "dot", style: { background: e.color } }), `${e.label} ${e.n}`)));
+    h("span", { title: e.title || "" }, h("span", { class: "dot", style: { background: e.color } }), `${e.label} ${e.n}`)),
+  h("button", {
+    class: "marks-key" + (state.showMarks ? "" : " off"),
+    title: state.showMarks ? "Hide event marks on the bars" : "Show event marks on the bars",
+    onclick: onToggleMarks,
+  }, ...MARK_KINDS.map(([kind, label]) => h("span", {}, h("i", { class: `mark-sample ${kind}` }), label))));
 
   // Density: prompts + responses per 10 minutes, summed over visible sessions.
   const density = new Map();
@@ -92,7 +100,7 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
     }
 
     const bars = h("div", { class: "bars" });
-    for (const p of layout(inWeek, dayStart, dayEnd, scale)) {
+    for (const p of layout(inWeek, dayStart, dayEnd)) {
       const s = p.session;
       const top = (p.start - dayStart) * scale;
       const height = Math.max(MIN_BAR_PX, (p.end - p.start) * scale);
@@ -110,7 +118,7 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
         onmouseenter: (e) => showTip(e, s, p),
         onmousemove: moveTip,
         onmouseleave: hideTip,
-      }, height >= 15 ? s.title : "");
+      }, height >= 15 ? s.title : "", ...(state.showMarks ? barMarks(s, p, scale, height) : []));
       bars.append(bar);
     }
     col.append(bars);
@@ -131,8 +139,8 @@ export function renderCalendar(container, visible, { onSelect, legend, rangeLabe
 }
 
 // Clip each session's segments to the day and assign side-by-side lanes to overlaps.
-function layout(sessions, dayStart, dayEnd, scale) {
-  const minMs = MIN_BAR_PX / scale;
+function layout(sessions, dayStart, dayEnd) {
+  const minMs = MIN_LANE_MS;
   const pieces = [];
   for (const s of sessions) {
     for (const [a, b] of s.segments) {
@@ -169,17 +177,44 @@ function layout(sessions, dayStart, dayEnd, scale) {
   return pieces;
 }
 
+export const MARK_KINDS = [
+  // [kind, legend label, noun in the tooltip]
+  ["prompt", "Prompt", "prompt"],
+  ["commit", "Commit", "commit"],
+  ["compact", "Compaction", "compaction"],
+  ["error", "API error", "API error"],
+];
+
+// Ticks for the events that fall inside this piece of the bar.
+function barMarks(s, p, scale, height) {
+  if (height < 8) return [];
+  // Keep marks at the very start or end of the bar fully visible.
+  const y = (t) => Math.min(Math.max((t - p.start) * scale, 4), height - 4);
+  return (s.marks || [])
+    .filter(([t]) => t >= p.start && t <= p.end)
+    .map(([t, kind]) => h("i", { class: `mark ${kind}`, style: { top: `${y(t)}px` } }));
+}
+
+function markCounts(s, from, to) {
+  const n = {};
+  for (const [t, kind] of s.marks || []) if (t >= from && t <= to) n[kind] = (n[kind] || 0) + 1;
+  const parts = MARK_KINDS.filter(([k]) => n[k]).map(([k, , noun]) => `${n[k]} ${noun}${n[k] > 1 ? "s" : ""}`);
+  return parts.length ? h("div", { class: "muted" }, `This block: ${parts.join(" · ")}`) : null;
+}
+
 const tip = () => document.getElementById("tooltip");
 
 function showTip(e, s, p) {
   const t = tip();
-  t.replaceChildren(
+  // replaceChildren would turn a null into the text "null".
+  t.replaceChildren(...[
     h("div", { style: { fontWeight: 600 } }, s.title),
     h("div", { class: "muted" }, `${s.project_name}${s.branch ? " · " + s.branch : ""}`),
     h("div", {}, `${fmtTime(p.segStart)} – ${fmtTime(p.segEnd)} (${fmtDuration(p.segEnd - p.segStart)})`),
     h("div", { class: "muted" }, `${STATUS_LABELS[s.status]} · ${s.prompt_count} prompts · ${fmtCost(s.cost, s.cost_estimated)}`),
+    markCounts(s, p.segStart, p.segEnd),
     matchSnippet(s, state.search),
-  );
+  ].filter(Boolean));
   t.hidden = false;
   moveTip(e);
 }

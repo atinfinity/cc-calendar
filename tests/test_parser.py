@@ -252,3 +252,15 @@ def test_cache_stats():
     # 800 reads at $2.00 - $0.20, minus 100 writes at the $0.50 premium, per million tokens.
     assert saved == pytest.approx((800 * 1.8 - 100 * 0.5) / 1e6)
     assert SessionAcc(session_id="e", path="x", project_dir="p").cache_stats() == (None, 0)
+
+
+def test_marks():
+    b = basic_session()
+    b._base("system", 3, subtype="compact_boundary")
+    b.assistant(4, [{"type": "text", "text": "API Error"}], msg_id="e1", model="<synthetic>")
+    s = feed(b)
+    kinds = [k for _, k in s.marks()]
+    assert kinds.count("prompt") == 1 and kinds.count("commit") == 1
+    assert (T0 + 3 * MIN, "compact") in s.marks()
+    assert (T0 + 4 * MIN, "error") in s.marks()
+    assert s.marks() == sorted(s.marks())

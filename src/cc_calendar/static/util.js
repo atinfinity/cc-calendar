@@ -7,6 +7,9 @@ export const STATUS_LABELS = {
   interrupted: "Interrupted",
 };
 
+// Smallest calendar zoom, in pixels per hour.
+export const MIN_HOUR_PX = 12;
+
 export const STATUS_HINTS = {
   running: "Claude Code is working on this session right now",
   waiting: "Claude Code is open and waiting for your input",
