@@ -151,6 +151,10 @@ a { color: var(--accent); }
 .list table { width: 100%; border-collapse: collapse; }
 .list th, .list td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
 .list th { position: sticky; top: 0; background: var(--bg-soft); font-weight: 600; color: var(--muted); z-index: 1; }
+.list th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.list th.sortable:hover { color: var(--text); }
+.list th.sorted { color: var(--accent); }
+.list th.num { text-align: right; }
 .list tr { cursor: pointer; }
 .list tr:hover td { background: var(--bg-hover); }
 .list tr.selected td { background: var(--accent-soft); }

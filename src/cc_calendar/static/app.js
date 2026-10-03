@@ -3,7 +3,7 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
-  STATUS_LABELS, addDays, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, paletteColor,
+  STATUS_LABELS, addDays, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, paletteColor,
   prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
 
@@ -23,7 +23,7 @@ export const state = {
   projects: new Set(prefs.get("projects", [])), // empty = all
   statuses: new Set(prefs.get("statuses", Object.keys(STATUS_LABELS))),
   hideNoPrompt: prefs.get("hideNoPrompt", true),
-  sort: prefs.get("sort", "start"),
+  sort: prefs.get("listSort", { key: "start", dir: "desc" }),
   selectedId: null,
   projectColors: new Map(),
   modelColors: new Map(),
@@ -170,7 +170,6 @@ function renderToolbar() {
     b.classList.toggle("active", b.dataset.span === state.span));
   $("go-today").textContent = state.span === "day" ? "Today" : "This week";
   $("gap").value = String(state.gap);
-  $("sort").value = state.sort;
   $("hide-noprompt").checked = state.hideNoPrompt;
 
   const counts = {};
@@ -224,19 +223,61 @@ function renderProjectMenu() {
   );
 }
 
+const STATUS_ORDER = Object.keys(STATUS_LABELS);
+
+// [key, header, sort value, first direction when clicked, numeric column?]
+const LIST_COLUMNS = [
+  ["status", "", (s) => STATUS_ORDER.indexOf(s.status), "asc", false],
+  ["title", "Title", (s) => s.title.toLowerCase(), "asc", false],
+  ["project", "Project", (s) => s.project_name.toLowerCase(), "asc", false],
+  ["start", "Started", (s) => s.start, "desc", true],
+  ["end", "Last activity", (s) => s.end, "desc", true],
+  ["length", "Length", (s) => s.end - s.start, "desc", true],
+  ["prompts", "Prompts", (s) => s.prompt_count, "desc", true],
+  ["tokens", "Tokens", (s) => s.tokens, "desc", true],
+  ["cost", "Cost", (s) => s.cost, "desc", true],
+];
+
+function sortRows(rows) {
+  const col = LIST_COLUMNS.find((c) => c[0] === state.sort.key) || LIST_COLUMNS[3];
+  const value = col[2];
+  const sign = state.sort.dir === "asc" ? 1 : -1;
+  const start = (s) => s.start || 0;
+  return [...rows].sort((a, b) => {
+    const x = value(a);
+    const y = value(b);
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1; // missing values last
+    const c = typeof x === "string" ? x.localeCompare(y) : x - y;
+    return sign * c || start(b) - start(a);
+  });
+}
+
+function setSort(key) {
+  const col = LIST_COLUMNS.find((c) => c[0] === key);
+  const dir = state.sort.key === key ? (state.sort.dir === "asc" ? "desc" : "asc") : col[3];
+  state.sort = { key, dir };
+  prefs.set("listSort", state.sort);
+  renderMain();
+}
+
 function renderList(visible) {
-  const key = { start: "start", end: "end", cost: "cost" }[state.sort];
-  const rows = [...visible].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+  const rows = sortRows(visible);
   $("list-count").textContent = `${rows.length} sessions`;
   if (!rows.length) {
     $("list").replaceChildren(h("div", { class: "empty" }, "No sessions match the filters."));
     return;
   }
+  const header = LIST_COLUMNS.map(([key, label, , , numeric]) => {
+    const sorted = state.sort.key === key;
+    return h("th", {
+      class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
+      title: key === "status" ? "Sort by status" : `Sort by ${label.toLowerCase()}`,
+      onclick: () => setSort(key),
+    }, label, sorted ? (state.sort.dir === "asc" ? " ▲" : " ▼") : "");
+  });
   $("list").replaceChildren(
     h("table", {},
-      h("thead", {}, h("tr", {},
-        h("th", {}, ""), h("th", {}, "Title"), h("th", {}, "Project"), h("th", {}, "Started"),
-        h("th", {}, "Length"), h("th", {}, "Prompts"), h("th", {}, "Tokens"), h("th", {}, "Cost"))),
+      h("thead", {}, h("tr", {}, ...header)),
       h("tbody", {}, rows.map((s) =>
         h("tr", {
           "data-sid": s.id,
@@ -247,6 +288,7 @@ function renderList(visible) {
           h("td", { class: "title-cell" }, s.title),
           h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }), s.project_name),
           h("td", { class: "num" }, fmtDateTime(s.start)),
+          h("td", { class: "num", title: fmtDateTime(s.end) }, fmtAgo(s.end)),
           h("td", { class: "num" }, fmtDuration(s.end - s.start)),
           h("td", { class: "num" }, s.prompt_count),
           h("td", { class: "num" }, fmtTokens(s.tokens)),
@@ -313,7 +355,6 @@ function bind() {
     prefs.set("gap", state.gap);
     loadSessions();
   };
-  $("sort").onchange = (e) => { state.sort = e.target.value; prefs.set("sort", state.sort); renderMain(); };
   $("hide-noprompt").onchange = (e) => {
     state.hideNoPrompt = e.target.checked;
     prefs.set("hideNoPrompt", state.hideNoPrompt);
