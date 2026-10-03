@@ -3,13 +3,14 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
-  CACHE_LOW, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h,
-  fmtPct, matchSnippet, paletteColor,
+  CACHE_LOW, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
+  fmtDuration, fmtPct, fmtTokens, h, matchSnippet, paletteColor,
   prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
 
 const $ = (id) => document.getElementById(id);
 const DEFAULT_HOUR_PX = 42;
+const MAX_HOUR_PX = 240;
 
 export const state = {
   sessions: [],
@@ -26,6 +27,7 @@ export const state = {
   hideNoPrompt: prefs.get("hideNoPrompt", true),
   sort: prefs.get("listSort", { key: "start", dir: "desc" }),
   showSummary: prefs.get("summary", false),
+  showMarks: prefs.get("marks", true),
   selectedId: null,
   projectColors: new Map(),
   modelColors: new Map(),
@@ -158,6 +160,11 @@ function renderMain() {
       rangeLabel: $("range-label"),
       rangeCount: $("range-count"),
       summaryPane: $("summary"),
+      onToggleMarks: () => {
+        state.showMarks = !state.showMarks;
+        prefs.set("marks", state.showMarks);
+        renderMain();
+      },
     });
   } else {
     renderList(visible);
@@ -325,7 +332,7 @@ export function openDay(day) {
 }
 
 function setHourPx(px) {
-  state.hourPx = Math.max(12, Math.min(240, Math.round(px)));
+  state.hourPx = Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, Math.round(px)));
   prefs.set("hourPx", state.hourPx);
   renderMain();
 }

@@ -120,6 +120,8 @@ SESSIONS = [
             "commit": ["New checkout layout", "Fix checkout on narrow screens"],
             "lunch": 2,
             "agent": "Find layout components",
+            "error": 1,
+            "compact": 3,
         },
     ),
     (
@@ -321,6 +323,9 @@ def build_session(i: int, spec: tuple, root: Path, rng: random.Random) -> None:
     for p_idx, text in enumerate(prompts):
         if p_idx and extras.get("lunch") == p_idx:
             t += timedelta(minutes=rng.randint(55, 80))  # a break splits the bar
+        if p_idx and extras.get("compact") == p_idx:
+            w.rec("system", t, subtype="compact_boundary")
+            t += timedelta(seconds=30)
         w.prompt(t, text)
         steps = rng.randint(5, 14)
         for s in range(steps):
@@ -339,6 +344,17 @@ def build_session(i: int, spec: tuple, root: Path, rng: random.Random) -> None:
                 removed += rng.randint(0, 25)
             _, u = w.tool(t, model, kind, inp, out)
             usages.append((model, u))
+            if s == 2 and extras.get("error") == p_idx:
+                w.rec(
+                    "assistant",
+                    t,
+                    isApiErrorMessage=True,
+                    message={
+                        "role": "assistant",
+                        "model": "<synthetic>",
+                        "content": [{"type": "text", "text": "API Error: 529 Overloaded"}],
+                    },
+                )
             if p_idx == 0 and s == 1 and extras.get("agent"):
                 usages += subagent(w, t, model, extras["agent"], proj_dir, rng)
         if commits and (p_idx == len(prompts) - 1 or rng.random() < 0.5):

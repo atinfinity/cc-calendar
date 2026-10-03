@@ -198,6 +198,8 @@ class SessionAcc:
     last_prompt_ts: int | None = None
     last_interrupt_ts: int | None = None
     pending_background: int = 0
+    compactions: list[int] = field(default_factory=list)
+    api_errors: list[int] = field(default_factory=list)
     commits: list[dict] = field(default_factory=list)
     files: Counter = field(default_factory=Counter)
     prs: dict[str, dict] = field(default_factory=dict)
@@ -237,6 +239,8 @@ class SessionAcc:
             if rec.get("subtype") == "turn_duration":
                 self.last_turn_end_ts = ts
                 self.pending_background = rec.get("pendingBackgroundAgentCount") or 0
+            elif rec.get("subtype") == "compact_boundary" and ts is not None:
+                self.compactions.append(ts)
         elif rtype == "attachment":
             # Notifications that arrive mid-turn are queued as attachments, not user records.
             att = rec.get("attachment") or {}
@@ -374,6 +378,8 @@ class SessionAcc:
         msg = rec.get("message") or {}
         model = msg.get("model")
         if model == "<synthetic>" or rec.get("isApiErrorMessage"):
+            if ts is not None:
+                self.api_errors.append(ts)
             return
         if ts is not None:
             self.activity.append(ts)
@@ -452,6 +458,14 @@ class SessionAcc:
             else:
                 segs[-1][1] = t
         return segs
+
+    def marks(self) -> list[tuple[int, str]]:
+        """Timestamped events drawn on the calendar bars, oldest first."""
+        out = [(p["ts"], "prompt") for p in self.prompts if p["ts"] is not None]
+        out += [(c["ts"], "commit") for c in self.commits if c.get("ts") is not None]
+        out += [(t, "compact") for t in self.compactions]
+        out += [(t, "error") for t in self.api_errors]
+        return sorted(out)
 
     def density(self) -> dict[int, int]:
         out: Counter = Counter()

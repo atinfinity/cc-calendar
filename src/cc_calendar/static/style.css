@@ -151,6 +151,26 @@ a { color: var(--accent); }
 .bar:hover { filter: brightness(1.08); z-index: 3; }
 .bar.selected { outline: 2px solid var(--text); outline-offset: 1px; z-index: 4; }
 .bar.dim { opacity: 0.25; }
+/* Event marks: time runs downward, so each mark is a horizontal tick at its moment. */
+.mark { position: absolute; pointer-events: none; transform: translateY(-50%); }
+.mark.prompt { left: 0; width: 3px; height: 2px; background: rgba(255, 255, 255, 0.95); }
+.mark.compact { left: 0; right: 0; border-top: 2px dashed rgba(255, 255, 255, 0.9); }
+.mark.commit, .mark.error { right: 2px; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #fff; }
+.mark.commit { background: #1f2328; }
+.mark.error { background: #e5484d; }
+.marks-key {
+  display: inline-flex; align-items: center; gap: 10px; margin-left: auto; padding: 1px 8px;
+  font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+}
+.marks-key.off { opacity: 0.5; text-decoration: line-through; }
+.marks-key span { gap: 4px; }
+.mark-sample { position: relative; display: inline-block; width: 12px; height: 9px; border-radius: 2px; background: #8a8f98; }
+.mark-sample::after { content: ""; position: absolute; }
+.mark-sample.prompt::after { left: 0; top: 3.5px; width: 4px; height: 2px; background: #fff; }
+.mark-sample.compact::after { left: 0; right: 0; top: 3px; border-top: 2px dashed #fff; }
+.mark-sample.commit::after, .mark-sample.error::after { right: 1px; top: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid #fff; }
+.mark-sample.commit::after { background: #1f2328; }
+.mark-sample.error::after { background: #e5484d; }
 .now-line { position: absolute; left: 0; right: 0; border-top: 2px solid var(--now); z-index: 4; pointer-events: none; }
 .now-line::before {
   content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px;
