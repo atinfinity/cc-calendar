@@ -1,0 +1,331 @@
+// Entry point: state, data loading, filters, list view, live updates.
+import { renderCalendar } from "./calendar.js";
+import { renderDetail } from "./detail.js";
+import { openLog } from "./transcript.js";
+import {
+  STATUS_LABELS, addDays, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, paletteColor,
+  prefs, shortModel, startOfWeek, statusColor,
+} from "./util.js";
+
+const $ = (id) => document.getElementById(id);
+const DEFAULT_HOUR_PX = 42;
+
+export const state = {
+  sessions: [],
+  byId: new Map(),
+  view: prefs.get("view", "calendar"),
+  weekStart: startOfWeek(new Date()),
+  hourPx: prefs.get("hourPx", DEFAULT_HOUR_PX),
+  colorBy: prefs.get("colorBy", "project"),
+  gap: prefs.get("gap", 15),
+  search: "",
+  projects: new Set(prefs.get("projects", [])), // empty = all
+  statuses: new Set(prefs.get("statuses", Object.keys(STATUS_LABELS))),
+  hideNoPrompt: prefs.get("hideNoPrompt", true),
+  sort: prefs.get("sort", "start"),
+  selectedId: null,
+  projectColors: new Map(),
+  modelColors: new Map(),
+};
+
+// ------------------------------------------------------------------ data
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status} ${url}`);
+  return res.json();
+}
+
+async function loadSessions() {
+  const data = await fetchJSON(`/api/sessions?gap=${state.gap}`);
+  state.sessions = data.sessions;
+  state.byId = new Map(data.sessions.map((s) => [s.id, s]));
+  assignColors();
+  renderAll();
+}
+
+function assignColors() {
+  const count = (key) => {
+    const m = new Map();
+    for (const s of state.sessions) m.set(s[key], (m.get(s[key]) || 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  };
+  state.projectColors = new Map(count("project").map((p, i) => [p, paletteColor(i)]));
+  state.modelColors = new Map(count("model").map((m, i) => [m, paletteColor(i + 2)]));
+}
+
+export function colorFor(s) {
+  if (state.colorBy === "status") return statusColor(s.status);
+  if (state.colorBy === "model") return state.modelColors.get(s.model) || "#888";
+  return state.projectColors.get(s.project) || "#888";
+}
+
+export function legendItems(visible) {
+  const counts = new Map();
+  for (const s of visible) {
+    let key, label, color;
+    if (state.colorBy === "status") {
+      key = s.status; label = STATUS_LABELS[s.status]; color = statusColor(s.status);
+    } else if (state.colorBy === "model") {
+      key = s.model; label = shortModel(s.model); color = colorFor(s);
+    } else {
+      key = s.project; label = s.project_name; color = colorFor(s);
+    }
+    const e = counts.get(key) || { label, color, n: 0, title: key };
+    e.n++;
+    counts.set(key, e);
+  }
+  return [...counts.values()].sort((a, b) => b.n - a.n);
+}
+
+export function filtered() {
+  const q = state.search.trim().toLowerCase();
+  return state.sessions.filter((s) => {
+    if (state.hideNoPrompt && s.prompt_count === 0) return false;
+    if (!state.statuses.has(s.status)) return false;
+    if (state.projects.size && !state.projects.has(s.project)) return false;
+    if (q && !s.search.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+// ------------------------------------------------------------------ selection
+
+export async function select(id) {
+  state.selectedId = id;
+  document.querySelectorAll(".bar.selected, tr.selected").forEach((el) => el.classList.remove("selected"));
+  document.querySelectorAll(`[data-sid="${id}"]`).forEach((el) => el.classList.add("selected"));
+  await refreshDetail();
+}
+
+async function refreshDetail() {
+  const pane = $("detail");
+  if (!state.selectedId) {
+    pane.hidden = true;
+    return;
+  }
+  pane.hidden = false;
+  try {
+    const d = await fetchJSON(`/api/sessions/${state.selectedId}?gap=${state.gap}`);
+    if (d.id !== state.selectedId) return;
+    renderDetail(pane, d, {
+      onClose: () => { state.selectedId = null; refreshDetail(); renderMain(); },
+      onOpenLog: (agent) => openLog(d, agent),
+      onSelect: (sid) => select(sid),
+    });
+  } catch (e) {
+    pane.replaceChildren(h("div", { class: "empty" }, "Session not found."));
+  }
+}
+
+// ------------------------------------------------------------------ rendering
+
+function renderAll() {
+  renderToolbar();
+  renderMain();
+}
+
+function renderMain() {
+  $("calendar-view").hidden = state.view !== "calendar";
+  $("list-view").hidden = state.view !== "list";
+  const visible = filtered();
+  if (state.view === "calendar") {
+    renderCalendar($("calendar"), visible, {
+      onSelect: select,
+      legend: $("legend"),
+      rangeLabel: $("range-label"),
+      rangeCount: $("range-count"),
+    });
+  } else {
+    renderList(visible);
+  }
+}
+
+function renderToolbar() {
+  document.querySelectorAll("#view-toggle button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.view === state.view));
+  document.querySelectorAll("#color-by button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.color === state.colorBy));
+  $("gap").value = String(state.gap);
+  $("sort").value = state.sort;
+  $("hide-noprompt").checked = state.hideNoPrompt;
+
+  const counts = {};
+  for (const s of state.sessions) {
+    if (state.hideNoPrompt && s.prompt_count === 0) continue;
+    counts[s.status] = (counts[s.status] || 0) + 1;
+  }
+  $("status-chips").replaceChildren(
+    ...Object.entries(STATUS_LABELS).map(([key, label]) =>
+      h("button", {
+        class: "chip" + (state.statuses.has(key) ? "" : " off"),
+        title: `Toggle ${label}`,
+        onclick: () => {
+          state.statuses.has(key) ? state.statuses.delete(key) : state.statuses.add(key);
+          prefs.set("statuses", [...state.statuses]);
+          renderAll();
+        },
+      }, h("span", { class: "dot", style: { background: statusColor(key) } }), `${label} ${counts[key] || 0}`)),
+  );
+
+  const n = state.projects.size;
+  $("project-btn").textContent = n ? `${n} project${n > 1 ? "s" : ""} ▾` : "All projects ▾";
+}
+
+function renderProjectMenu() {
+  const menu = $("project-menu");
+  const projects = new Map();
+  for (const s of state.sessions) {
+    const e = projects.get(s.project) || { name: s.project_name, n: 0 };
+    e.n++;
+    projects.set(s.project, e);
+  }
+  const entries = [...projects.entries()].sort((a, b) => b[1].n - a[1].n);
+  const save = () => { prefs.set("projects", [...state.projects]); renderAll(); };
+  menu.replaceChildren(
+    h("div", { class: "actions" },
+      h("button", { onclick: () => { state.projects.clear(); save(); renderProjectMenu(); } }, "All"),
+    ),
+    ...entries.map(([path, e]) =>
+      h("label", { title: path },
+        h("input", {
+          type: "checkbox",
+          checked: state.projects.has(path),
+          onchange: (ev) => {
+            ev.target.checked ? state.projects.add(path) : state.projects.delete(path);
+            save();
+          },
+        }),
+        h("span", { class: "dot", style: { background: state.projectColors.get(path) } }),
+        `${e.name} `, h("span", { class: "muted" }, `(${e.n})`))),
+  );
+}
+
+function renderList(visible) {
+  const key = { start: "start", end: "end", cost: "cost" }[state.sort];
+  const rows = [...visible].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+  $("list-count").textContent = `${rows.length} sessions`;
+  if (!rows.length) {
+    $("list").replaceChildren(h("div", { class: "empty" }, "No sessions match the filters."));
+    return;
+  }
+  $("list").replaceChildren(
+    h("table", {},
+      h("thead", {}, h("tr", {},
+        h("th", {}, ""), h("th", {}, "Title"), h("th", {}, "Project"), h("th", {}, "Started"),
+        h("th", {}, "Length"), h("th", {}, "Prompts"), h("th", {}, "Tokens"), h("th", {}, "Cost"))),
+      h("tbody", {}, rows.map((s) =>
+        h("tr", {
+          "data-sid": s.id,
+          class: s.id === state.selectedId ? "selected" : "",
+          onclick: () => select(s.id),
+        },
+          h("td", {}, h("span", { class: "dot", title: STATUS_LABELS[s.status], style: { background: statusColor(s.status) } })),
+          h("td", { class: "title-cell" }, s.title),
+          h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }), s.project_name),
+          h("td", { class: "num" }, fmtDateTime(s.start)),
+          h("td", { class: "num" }, fmtDuration(s.end - s.start)),
+          h("td", { class: "num" }, s.prompt_count),
+          h("td", { class: "num" }, fmtTokens(s.tokens)),
+          h("td", { class: "num" }, fmtCost(s.cost, s.cost_estimated)),
+        ))),
+    ),
+  );
+}
+
+// ------------------------------------------------------------------ controls
+
+function setHourPx(px) {
+  state.hourPx = Math.max(12, Math.min(240, Math.round(px)));
+  prefs.set("hourPx", state.hourPx);
+  renderMain();
+}
+
+function bind() {
+  document.querySelectorAll("#view-toggle button").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.view = b.dataset.view;
+      prefs.set("view", state.view);
+      renderAll();
+    }));
+  document.querySelectorAll("#color-by button").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.colorBy = b.dataset.color;
+      prefs.set("colorBy", state.colorBy);
+      renderAll();
+    }));
+  $("this-week").onclick = () => { state.weekStart = startOfWeek(new Date()); renderMain(); };
+  $("prev-week").onclick = () => { state.weekStart = addDays(state.weekStart, -7); renderMain(); };
+  $("next-week").onclick = () => { state.weekStart = addDays(state.weekStart, 7); renderMain(); };
+  $("zoom-in").onclick = () => setHourPx(state.hourPx * 1.25);
+  $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);
+  $("zoom-reset").onclick = () => setHourPx(DEFAULT_HOUR_PX);
+  $("calendar").addEventListener("wheel", (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setHourPx(state.hourPx * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+  }, { passive: false });
+  $("gap").onchange = (e) => {
+    state.gap = Number(e.target.value);
+    prefs.set("gap", state.gap);
+    loadSessions();
+  };
+  $("sort").onchange = (e) => { state.sort = e.target.value; prefs.set("sort", state.sort); renderMain(); };
+  $("hide-noprompt").onchange = (e) => {
+    state.hideNoPrompt = e.target.checked;
+    prefs.set("hideNoPrompt", state.hideNoPrompt);
+    renderAll();
+  };
+  let searchTimer;
+  $("search").addEventListener("input", (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { state.search = e.target.value; renderMain(); }, 150);
+  });
+  $("reload").onclick = () => { loadSessions(); refreshDetail(); };
+  $("project-btn").onclick = (e) => {
+    e.stopPropagation();
+    const menu = $("project-menu");
+    menu.hidden = !menu.hidden;
+    if (!menu.hidden) renderProjectMenu();
+  };
+  document.addEventListener("click", (e) => {
+    if (!$("project-filter").contains(e.target)) $("project-menu").hidden = true;
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("log-modal").hidden && state.selectedId) {
+      state.selectedId = null;
+      refreshDetail();
+      renderMain();
+    }
+  });
+}
+
+// ------------------------------------------------------------------ live updates
+
+function connectEvents() {
+  const indicator = $("live-indicator");
+  const es = new EventSource("/api/events");
+  let timer = null;
+  es.onopen = () => indicator.classList.remove("off");
+  es.onerror = () => indicator.classList.add("off");
+  es.onmessage = (ev) => {
+    const payload = JSON.parse(ev.data);
+    clearTimeout(timer);
+    // Coalesce bursts of writes from busy sessions.
+    timer = setTimeout(async () => {
+      await loadSessions();
+      if (state.selectedId && (payload.live || payload.sessions.includes(state.selectedId))) {
+        refreshDetail();
+      }
+    }, 300);
+  };
+}
+
+// Keep "now" line and relative times fresh even when nothing is written.
+setInterval(() => { if (state.view === "calendar") renderMain(); }, 60_000);
+
+bind();
+loadSessions().catch((e) => {
+  $("calendar").replaceChildren(h("div", { class: "empty" }, `Failed to load sessions: ${e.message}`));
+});
+connectEvents();

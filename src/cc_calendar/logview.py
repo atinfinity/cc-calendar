@@ -1,0 +1,138 @@
+"""Flatten a transcript file into display entries for the log viewer."""
+
+from __future__ import annotations
+
+import json
+from collections import OrderedDict
+from pathlib import Path
+from typing import Any
+
+from .parser import classify_user, command_text, content_text, parse_ts, tool_result_text
+
+MAX_TEXT = 20_000
+MAX_INPUT = 4_000
+_cache: OrderedDict[tuple[str, float, int], list[dict]] = OrderedDict()
+CACHE_SIZE = 4
+
+
+def _clip(text: str, limit: int = MAX_TEXT) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n… ({len(text) - limit:,} more characters)"
+
+
+def _input_summary(name: str, inp: dict) -> str:
+    for key in ("command", "file_path", "pattern", "url", "description", "prompt", "query"):
+        if isinstance(inp.get(key), str):
+            return inp[key].splitlines()[0][:200] if inp[key] else ""
+    return ""
+
+
+def build_entries(path: Path, session_id: str | None) -> list[dict]:
+    st = path.stat()
+    key = (str(path), st.st_mtime, st.st_size)
+    if key in _cache:
+        _cache.move_to_end(key)
+        return _cache[key]
+    entries: list[dict] = []
+    seen: set[str] = set()
+    tool_names: dict[str, str] = {}
+    with open(path, "rb") as f:
+        for line in f:
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            if session_id and rec.get("sessionId") not in (None, session_id):
+                continue
+            uuid = rec.get("uuid")
+            if uuid:
+                if uuid in seen:
+                    continue
+                seen.add(uuid)
+            entries.extend(_entries_for(rec, tool_names))
+    for i, e in enumerate(entries):
+        e["i"] = i
+    _cache[key] = entries
+    while len(_cache) > CACHE_SIZE:
+        _cache.popitem(last=False)
+    return entries
+
+
+def _entries_for(rec: dict, tool_names: dict[str, str]) -> list[dict]:
+    rtype = rec.get("type")
+    ts = parse_ts(rec.get("timestamp"))
+    msg = rec.get("message") or {}
+    content: Any = msg.get("content")
+    if rtype == "user":
+        kind = classify_user(rec)
+        if kind == "tool_result":
+            out = []
+            for b in content if isinstance(content, list) else []:
+                if isinstance(b, dict) and b.get("type") == "tool_result":
+                    tid = b.get("tool_use_id")
+                    out.append(
+                        {
+                            "kind": "tool_result",
+                            "ts": ts,
+                            "tool_use_id": tid,
+                            "name": tool_names.get(tid, ""),
+                            "is_error": bool(b.get("is_error")),
+                            "text": _clip(tool_result_text(b.get("content"))),
+                        }
+                    )
+            return out
+        text = content_text(content)
+        if kind == "prompt":
+            return [{"kind": "user", "ts": ts, "text": _clip(text)}]
+        if kind == "command":
+            return [{"kind": "user", "ts": ts, "text": command_text(text), "command": True}]
+        if kind == "interrupt":
+            return [{"kind": "interrupt", "ts": ts, "text": text.strip()}]
+        if kind == "compact":
+            return [{"kind": "compact", "ts": ts, "text": _clip(text)}]
+        if kind == "notification":
+            return [{"kind": "notification", "ts": ts, "text": _clip(text, 2000)}]
+        return [{"kind": "meta", "ts": ts, "text": _clip(text, 4000)}]
+    if rtype == "assistant":
+        if msg.get("model") == "<synthetic>":
+            return [{"kind": "error", "ts": ts, "text": _clip(content_text(content), 2000)}]
+        out = []
+        for b in content if isinstance(content, list) else []:
+            if not isinstance(b, dict):
+                continue
+            bt = b.get("type")
+            if bt == "text" and b.get("text", "").strip():
+                out.append({"kind": "assistant", "ts": ts, "text": _clip(b["text"])})
+            elif bt == "thinking" and b.get("thinking", "").strip():
+                out.append({"kind": "thinking", "ts": ts, "text": _clip(b["thinking"])})
+            elif bt == "tool_use":
+                inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+                name = b.get("name", "")
+                tool_names[b.get("id")] = name
+                entry = {
+                    "kind": "tool_use",
+                    "ts": ts,
+                    "id": b.get("id"),
+                    "name": name,
+                    "summary": _input_summary(name, inp),
+                    "input": _clip(json.dumps(inp, ensure_ascii=False, indent=2), MAX_INPUT),
+                }
+                out.append(entry)
+        return out
+    if rtype == "attachment":
+        att = rec.get("attachment") or {}
+        prompt = att.get("prompt")
+        if isinstance(prompt, str) and "<task-notification>" in prompt:
+            return [{"kind": "notification", "ts": ts, "text": _clip(prompt, 2000)}]
+        return [{"kind": "attachment", "ts": ts, "text": att.get("type", "attachment")}]
+    if rtype == "system":
+        sub = rec.get("subtype")
+        if sub == "compact_boundary":
+            return [{"kind": "compact", "ts": ts, "text": "— context compacted —"}]
+        if sub in ("turn_duration", None):
+            return []
+        return [{"kind": "system", "ts": ts, "text": f"{sub}: {rec.get('content', '')}"[:2000]}]
+    return []
