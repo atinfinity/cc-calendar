@@ -125,6 +125,23 @@ export const prefs = {
   },
 };
 
+const SNIPPET_CONTEXT = 40;
+
+// When a search matches a prompt rather than the title, show where it matched.
+export function matchSnippet(s, query) {
+  const q = query.trim().toLowerCase();
+  if (!q || s.title.toLowerCase().includes(q)) return null;
+  const text = s.search.replace(/\s+/g, " ");
+  const i = text.toLowerCase().indexOf(q);
+  if (i < 0) return null;
+  const from = Math.max(0, i - SNIPPET_CONTEXT);
+  const to = Math.min(text.length, i + q.length + SNIPPET_CONTEXT);
+  return h("div", { class: "snippet" },
+    from > 0 ? "…" : "", text.slice(from, i),
+    h("mark", {}, text.slice(i, i + q.length)),
+    text.slice(i + q.length, to), to < text.length ? "…" : "");
+}
+
 export function renderMarkdown(text) {
   const div = h("div", { class: "md" });
   if (window.marked && window.DOMPurify) {
