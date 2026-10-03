@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
 from . import __version__, gitinfo
@@ -25,6 +26,9 @@ SEARCH_TEXT_LIMIT = 4000
 # Always revalidate: without this, browsers cache ES modules heuristically and keep
 # running stale code after an upgrade.
 NO_CACHE = {"Cache-Control": "no-cache"}
+# Reject requests whose Host is not loopback: a page on another site could otherwise
+# rebind its domain to 127.0.0.1 (DNS rebinding) and read transcripts through the browser.
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 class NoCacheStaticFiles(StaticFiles):
@@ -148,6 +152,7 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
             task.cancel()
 
     app = FastAPI(title="cc-calendar", version=__version__, lifespan=lifespan)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
     app.state.store = store
 
     def get_session(sid: str) -> SessionAcc:
