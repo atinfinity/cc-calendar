@@ -29,7 +29,7 @@ function costIn(s, from, to) {
 
 // Totals per day and per project. `bounds` holds each day's [start, end) in ms.
 export function summarize(sessions, bounds) {
-  const days = bounds.map(() => ({ ms: 0, cost: 0, estimated: false }));
+  const days = bounds.map(() => ({ ms: 0, cost: 0, estimated: false, sessions: 0 }));
   const projects = new Map();
   for (const s of sessions) {
     let row = projects.get(s.project);
@@ -46,6 +46,7 @@ export function summarize(sessions, bounds) {
       days[i].ms += ms;
       days[i].cost += cost;
       days[i].estimated ||= s.cost_estimated;
+      days[i].sessions++;
       row.days[i] += ms;
       row.ms += ms;
       row.cost += cost;

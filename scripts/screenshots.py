@@ -111,6 +111,12 @@ def shoot(url: str) -> None:
         page.click('#view-toggle button[data-view="list"]')
         page.wait_for_selector(".list table")
         page.screenshot(path=OUT / "list.png")
+
+        page.keyboard.press("Escape")
+        page.click('#view-toggle button[data-view="calendar"]')
+        page.click('#span-toggle button[data-span="month"]')
+        page.wait_for_selector(".month-day")
+        page.screenshot(path=OUT / "month.png")
         browser.close()
     for f in sorted(OUT.glob("*.png")):
         print(f"{f}  {f.stat().st_size // 1024} KB")

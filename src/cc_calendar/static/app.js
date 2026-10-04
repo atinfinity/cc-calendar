@@ -1,6 +1,7 @@
 // Entry point: state, data loading, filters, list view, live updates.
 import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
+import { overviewRange, renderOverview } from "./overview.js";
 import { openLog } from "./transcript.js";
 import {
   CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
@@ -16,7 +17,8 @@ export const state = {
   sessions: [],
   byId: new Map(),
   view: prefs.get("view", "calendar"),
-  span: prefs.get("span", "week"), // "week" | "day"
+  span: prefs.get("span", "week"), // "day" | "week" | "month" | "year"
+  heat: prefs.get("heat", "time"), // month and year shading: "time" | "cost"
   anchor: startOfDay(new Date()), // any day inside the displayed range
   hourPx: prefs.get("hourPx", DEFAULT_HOUR_PX),
   colorBy: prefs.get("colorBy", "project"),
@@ -167,7 +169,18 @@ function renderMain() {
   $("calendar-view").hidden = state.view !== "calendar";
   $("list-view").hidden = state.view !== "list";
   const visible = filtered();
-  if (state.view === "calendar") {
+  const overview = state.span === "month" || state.span === "year";
+  // Month and year cells are shaded by time or cost, so bar zoom and colors do not apply.
+  for (const id of ["zoom", "color-by", "color-by-label"]) $(id).hidden = overview;
+  if (state.view === "calendar" && overview) {
+    renderOverview($("calendar"), visible, {
+      legend: $("legend"),
+      rangeLabel: $("range-label"),
+      rangeCount: $("range-count"),
+      summaryPane: $("summary"),
+      rerender: renderMain,
+    });
+  } else if (state.view === "calendar") {
     renderCalendar($("calendar"), visible, {
       onSelect: select,
       onOpenEvent: openEvent,
@@ -193,7 +206,7 @@ function renderToolbar() {
     b.classList.toggle("active", b.dataset.color === state.colorBy));
   document.querySelectorAll("#span-toggle button").forEach((b) =>
     b.classList.toggle("active", b.dataset.span === state.span));
-  $("go-today").textContent = state.span === "day" ? "Today" : "This week";
+  $("go-today").textContent = { day: "Today", week: "This week", month: "This month", year: "This year" }[state.span];
   $("summary-toggle").classList.toggle("active", state.showSummary);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
@@ -331,6 +344,12 @@ function renderList(visible) {
 
 export function rangeDays() {
   if (state.span === "day") return [startOfDay(state.anchor)];
+  if (state.span === "month" || state.span === "year") {
+    const [first, end] = overviewRange(state.span, state.anchor);
+    const days = [];
+    for (let d = first; d < end; d = addDays(d, 1)) days.push(d);
+    return days;
+  }
   const start = startOfWeek(state.anchor);
   return [...Array(7)].map((_, i) => addDays(start, i));
 }
@@ -344,6 +363,19 @@ function setSpan(span, day) {
 
 export function openDay(day) {
   setSpan("day", day);
+}
+
+export function openMonth(day) {
+  setSpan("month", day);
+}
+
+// Move the displayed range back (-1) or forward (+1) by one day, week, month or year.
+function shift(dir) {
+  const a = state.anchor;
+  if (state.span === "month") state.anchor = new Date(a.getFullYear(), a.getMonth() + dir, 1);
+  else if (state.span === "year") state.anchor = new Date(a.getFullYear() + dir, 0, 1);
+  else state.anchor = addDays(a, dir * (state.span === "day" ? 1 : 7));
+  renderMain();
 }
 
 function setHourPx(px) {
@@ -367,10 +399,9 @@ function bind() {
     }));
   document.querySelectorAll("#span-toggle button").forEach((b) =>
     b.addEventListener("click", () => setSpan(b.dataset.span)));
-  const step = () => (state.span === "day" ? 1 : 7);
   $("go-today").onclick = () => { state.anchor = startOfDay(new Date()); renderMain(); };
-  $("go-prev").onclick = () => { state.anchor = addDays(state.anchor, -step()); renderMain(); };
-  $("go-next").onclick = () => { state.anchor = addDays(state.anchor, step()); renderMain(); };
+  $("go-prev").onclick = () => shift(-1);
+  $("go-next").onclick = () => shift(1);
   $("summary-toggle").onclick = () => {
     state.showSummary = !state.showSummary;
     prefs.set("summary", state.showSummary);
@@ -380,7 +411,7 @@ function bind() {
   $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);
   $("zoom-reset").onclick = () => setHourPx(DEFAULT_HOUR_PX);
   $("calendar").addEventListener("wheel", (e) => {
-    if (!e.ctrlKey && !e.metaKey) return;
+    if ((!e.ctrlKey && !e.metaKey) || $("zoom").hidden) return;
     e.preventDefault();
     setHourPx(state.hourPx * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
   }, { passive: false });

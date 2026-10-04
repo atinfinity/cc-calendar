@@ -36,6 +36,8 @@
           <div class="seg small" id="span-toggle">
             <button data-span="day">Day</button>
             <button data-span="week">Week</button>
+            <button data-span="month">Month</button>
+            <button data-span="year">Year</button>
           </div>
           <button id="go-today">This week</button>
           <button id="go-prev" aria-label="Previous">◀</button>
@@ -43,12 +45,12 @@
           <span class="range" id="range-label"></span>
           <span class="muted" id="range-count"></span>
           <button id="summary-toggle" title="Active time and cost per project">Summary</button>
-          <div class="seg small">
+          <div class="seg small" id="zoom">
             <button id="zoom-out" aria-label="Zoom out">−</button>
             <button id="zoom-in" aria-label="Zoom in">+</button>
             <button id="zoom-reset">Reset</button>
           </div>
-          <span class="muted">Color by</span>
+          <span class="muted" id="color-by-label">Color by</span>
           <div class="seg small" id="color-by">
             <button data-color="project">Project</button>
             <button data-color="status">Status</button>
