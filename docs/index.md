@@ -60,7 +60,7 @@ requests. It runs as a local web UI that updates live while sessions run.
 ## Quick start
 
 ```sh
-uv tool install git+https://github.com/atinfinity/cc-calendar@v0.3.0
+uv tool install cc-calendar
 cc-calendar
 ```
 

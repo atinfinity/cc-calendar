@@ -8,8 +8,16 @@ automatically if needed.
 === "Install as a tool"
 
     ```sh
-    uv tool install git+https://github.com/atinfinity/cc-calendar@v0.3.0
+    uv tool install cc-calendar
     cc-calendar
+    ```
+
+    Update it later with `uv tool upgrade cc-calendar`.
+
+=== "Run without installing"
+
+    ```sh
+    uvx cc-calendar
     ```
 
 === "Run from a checkout"
@@ -31,6 +39,7 @@ The server binds to `127.0.0.1` on a free port and opens your browser. It reads 
 | `--no-browser` | Do not open a browser window |
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
 | `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](#notes-and-tags)) |
+| `--search-index PATH` | File that keeps the full-text search index (default: see [Full-text search](features.md#full-text-search)) |
 
 ## Several config directories
 

@@ -1,5 +1,7 @@
 # cc-calendar
 
+[![PyPI](https://img.shields.io/pypi/v/cc-calendar)](https://pypi.org/project/cc-calendar/)
+
 A Google Calendar-style weekly view of your [Claude Code](https://claude.com/claude-code) sessions.
 
 `cc-calendar` reads the transcripts Claude Code already writes to `~/.claude/projects/` and shows
@@ -8,18 +10,20 @@ requests — in a local web UI that updates live while sessions run.
 
 **Project site:** <https://atinfinity.github.io/cc-calendar/>
 
-![Week calendar colored by project](docs/images/calendar.png)
+![Week calendar colored by project](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/calendar.png)
 
 ## Install
 
 Requires [uv](https://docs.astral.sh/uv/) (Python 3.12+ is fetched automatically).
 
 ```sh
-uv tool install git+https://github.com/atinfinity/cc-calendar@v0.3.0
+uv tool install cc-calendar
 cc-calendar
 ```
 
-Or run it from a checkout:
+Or try it without installing: `uvx cc-calendar`. Update with `uv tool upgrade cc-calendar`.
+
+To run it from a checkout:
 
 ```sh
 uv run cc-calendar
@@ -32,7 +36,8 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 | `--port N` | Listen on a specific port instead of a free one |
 | `--no-browser` | Do not open a browser window |
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
-| `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](#notes-and-tags)) |
+| `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)) |
+| `--search-index PATH` | File that keeps the full-text search index (default: see [Full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search)) |
 
 ### Several config directories
 
@@ -139,9 +144,9 @@ the logs it covers.
   later. The note saves when you leave the box (or with ⌘/Ctrl+Enter); `Enter` or a comma adds a
   tag, with suggestions from tags already in use. Tags that differ only in case count as one.
   Tags show in the list (**Tags** column and filter) and the calendar tooltip, and a 📝 marks
-  sessions with a note. See [where they are saved](#notes-and-tags).
+  sessions with a note. See [where they are saved](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags).
 - **List view** with search over titles, prompts, notes and tags (a match inside a prompt or note is shown under the title), optional
-  [full-text search](#full-text-search) over the whole transcripts, project and status filters, and sorting by
+  [full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search) over the whole transcripts, project and status filters, and sorting by
   any column (click a header; click again to reverse). List-only filters narrow it down further
   by model, git branch, source (with several config directories), tag, date range (sessions active on
   any day in the range) and cost range.
@@ -164,9 +169,9 @@ the logs it covers.
 
 | Session detail | Transcript with stats |
 | --- | --- |
-| ![Detail pane](docs/images/detail.png) | ![Transcript viewer](docs/images/transcript.png) |
+| ![Detail pane](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/detail.png) | ![Transcript viewer](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/transcript.png) |
 | **List view** | **Month view** |
-| ![List view](docs/images/list.png) | ![Month view](docs/images/month.png) |
+| ![List view](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/list.png) | ![Month view](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/month.png) |
 
 Screenshots show fictional demo data.
 
@@ -182,8 +187,8 @@ as $0, so it needs updating when new models ship.
 
 Everything stays on your machine. The server listens only on localhost, reads your logs read-only,
 and makes no network requests. It writes two files: the notes file
-([Notes and tags](#notes-and-tags)), only when you add or change a note or tag, and the
-[full-text search index](#full-text-search), a cache built from your logs. Requests from other
+([Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)), only when you add or change a note or tag, and the
+[full-text search index](https://atinfinity.github.io/cc-calendar/features/#full-text-search), a cache built from your logs. Requests from other
 websites cannot change either. Commit hashes that do not appear in the
 logs are looked up with `git log` in the session's working directory.
 
@@ -197,6 +202,9 @@ uv run ruff check . && uv run ruff format --check .
 
 The frontend is plain HTML, CSS and ES modules in `src/cc_calendar/static/` — no build step.
 Tests use synthetic logs only; never commit real transcripts.
+
+Releases are published to PyPI by pushing a version tag; see
+[Releasing](https://atinfinity.github.io/cc-calendar/development/#releasing).
 
 The README screenshots are rendered from fictional data generated by `scripts/demo_data.py`, using
 your installed Google Chrome:
