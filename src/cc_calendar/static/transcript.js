@@ -3,6 +3,7 @@ import {
   MARK_KINDS, cacheTitle, compactDetail, fmtCost, fmtEffortMix, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
   shortModel,
 } from "./util.js";
+import { helpOpen, typing } from "./shortcuts.js";
 
 const PAGE = 300;
 const $ = (id) => document.getElementById(id);
@@ -46,12 +47,31 @@ function bind() {
     const b = e.currentTarget;
     if (!view.loading && b.scrollTop + b.clientHeight > b.scrollHeight - 400) loadMore();
   });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !$("log-modal").hidden) {
-      e.stopPropagation();
-      closeLog();
-    }
-  });
+  document.addEventListener("keydown", onKey);
+}
+
+// Keys while the viewer is open. The global handler (shortcuts.js) runs first and has
+// already taken Esc and ? when the shortcut list is open.
+const KEYS = {
+  n: () => step(null, 1),
+  p: () => step(null, -1),
+  "]": () => step("prompt", 1),
+  "[": () => step("prompt", -1),
+  s: () => $("log-stats-toggle").click(),
+  e: () => $("log-expand").click(),
+  b: () => $("log-back").hidden ? false : openLog(view.detail, null),
+};
+
+function onKey(e) {
+  if ($("log-modal").hidden || e.defaultPrevented || helpOpen()) return;
+  if (e.key === "Escape") {
+    closeLog();
+    e.preventDefault();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing || typing(e.target)) return;
+  const handler = KEYS[e.key];
+  if (handler && handler() !== false) e.preventDefault();
 }
 
 // `target` ({ts, kind}) scrolls to the event nearest to that moment once the log loads.
@@ -74,6 +94,8 @@ export async function openLog(detail, agentId, target = null) {
   $("log-body").replaceChildren(h("div", { class: "load-more" }, "Loading…"));
   $("log-body").scrollTop = 0;
   $("log-modal").hidden = false;
+  // Arrow keys, Page Up / Down and Space scroll the transcript.
+  $("log-body").focus({ preventScroll: true });
   $("log-stats").replaceChildren();
   $("log-events").replaceChildren();
   loadStats();
@@ -112,8 +134,9 @@ function anchorIndex() {
   return -1;
 }
 
+// Jump to the next (+1) or previous (-1) event of `kind`, or of any kind when it is null.
 function step(kind, dir) {
-  const list = view.events.filter((ev) => ev[2] === kind);
+  const list = kind ? view.events.filter((ev) => ev[2] === kind) : view.events;
   const at = anchorIndex();
   const ev = dir > 0 ? list.find((x) => x[0] > at) : list.findLast((x) => x[0] < at);
   if (ev) jumpTo(ev[0]);
@@ -146,11 +169,12 @@ function renderEventNav() {
     const list = view.events.filter((ev) => ev[2] === kind);
     if (!list.length) return null;
     const pos = list.findIndex((ev) => ev[0] === view.focus);
+    const key = (k) => (kind === "prompt" ? ` (${k})` : "");
     return h("span", { class: "ev-nav" },
       h("i", { class: `mark-sample ${kind}` }),
       h("span", {}, `${plural} `, h("span", { class: "muted" }, pos >= 0 ? `${pos + 1}/${list.length}` : list.length)),
-      h("button", { title: `Previous ${plural.toLowerCase()}`, onclick: () => step(kind, -1) }, "‹"),
-      h("button", { title: `Next ${plural.toLowerCase()}`, onclick: () => step(kind, 1) }, "›"));
+      h("button", { title: `Previous ${plural.toLowerCase()}${key("[")}`, onclick: () => step(kind, -1) }, "‹"),
+      h("button", { title: `Next ${plural.toLowerCase()}${key("]")}`, onclick: () => step(kind, 1) }, "›"));
   }).filter(Boolean);
   bar.hidden = !parts.length;
   bar.replaceChildren(...parts);
@@ -254,6 +278,8 @@ function renderStats(panel, st) {
 
 export function closeLog() {
   $("log-modal").hidden = true;
+  // A focused control would keep taking Enter while hidden.
+  if ($("log-modal").contains(document.activeElement)) document.activeElement.blur();
   view.token++;
 }
 

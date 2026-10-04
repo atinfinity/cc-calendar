@@ -100,18 +100,18 @@
   <div class="modal" id="log-modal" hidden>
     <div class="modal-box">
       <div class="modal-head">
-        <button id="log-back" hidden>← Parent session</button>
+        <button id="log-back" title="Back to the parent session (b)" hidden>← Parent session</button>
         <strong id="log-title"></strong>
         <div class="spacer"></div>
-        <label class="check"><input type="checkbox" id="log-stats-toggle"> Stats</label>
+        <label class="check" title="Stats (s)"><input type="checkbox" id="log-stats-toggle"> Stats</label>
         <label class="check"><input type="checkbox" id="log-thinking"> Thinking</label>
         <label class="check"><input type="checkbox" id="log-meta"> Meta &amp; attachments</label>
-        <label class="check"><input type="checkbox" id="log-expand"> Expand tools</label>
+        <label class="check" title="Expand tools (e)"><input type="checkbox" id="log-expand"> Expand tools</label>
         <button id="log-close" aria-label="Close">✕</button>
       </div>
       <div class="log-events" id="log-events" hidden></div>
       <div class="log-stats" id="log-stats" hidden></div>
-      <div class="log-body" id="log-body"></div>
+      <div class="log-body" id="log-body" tabindex="-1"></div>
     </div>
   </div>
   <div class="modal" id="help-modal" hidden>

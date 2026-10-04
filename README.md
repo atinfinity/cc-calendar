@@ -111,7 +111,9 @@ A session found in more than one directory is shown once, from the copy with the
   ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
   `c` / `l` calendar / list, `/` search, `j` / `k` next / previous session, `Enter` open its
-  transcript, `Esc` close. Press `?` (or click **?** in the top bar) for the full list.
+  transcript, `Esc` close. In a transcript, `n` / `p` step through events, `]` / `[` through
+  prompts, and `s` / `e` toggle Stats / Expand tools. Press `?` (or click **?** in the top bar)
+  for the full list.
 - **Views in the URL** — the address keeps the view, span, date, selected session and project
   page, so reloading keeps your place, Back and Forward step through range and view changes, and
   views can be bookmarked.
