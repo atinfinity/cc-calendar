@@ -17,15 +17,17 @@
       <button data-view="calendar" title="Calendar (c)">Calendar</button>
       <button data-view="list" title="List (l)">List</button>
     </div>
-    <input id="search" type="search" placeholder="Search titles and prompts…" title="Search (/)" autocomplete="off">
+    <span class="search-box">
+      <input id="search" type="search" placeholder="Search sessions…" title="Search titles, prompts, notes and tags (/)" autocomplete="off">
+      <span class="muted ft-status" id="full-text-status" aria-live="polite"></span>
+    </span>
     <label class="check" title="Also search Claude's replies, tool calls and tool output, subagents included (at least 3 characters)"><input type="checkbox" id="full-text"> Full text</label>
-    <span class="muted ft-status" id="full-text-status" aria-live="polite"></span>
     <div class="dropdown" id="project-filter">
       <button class="dropdown-btn" id="project-btn">All projects ▾</button>
       <div class="dropdown-menu" id="project-menu" hidden></div>
     </div>
     <div class="chips" id="status-chips"></div>
-    <label class="check"><input type="checkbox" id="hide-noprompt"> Hide sessions without prompts</label>
+    <label class="check" title="Hide sessions with no prompts"><input type="checkbox" id="hide-noprompt"> With prompts only</label>
     <div class="spacer"></div>
     <button id="notify-toggle">Notify</button>
     <span class="live" id="live-indicator" title="Live updates">● live</span>

@@ -1,8 +1,8 @@
 """Notes and tags the user attaches to sessions, kept in a JSON file of their own.
 
-The logs stay read-only; this file is the only thing cc-calendar writes. It is keyed by session
-id, so one file serves every config directory, and entries are kept after a session's log is
-gone (Claude Code deletes old logs on its own).
+The logs stay read-only; besides the full-text search index (a cache), this file is the only
+thing cc-calendar writes. It is keyed by session id, so one file serves every config directory,
+and entries are kept after a session's log is gone (Claude Code deletes old logs on its own).
 """
 
 from __future__ import annotations

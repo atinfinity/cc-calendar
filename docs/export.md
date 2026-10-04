@@ -1,8 +1,9 @@
 # Export format
 
 The **Export** buttons in the list view download the sessions shown there as CSV or JSON. The file
-contains the sessions that pass the current filters (search, projects, statuses, "Hide sessions
-without prompts"), in the current sort order.
+contains the sessions that pass the current filters (search, projects, statuses, "With prompts
+only", and the list filters for model, branch, source, tag, dates and cost), in the current sort
+order.
 
 The file is named `cc-calendar-sessions-YYYY-MM-DD.csv` or `.json`, using the date of the export.
 
@@ -27,12 +28,12 @@ CSV and JSON carry the same fields, in this order.
 | `start` | string | First activity, ISO 8601 with your UTC offset, e.g. `2026-09-29T20:15:00+09:00` |
 | `end` | string | Last activity, same format |
 | `active_minutes` | number | Active time: the length of the drawn bars, one decimal place |
-| `span_minutes` | number | Minutes from `start` to `end`, idle time included |
+| `span_minutes` | number or null | Minutes from `start` to `end`, idle time included, one decimal place |
 | `prompts` | integer | Prompts you sent |
 | `tokens` | integer | All tokens, subagents included: input, output, cache reads and cache writes |
 | `cost_usd` | number | Cost in US dollars, four decimal places |
 | `cost_estimated` | boolean | `true` when the cost is estimated from token usage (shown with `~` in the app) |
-| `cache_hit_rate` | number or null | Cache reads as a share of input tokens, from 0 to 1 |
+| `cache_hit_rate` | number or null | Cache reads as a share of all input-side tokens (input, cache writes and cache reads), from 0 to 1 |
 | `model` | string or null | Model used for the most requests |
 | `effort` | string or null | Effort level most requests ran at: `max`, `xhigh`, `high`, `medium` or `low` |
 | `claude_code_version` | string or null | Claude Code version recorded in the log (the latest one if it changed) |
@@ -114,4 +115,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | Schema version | cc-calendar | Changes |
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
-| 1 | Unreleased | Added `source`, `tags` and `note` |
+| 1 | 0.4.0 | Added `source`, `tags` and `note` |
