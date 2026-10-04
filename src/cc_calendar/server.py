@@ -15,7 +15,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
 from . import __version__, gitinfo
-from .logview import build_entries
+from .logview import build_entries, log_events
 from .parser import SessionAcc
 from .stats import log_stats
 from .store import Store
@@ -214,11 +214,15 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
             entries = build_entries(path, filter_sid)
         except OSError as e:
             raise HTTPException(404, "log file not readable") from e
-        return {
+        out = {
             "total": len(entries),
             "offset": offset,
             "entries": entries[offset : offset + limit],
         }
+        if offset == 0:
+            # Lets the viewer jump to an event that is not loaded yet.
+            out["events"] = log_events(entries)
+        return out
 
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:

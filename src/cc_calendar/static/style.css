@@ -151,26 +151,31 @@ a { color: var(--accent); }
 .bar:hover { filter: brightness(1.08); z-index: 3; }
 .bar.selected { outline: 2px solid var(--text); outline-offset: 1px; z-index: 4; }
 .bar.dim { opacity: 0.25; }
-/* Event marks: time runs downward, so each mark is a horizontal tick at its moment. */
-.mark { position: absolute; pointer-events: none; transform: translateY(-50%); }
-.mark.prompt { left: 0; width: 3px; height: 2px; background: rgba(255, 255, 255, 0.95); }
-.mark.compact { left: 0; right: 0; border-top: 2px dashed rgba(255, 255, 255, 0.9); }
-.mark.commit, .mark.error { right: 2px; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #fff; }
-.mark.commit { background: #1f2328; }
-.mark.error { background: #e5484d; }
+/* Event marks: time runs downward, so each mark sits at its moment. Shapes tell the kinds
+   apart on any bar color: white tick = prompt, ring = commit, amber band = compaction,
+   red diamond = API error. */
+.mark { position: absolute; transform: translateY(-50%); cursor: pointer; z-index: 1; }
+.mark::before { content: ""; position: absolute; inset: -4px; } /* bigger click target */
+.mark:hover { z-index: 2; filter: brightness(1.15); }
+.m-prompt { left: 0; width: 7px; height: 3px; border-radius: 0 2px 2px 0; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45); }
+.m-compact { left: 0; right: 0; height: 4px; background: #f5a524; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45); }
+.m-commit, .m-error { right: 2px; width: 11px; height: 11px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.45); }
+.m-commit { border-radius: 50%; background: #fff; border: 3px solid #1f2328; }
+.m-error { width: 10px; height: 10px; background: #e5484d; border: 2px solid #fff; transform: translateY(-50%) rotate(45deg); }
+.m-prompt:hover, .m-commit:hover { transform: translateY(-50%) scale(1.3); }
+.m-error:hover { transform: translateY(-50%) rotate(45deg) scale(1.3); }
 .marks-key {
   display: inline-flex; align-items: center; gap: 10px; margin-left: auto; padding: 1px 8px;
   font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
 }
 .marks-key.off { opacity: 0.5; text-decoration: line-through; }
 .marks-key span { gap: 4px; }
-.mark-sample { position: relative; display: inline-block; width: 12px; height: 9px; border-radius: 2px; background: #8a8f98; }
-.mark-sample::after { content: ""; position: absolute; }
-.mark-sample.prompt::after { left: 0; top: 3.5px; width: 4px; height: 2px; background: #fff; }
-.mark-sample.compact::after { left: 0; right: 0; top: 3px; border-top: 2px dashed #fff; }
-.mark-sample.commit::after, .mark-sample.error::after { right: 1px; top: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid #fff; }
-.mark-sample.commit::after { background: #1f2328; }
-.mark-sample.error::after { background: #e5484d; }
+.mark-sample { position: relative; display: inline-block; width: 14px; height: 11px; border-radius: 2px; background: #8a8f98; vertical-align: -1px; }
+.mark-sample::after { content: ""; position: absolute; box-sizing: border-box; }
+.mark-sample.prompt::after { left: 0; top: 4px; width: 6px; height: 3px; background: #fff; }
+.mark-sample.compact::after { left: 0; right: 0; top: 3.5px; height: 4px; background: #f5a524; }
+.mark-sample.commit::after { left: 3px; top: 1.5px; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2.5px solid #1f2328; }
+.mark-sample.error::after { left: 3.5px; top: 2px; width: 7px; height: 7px; background: #e5484d; border: 1.5px solid #fff; transform: rotate(45deg); }
 .now-line { position: absolute; left: 0; right: 0; border-top: 2px solid var(--now); z-index: 4; pointer-events: none; }
 .now-line::before {
   content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px;
@@ -222,7 +227,7 @@ a { color: var(--accent); }
 .check-pill.na { color: var(--muted); border-style: dashed; }
 .prompt { padding: 6px 0; border-bottom: 1px dashed var(--border); }
 .prompt:last-child { border-bottom: none; }
-.prompt .when { font-size: 11px; color: var(--muted); margin-right: 6px; }
+.prompt .when, .prompt button.when { font-size: 11px; color: var(--muted); margin-right: 6px; }
 .prompt .text { white-space: pre-wrap; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .prompt .text.open { display: block; }
 .prompt .kind { font-size: 10px; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 4px; color: var(--muted); }
@@ -246,6 +251,20 @@ details > summary { cursor: pointer; padding: 3px 0; }
 .log-body { flex: 1; overflow: auto; padding: 12px 18px 40px; }
 .log-stats { max-height: 45vh; overflow: auto; padding: 10px 18px; border-bottom: 1px solid var(--border); background: var(--bg-soft); }
 .log-stats[hidden] { display: none; }
+.log-events { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.log-events[hidden] { display: none; }
+.ev-nav { display: inline-flex; align-items: center; gap: 5px; }
+.ev-nav button { padding: 0 7px; line-height: 18px; font-size: 14px; }
+.ev-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 0 6px; margin-right: 6px; border-radius: 999px; color: #fff; text-transform: uppercase; letter-spacing: 0.03em; vertical-align: 1px; }
+.ev-badge.commit { background: #1f2328; }
+.ev-badge.compact { background: #c27c0e; }
+.ev-badge.error { background: #e5484d; }
+.entry.ev-commit > details { border-left: 3px solid #1f2328; }
+.entry.ev-compact { border-top: 2px solid #f5a524; padding-top: 4px; }
+.entry.flash { animation: flash 2.2s ease-out; border-radius: 6px; }
+@keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--accent); background: var(--accent-soft); } 100% { box-shadow: 0 0 0 3px transparent; } }
+button.log-link { border: none; background: none; padding: 0; font: inherit; color: var(--muted); cursor: pointer; }
+button.log-link:hover { background: none; color: var(--accent); text-decoration: underline; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; margin-bottom: 10px; }
 .tile { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
 .tile .k { font-size: 11px; color: var(--muted); }

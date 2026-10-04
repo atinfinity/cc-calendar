@@ -1,7 +1,7 @@
 // Week or day calendar: activity segments as bars, laid out in lanes like Google Calendar.
 import { colorFor, legendItems, openDay, rangeDays, state } from "./app.js";
 import { dayTotalLabel, renderSummary, summarize } from "./summary.js";
-import { MIN_HOUR_PX, STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, matchSnippet } from "./util.js";
+import { MARK_KINDS, MIN_HOUR_PX, STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, matchSnippet } from "./util.js";
 
 const HOUR_MS = 3600_000;
 const BUCKET_MS = 600_000;
@@ -11,7 +11,7 @@ const MIN_BAR_PX = 4;
 const MIN_LANE_MS = (MIN_BAR_PX / MIN_HOUR_PX) * HOUR_MS;
 let scrolledOnce = false;
 
-export function renderCalendar(container, visible, { onSelect, onToggleMarks, legend, rangeLabel, rangeCount, summaryPane }) {
+export function renderCalendar(container, visible, { onSelect, onOpenEvent, onToggleMarks, legend, rangeLabel, rangeCount, summaryPane }) {
   const prevScroll = container.scrollTop;
   hideTip();
   const days = rangeDays();
@@ -118,7 +118,7 @@ export function renderCalendar(container, visible, { onSelect, onToggleMarks, le
         onmouseenter: (e) => showTip(e, s, p),
         onmousemove: moveTip,
         onmouseleave: hideTip,
-      }, height >= 15 ? s.title : "", ...(state.showMarks ? barMarks(s, p, scale, height) : []));
+      }, height >= 15 ? s.title : "", ...(state.showMarks ? barMarks(s, p, scale, height, onOpenEvent) : []));
       bars.append(bar);
     }
     col.append(bars);
@@ -177,22 +177,34 @@ function layout(sessions, dayStart, dayEnd) {
   return pieces;
 }
 
-export const MARK_KINDS = [
-  // [kind, legend label, noun in the tooltip]
-  ["prompt", "Prompt", "prompt"],
-  ["commit", "Commit", "commit"],
-  ["compact", "Compaction", "compaction"],
-  ["error", "API error", "API error"],
-];
-
-// Ticks for the events that fall inside this piece of the bar.
-function barMarks(s, p, scale, height) {
+// Marks for the events that fall inside this piece of the bar; clicking one opens the log there.
+function barMarks(s, p, scale, height, onOpenEvent) {
   if (height < 8) return [];
   // Keep marks at the very start or end of the bar fully visible.
-  const y = (t) => Math.min(Math.max((t - p.start) * scale, 4), height - 4);
+  const y = (t) => Math.min(Math.max((t - p.start) * scale, 5), height - 5);
   return (s.marks || [])
     .filter(([t]) => t >= p.start && t <= p.end)
-    .map(([t, kind]) => h("i", { class: `mark ${kind}`, style: { top: `${y(t)}px` } }));
+    .map(([t, kind]) => h("i", {
+      class: `mark m-${kind}`,
+      style: { top: `${y(t)}px` },
+      onclick: (e) => {
+        e.stopPropagation();
+        hideTip();
+        onOpenEvent(s.id, t, kind);
+      },
+      onmouseenter: (e) => showMarkTip(e, s, t, kind),
+      onmouseleave: (e) => showTip(e, s, p),
+    }));
+}
+
+function showMarkTip(e, s, t, kind) {
+  const label = MARK_KINDS.find(([k]) => k === kind)[1];
+  tip().replaceChildren(
+    h("div", { style: { fontWeight: 600 } }, h("i", { class: `mark-sample ${kind}` }), ` ${label} · ${fmtTime(t)}`),
+    h("div", { class: "muted" }, s.title),
+    h("div", { class: "muted" }, "Click to open the log here"));
+  tip().hidden = false;
+  moveTip(e);
 }
 
 function markCounts(s, from, to) {

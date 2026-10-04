@@ -8,7 +8,14 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from .parser import classify_user, command_text, content_text, parse_ts, tool_result_text
+from .parser import (
+    GIT_COMMIT_RE,
+    classify_user,
+    command_text,
+    content_text,
+    parse_ts,
+    tool_result_text,
+)
 
 MAX_TEXT = 20_000
 MAX_INPUT = 4_000
@@ -58,17 +65,33 @@ def build_entries(path: Path, session_id: str | None) -> list[dict]:
         return _cache[key]
     entries: list[dict] = []
     tool_names: dict[str, str] = {}
+    commit_calls: set[str] = set()
     for rec in iter_records(path, session_id):
-        entries.extend(_entries_for(rec, tool_names))
+        entries.extend(_entries_for(rec, tool_names, commit_calls))
     for i, e in enumerate(entries):
         e["i"] = i
+    _tag_commits(entries, commit_calls)
     _cache[key] = entries
     while len(_cache) > CACHE_SIZE:
         _cache.popitem(last=False)
     return entries
 
 
-def _entries_for(rec: dict, tool_names: dict[str, str]) -> list[dict]:
+def _tag_commits(entries: list[dict], commit_calls: set[str]) -> None:
+    """Mark git commit calls that succeeded, matching the commits drawn on the calendar."""
+    calls = {e["id"]: e for e in entries if e["kind"] == "tool_use" and e["id"] in commit_calls}
+    for e in entries:
+        call = calls.get(e.get("tool_use_id")) if e["kind"] == "tool_result" else None
+        if call and not e["is_error"] and not e.get("interrupted"):
+            call["event"] = "commit"
+
+
+def log_events(entries: list[dict]) -> list[tuple[int, int | None, str]]:
+    """(index, ts, kind) of the entries that correspond to the calendar's event marks."""
+    return [(e["i"], e["ts"], e["event"]) for e in entries if "event" in e]
+
+
+def _entries_for(rec: dict, tool_names: dict[str, str], commit_calls: set[str]) -> list[dict]:
     rtype = rec.get("type")
     ts = parse_ts(rec.get("timestamp"))
     msg = rec.get("message") or {}
@@ -76,6 +99,8 @@ def _entries_for(rec: dict, tool_names: dict[str, str]) -> list[dict]:
     if rtype == "user":
         kind = classify_user(rec)
         if kind == "tool_result":
+            tur = rec.get("toolUseResult")
+            interrupted = isinstance(tur, dict) and bool(tur.get("interrupted"))
             out = []
             for b in content if isinstance(content, list) else []:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
@@ -87,15 +112,17 @@ def _entries_for(rec: dict, tool_names: dict[str, str]) -> list[dict]:
                             "tool_use_id": tid,
                             "name": tool_names.get(tid, ""),
                             "is_error": bool(b.get("is_error")),
+                            "interrupted": interrupted,
                             "text": _clip(tool_result_text(b.get("content"))),
                         }
                     )
             return out
         text = content_text(content)
         if kind == "prompt":
-            return [{"kind": "user", "ts": ts, "text": _clip(text)}]
+            return [{"kind": "user", "ts": ts, "text": _clip(text), "event": "prompt"}]
         if kind == "command":
-            return [{"kind": "user", "ts": ts, "text": command_text(text), "command": True}]
+            text = command_text(text)
+            return [{"kind": "user", "ts": ts, "text": text, "command": True, "event": "prompt"}]
         if kind == "interrupt":
             return [{"kind": "interrupt", "ts": ts, "text": text.strip()}]
         if kind == "compact":
@@ -104,8 +131,9 @@ def _entries_for(rec: dict, tool_names: dict[str, str]) -> list[dict]:
             return [{"kind": "notification", "ts": ts, "text": _clip(text, 2000)}]
         return [{"kind": "meta", "ts": ts, "text": _clip(text, 4000)}]
     if rtype == "assistant":
-        if msg.get("model") == "<synthetic>":
-            return [{"kind": "error", "ts": ts, "text": _clip(content_text(content), 2000)}]
+        if msg.get("model") == "<synthetic>" or rec.get("isApiErrorMessage"):
+            text = _clip(content_text(content), 2000)
+            return [{"kind": "error", "ts": ts, "text": text, "event": "error"}]
         out = []
         for b in content if isinstance(content, list) else []:
             if not isinstance(b, dict):
@@ -119,6 +147,8 @@ def _entries_for(rec: dict, tool_names: dict[str, str]) -> list[dict]:
                 inp = b.get("input") if isinstance(b.get("input"), dict) else {}
                 name = b.get("name", "")
                 tool_names[b.get("id")] = name
+                if name == "Bash" and GIT_COMMIT_RE.search(str(inp.get("command", ""))):
+                    commit_calls.add(b.get("id"))
                 entry = {
                     "kind": "tool_use",
                     "ts": ts,
@@ -138,7 +168,8 @@ def _entries_for(rec: dict, tool_names: dict[str, str]) -> list[dict]:
     if rtype == "system":
         sub = rec.get("subtype")
         if sub == "compact_boundary":
-            return [{"kind": "compact", "ts": ts, "text": "— context compacted —"}]
+            text = "— context compacted —"
+            return [{"kind": "compact", "ts": ts, "text": text, "event": "compact"}]
         if sub in ("turn_duration", None):
             return []
         return [{"kind": "system", "ts": ts, "text": f"{sub}: {rec.get('content', '')}"[:2000]}]
