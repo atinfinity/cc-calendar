@@ -1,6 +1,6 @@
 [project]
 name = "cc-calendar"
-version = "0.4.0"
+version = "0.4.1"
 description = "Google Calendar-style weekly view of your Claude Code sessions"
 readme = "README.md"
 license = "MIT"
