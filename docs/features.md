@@ -98,6 +98,18 @@
     - Search over titles and prompts.
     - Filter by project and status.
     - Sort by any column.
+- **Project page**: click a project name to open it. Project names can be clicked in the list,
+  the Summary table, the detail pane, and the project menu (**Page**). The page covers all time
+  and ignores the filters. It shows:
+    - total active time, cost, sessions, prompts, tokens and commits
+    - active time, cost, sessions and commits per month
+    - every session of the project; click one to open its details
+    - the commit history, newest first, with links to the commits on GitHub or GitLab
+
+    **← Back** or ++esc++ returns to the calendar or list.
+
+![Project page](images/project.png)
+
 - **Export**: download the sessions shown in the list view as CSV or JSON. The file follows
   the current filters and sort order. It covers:
     - start and end (ISO 8601 with your UTC offset) and active time

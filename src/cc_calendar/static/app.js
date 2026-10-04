@@ -4,6 +4,7 @@ import { renderDetail } from "./detail.js";
 import { exportSessions } from "./export.js";
 import { bindNotifyToggle, checkTransitions } from "./notify.js";
 import { overviewRange, renderOverview } from "./overview.js";
+import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
 import { renderToolsPane } from "./toolspane.js";
 import { openLog } from "./transcript.js";
@@ -38,6 +39,7 @@ export const state = {
   dataVersion: 0, // bumped on every reload so cached aggregates refresh
   showMarks: prefs.get("marks", true),
   selectedId: null,
+  project: null, // path of the project whose page is open, or null
   projectColors: new Map(),
   modelColors: new Map(),
 };
@@ -162,6 +164,7 @@ async function refreshDetail() {
       onClose: () => { state.selectedId = null; refreshDetail(); renderMain(); },
       onOpenLog: (agent, target) => openLog(d, agent, target),
       onSelect: (sid) => select(sid),
+      onOpenProject: () => openProject(d.project),
     });
   } catch (e) {
     pane.replaceChildren(h("div", { class: "empty" }, "Session not found."));
@@ -175,9 +178,29 @@ function renderAll() {
   renderMain();
 }
 
+// Show a project's page in place of the calendar or list.
+export function openProject(project) {
+  state.project = project;
+  renderAll();
+  $("project-view").querySelector(".project-body")?.scrollTo(0, 0);
+}
+
+function closeProject() {
+  state.project = null;
+  renderAll();
+}
+
 function renderMain() {
-  $("calendar-view").hidden = state.view !== "calendar";
-  $("list-view").hidden = state.view !== "list";
+  $("calendar-view").hidden = state.view !== "calendar" || state.project != null;
+  $("list-view").hidden = state.view !== "list" || state.project != null;
+  $("project-view").hidden = state.project == null;
+  if (state.project != null) {
+    // Live updates re-render the page; keep the reader's place.
+    const top = $("project-view").querySelector(".project-body")?.scrollTop || 0;
+    renderProject($("project-view"), state.project, { onBack: closeProject });
+    $("project-view").querySelector(".project-body")?.scrollTo(0, top);
+    return;
+  }
   const visible = filtered();
   const overview = state.span === "month" || state.span === "year";
   // Month and year cells are shaded by time or cost, so bar zoom and colors do not apply.
@@ -223,7 +246,7 @@ function renderTools(visible) {
 
 function renderToolbar() {
   document.querySelectorAll("#view-toggle button").forEach((b) =>
-    b.classList.toggle("active", b.dataset.view === state.view));
+    b.classList.toggle("active", state.project == null && b.dataset.view === state.view));
   document.querySelectorAll("#color-by button").forEach((b) =>
     b.classList.toggle("active", b.dataset.color === state.colorBy));
   document.querySelectorAll("#span-toggle button").forEach((b) =>
@@ -281,7 +304,12 @@ function renderProjectMenu() {
           },
         }),
         h("span", { class: "dot", style: { background: state.projectColors.get(path) } }),
-        `${e.name} `, h("span", { class: "muted" }, `(${e.n})`))),
+        `${e.name} `, h("span", { class: "muted" }, `(${e.n})`),
+        h("button", {
+          class: "open-project",
+          title: "Open the project page",
+          onclick: (ev) => { ev.preventDefault(); $("project-menu").hidden = true; openProject(path); },
+        }, "Page"))),
   );
 }
 
@@ -349,7 +377,8 @@ function renderList(visible) {
         },
           h("td", {}, h("span", { class: "dot", title: STATUS_LABELS[s.status], style: { background: statusColor(s.status) } })),
           h("td", { class: "title-cell" }, s.title, matchSnippet(s, state.search)),
-          h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }), s.project_name),
+          h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }),
+            projectLink(s.project, s.project_name)),
           h("td", { class: "num" }, fmtDateTime(s.start)),
           h("td", { class: "num", title: fmtDateTime(s.end) }, fmtAgo(s.end)),
           h("td", { class: "num" }, fmtDuration(s.end - s.start)),
@@ -361,6 +390,15 @@ function renderList(visible) {
         ))),
     ),
   );
+}
+
+// A project name that opens the project page.
+export function projectLink(project, name) {
+  return h("button", {
+    class: "project-link",
+    title: `${project}\nOpen the project page`,
+    onclick: (e) => { e.stopPropagation(); openProject(project); },
+  }, name);
 }
 
 // ------------------------------------------------------------------ controls
@@ -411,6 +449,7 @@ function bind() {
   document.querySelectorAll("#view-toggle button").forEach((b) =>
     b.addEventListener("click", () => {
       state.view = b.dataset.view;
+      state.project = null;
       prefs.set("view", state.view);
       renderAll();
     }));
@@ -480,10 +519,13 @@ function bind() {
     if (!$("project-filter").contains(e.target)) $("project-menu").hidden = true;
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && $("log-modal").hidden && state.selectedId) {
+    if (e.key !== "Escape" || !$("log-modal").hidden) return;
+    if (state.selectedId) {
       state.selectedId = null;
       refreshDetail();
       renderMain();
+    } else if (state.project != null) {
+      closeProject();
     }
   });
 }
