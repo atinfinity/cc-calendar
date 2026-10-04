@@ -113,7 +113,8 @@
 ![Transcript viewer with stats](images/transcript.png)
 
 - **Transcript viewer**:
-    - Markdown rendering and collapsible tool calls.
+    - Markdown rendering and collapsible tool calls. Images linked in a transcript show as links and
+      are not loaded (see [Privacy](privacy.md)).
     - Optional thinking and metadata.
     - Drill-down into subagent transcripts.
     - A stats panel per transcript, with tokens and cost by model and calls and errors by tool.

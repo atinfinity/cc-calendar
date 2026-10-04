@@ -36,6 +36,20 @@ NO_CACHE = {"Cache-Control": "no-cache"}
 # Reject requests whose Host is not loopback: a page on another site could otherwise
 # rebind its domain to 127.0.0.1 (DNS rebinding) and read transcripts through the browser.
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+# Transcripts can hold HTML and Markdown that point anywhere (`![](https://…)`, a style with
+# url(…)). Let the browser load nothing from other origins, so viewing a log never contacts
+# another host.
+CSP = "; ".join(
+    [
+        "default-src 'self'",
+        "img-src 'self' data:",
+        "object-src 'none'",
+        "frame-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+        "frame-ancestors 'none'",
+    ]
+)
 
 
 class NoCacheStaticFiles(StaticFiles):
@@ -230,6 +244,13 @@ def create_app(
 
     app = FastAPI(title="cc-calendar", version=__version__, lifespan=lifespan)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
+
+    @app.middleware("http")
+    async def content_security_policy(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = CSP
+        return response
+
     app.state.store = store
     app.state.notes = notes
 
