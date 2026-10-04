@@ -12,6 +12,8 @@ from .parser import (
     GIT_COMMIT_RE,
     classify_user,
     command_text,
+    compact_extra,
+    compact_info,
     content_text,
     parse_ts,
     tool_result_text,
@@ -169,7 +171,8 @@ def _entries_for(rec: dict, tool_names: dict[str, str], commit_calls: set[str]) 
         sub = rec.get("subtype")
         if sub == "compact_boundary":
             text = "— context compacted —"
-            return [{"kind": "compact", "ts": ts, "text": text, "event": "compact"}]
+            entry = {"kind": "compact", "ts": ts, "text": text, "event": "compact"}
+            return [{**entry, **compact_extra(compact_info(rec))}]
         if sub in ("turn_duration", None):
             return []
         return [{"kind": "system", "ts": ts, "text": f"{sub}: {rec.get('content', '')}"[:2000]}]

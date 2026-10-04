@@ -1,7 +1,7 @@
 // Week or day calendar: activity segments as bars, laid out in lanes like Google Calendar.
 import { colorFor, legendItems, openDay, rangeDays, state } from "./app.js";
 import { dayTotalLabel, renderSummary, summarize } from "./summary.js";
-import { MARK_KINDS, MIN_HOUR_PX, STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, matchSnippet } from "./util.js";
+import { MARK_KINDS, compactDetail, MIN_HOUR_PX, STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, matchSnippet } from "./util.js";
 
 const HOUR_MS = 3600_000;
 const BUCKET_MS = 600_000;
@@ -184,7 +184,7 @@ function barMarks(s, p, scale, height, onOpenEvent) {
   const y = (t) => Math.min(Math.max((t - p.start) * scale, 5), height - 5);
   return (s.marks || [])
     .filter(([t]) => t >= p.start && t <= p.end)
-    .map(([t, kind]) => h("i", {
+    .map(([t, kind, extra]) => h("i", {
       class: `mark m-${kind}`,
       style: { top: `${y(t)}px` },
       onclick: (e) => {
@@ -192,17 +192,20 @@ function barMarks(s, p, scale, height, onOpenEvent) {
         hideTip();
         onOpenEvent(s.id, t, kind);
       },
-      onmouseenter: (e) => showMarkTip(e, s, t, kind),
+      onmouseenter: (e) => showMarkTip(e, s, t, kind, extra),
       onmouseleave: (e) => showTip(e, s, p),
     }));
 }
 
-function showMarkTip(e, s, t, kind) {
+function showMarkTip(e, s, t, kind, extra) {
   const label = MARK_KINDS.find(([k]) => k === kind)[1];
-  tip().replaceChildren(
+  const detail = kind === "compact" ? compactDetail(extra) : "";
+  tip().replaceChildren(...[
     h("div", { style: { fontWeight: 600 } }, h("i", { class: `mark-sample ${kind}` }), ` ${label} · ${fmtTime(t)}`),
+    detail ? h("div", {}, detail) : null,
     h("div", { class: "muted" }, s.title),
-    h("div", { class: "muted" }, "Click to open the log here"));
+    h("div", { class: "muted" }, "Click to open the log here"),
+  ].filter(Boolean));
   tip().hidden = false;
   moveTip(e);
 }

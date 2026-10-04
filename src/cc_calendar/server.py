@@ -70,6 +70,7 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "cache_hit": cache_hit,
         "cache_saved": round(cache_saved, 4),
         "model": models[0] if models else None,
+        "effort": s.effort(),
         "continued_in": s.continued_in,
         "continued_from": continued_from,
         "search": search,
@@ -93,6 +94,8 @@ def detail(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str | 
         {
             "cwd": s.cwd,
             "models": s.models(),
+            "efforts": s.effort_mix(),
+            "compactions": s.compactions,
             "permission_mode": s.permission_mode,
             "context_pct": s.context_pct(),
             "checks": checks,

@@ -260,11 +260,11 @@ def test_marks():
     b._base("system", 3, subtype="compact_boundary")
     b.assistant(4, [{"type": "text", "text": "API Error"}], msg_id="e1", model="<synthetic>")
     s = feed(b)
-    kinds = [k for _, k in s.marks()]
+    kinds = [m[1] for m in s.marks()]
     assert kinds.count("prompt") == 1 and kinds.count("commit") == 1
-    assert (T0 + 3 * MIN, "compact") in s.marks()
+    assert (T0 + 3 * MIN, "compact", {}) in s.marks()
     assert (T0 + 4 * MIN, "error") in s.marks()
-    assert s.marks() == sorted(s.marks())
+    assert [m[0] for m in s.marks()] == sorted(m[0] for m in s.marks())
 
 
 def test_log_events_match_marks(tmp_path):
@@ -273,8 +273,33 @@ def test_log_events_match_marks(tmp_path):
     b.assistant(4, [{"type": "text", "text": "API Error"}], msg_id="e1", model="<synthetic>")
     entries = build_entries(b.write(tmp_path / "s.jsonl"), b.sid)
     events = log_events(entries)
-    assert sorted(k for _, _, k in events) == sorted(k for _, k in feed(b).marks())
+    assert sorted(k for _, _, k in events) == sorted(m[1] for m in feed(b).marks())
     for i, _, kind in events:
         assert entries[i]["event"] == kind
     commit = next(entries[i] for i, _, k in events if k == "commit")
     assert commit["kind"] == "tool_use" and commit["name"] == "Bash"
+
+
+def test_effort_mix():
+    b = basic_session()
+    b.assistant(5, [{"type": "text", "text": "a"}], msg_id="x1", effort="low")
+    b.assistant(5.1, [{"type": "text", "text": "a"}], msg_id="x1", effort="low")  # same request
+    b.assistant(6, [{"type": "text", "text": "b"}], msg_id="x2", effort="high")
+    b.assistant(7, [{"type": "text", "text": "c"}], msg_id="x3", effort="low")
+    s = feed(b)
+    assert s.effort_mix() == {"high": 1, "low": 2}
+    assert s.effort() == "low"
+    assert feed(basic_session()).effort() is None
+
+
+def test_compaction_sizes(tmp_path):
+    b = basic_session()
+    meta = {"trigger": "auto", "preTokens": 167_000, "postTokens": 31_000}
+    b._base("system", 3, subtype="compact_boundary", compactMetadata=meta)
+    s = feed(b)
+    info = {"trigger": "auto", "pre": 167_000, "post": 31_000}
+    assert s.compactions == [{"ts": T0 + 3 * MIN, **info}]
+    assert (T0 + 3 * MIN, "compact", info) in s.marks()
+    entries = build_entries(b.write(tmp_path / "s.jsonl"), b.sid)
+    compact = next(e for e in entries if e.get("event") == "compact")
+    assert (compact["pre"], compact["post"], compact["trigger"]) == (167_000, 31_000, "auto")

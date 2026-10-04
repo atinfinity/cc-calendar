@@ -1,6 +1,6 @@
 // Right-hand detail pane for one session.
 import {
-  STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
+  STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, compactDetail, fmtEffortMix, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
   shortModel, statusColor,
 } from "./util.js";
 
@@ -51,7 +51,10 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
       d.cache_hit == null ? null : h("span", { class: "stat" + (d.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(d.cache_hit, d.cache_saved) },
         `cache ${fmtPct(d.cache_hit)}`),
       ctx,
-      ...d.models.map((m) => h("span", { class: "stat" }, shortModel(m)))),
+      ...d.models.map((m) => h("span", { class: "stat" }, shortModel(m))),
+      fmtEffortMix(d.efforts) ? h("span", { class: "stat", title: "Effort level: share of API requests" }, `effort ${fmtEffortMix(d.efforts)}`) : null,
+      d.compactions.length ? h("span", { class: "stat", title: d.compactions.map((c) => `${fmtTime(c.ts)}  ${compactDetail(c)}`).join("\n") },
+        `${d.compactions.length} compaction${d.compactions.length > 1 ? "s" : ""}`) : null),
   ];
 
   if (d.continued_from || d.continued_in) {

@@ -1,6 +1,6 @@
 // Modal transcript viewer with lazy loading and subagent drill-down.
 import {
-  MARK_KINDS, cacheTitle, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
+  MARK_KINDS, cacheTitle, compactDetail, fmtCost, fmtEffortMix, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
   shortModel,
 } from "./util.js";
 
@@ -189,6 +189,11 @@ function tile(label, value, sub, title) {
     h("div", { class: "v" }, value, sub ? h("small", {}, ` ${sub}`) : null));
 }
 
+function compactSizes(list) {
+  const sized = (list || []).filter((c) => c.pre != null);
+  return sized.map((c) => `${fmtTokens(c.pre)}→${fmtTokens(c.post)}`).join(", ");
+}
+
 function renderStats(panel, st) {
   const d = view.detail;
   const main = !view.agent;
@@ -207,7 +212,8 @@ function renderStats(panel, st) {
     tile("API requests", st.requests, st.api_errors ? `${st.api_errors} errors` : ""),
     tile("Tool calls", toolCalls, toolErrors ? `${toolErrors} errors` : ""),
     st.interrupts ? tile("Interrupts", st.interrupts) : null,
-    st.compactions ? tile("Compactions", st.compactions) : null,
+    st.compactions ? tile("Compactions", st.compactions, compactSizes(st.compaction_sizes), "Context size before → after each compaction") : null,
+    fmtEffortMix(st.efforts) ? tile("Effort", fmtEffortMix(st.efforts), "", "Share of API requests per effort level") : null,
     st.thinking_blocks ? tile("Thinking blocks", st.thinking_blocks) : null,
     tile("Input", fmtTokens(t.input), "tok"),
     tile("Output", fmtTokens(t.output), "tok"),
@@ -354,6 +360,10 @@ function renderEntry(e, results, opts) {
     case "error":
       return h("div", { class: `entry ${e.kind}` }, e.text);
     case "compact":
+      if (e.event) {
+        const detail = compactDetail(e);
+        return h("div", { class: "entry compact" }, detail ? `— context compacted (${detail}) —` : e.text);
+      }
       return h("div", { class: "entry compact" },
         e.text.length > 80
           ? h("details", {}, h("summary", {}, "— context compacted (summary) —"), h("pre", { style: { textAlign: "left" } }, e.text))

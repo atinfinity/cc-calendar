@@ -74,6 +74,7 @@ class LogBuilder:
         output_tokens: int = 10,
         stop_reason: str | None = None,
         usage: dict | None = None,
+        effort: str | None = None,
     ) -> dict:
         u = {"input_tokens": 100, "output_tokens": output_tokens, "cache_read_input_tokens": 1000}
         u.update(usage or {})
@@ -81,6 +82,7 @@ class LogBuilder:
             "assistant",
             minute,
             requestId=f"req-{msg_id}",
+            **({"effort": effort} if effort else {}),
             message={
                 "id": msg_id,
                 "role": "assistant",
