@@ -29,7 +29,24 @@ The server binds to `127.0.0.1` on a free port and opens your browser. It reads 
 | --- | --- |
 | `--port N` | Listen on a specific port instead of a free one |
 | `--no-browser` | Do not open a browser window |
-| `--claude-dir PATH` | Read logs from another Claude Code config directory (default `~/.claude`) |
+| `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
+
+## Several config directories
+
+Pass `--claude-dir` more than once to see sessions from several places together, such as
+`~/.claude` directories synced from other machines or separate configs used with
+`CLAUDE_CONFIG_DIR`. Only the directories you list are read, so include `~/.claude` to keep
+your local sessions:
+
+```sh
+cc-calendar --claude-dir ~/.claude --claude-dir ~/sync/laptop/.claude --claude-dir work=~/.claude-work
+```
+
+Each directory gets a name: the one you give with `NAME=`, otherwise `local` for `~/.claude`, the
+parent folder for a path ending in `.claude` (`laptop` above), or the folder itself. Sessions show
+where they came from in the list (**Source** column and filter), the detail pane and the calendar
+tooltip, and **Color by → Source** colors them by directory. A session found in more than one
+directory is shown once, from the copy with the latest activity.
 
 ## Finding your way around
 

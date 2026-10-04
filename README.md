@@ -31,7 +31,24 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 | --- | --- |
 | `--port N` | Listen on a specific port instead of a free one |
 | `--no-browser` | Do not open a browser window |
-| `--claude-dir PATH` | Read logs from another Claude Code config directory (default `~/.claude`) |
+| `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
+
+### Several config directories
+
+Pass `--claude-dir` more than once to see sessions from several places together, such as
+`~/.claude` directories synced from other machines or separate configs used with
+`CLAUDE_CONFIG_DIR`. Only the directories you list are read, so include `~/.claude` to keep
+your local sessions:
+
+```sh
+cc-calendar --claude-dir ~/.claude --claude-dir ~/sync/laptop/.claude --claude-dir work=~/.claude-work
+```
+
+Each directory gets a name: the one you give with `NAME=`, otherwise `local` for `~/.claude`, the
+parent folder for a path ending in `.claude` (`laptop` above), or the folder itself. Sessions show
+where they came from in the list (**Source** column and filter), the detail pane and the calendar
+tooltip, and **Color by → Source** colors them by directory. A session found in more than one
+directory is shown once, from the copy with the latest activity.
 
 ## Features
 
@@ -61,7 +78,8 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   in the detail pane) to open the transcript at that point; the transcript has ‹ › buttons to step
   through each kind of event. Click the key next to the legend to hide the marks.
 - **Activity density** — a heat strip behind each day shows prompts and responses per 10 minutes.
-- **Colors** by project, status, model, effort (the level most requests ran at) or cost
+- **Colors** by project, status, model, effort (the level most requests ran at), source (with
+  several config directories) or cost
   (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
 - **Effort and compactions** — the detail pane and transcript stats show the share of requests
   per effort level, and each compaction shows its trigger and context size before → after
@@ -82,7 +100,8 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   requests, tokens and cost by model, tool calls and errors by tool).
 - **List view** with search over titles and prompts (a match inside a prompt is shown under the title), project and status filters, and sorting by
   any column (click a header; click again to reverse). List-only filters narrow it down further
-  by model, git branch, date range (sessions active on any day in the range) and cost range.
+  by model, git branch, source (with several config directories), date range (sessions active on
+  any day in the range) and cost range.
 - **Project page** — click a project name (in the list, the Summary table, the detail pane or the
   project menu) to see the project over all time: total active time and cost, activity by month,
   every session, and its commit history with links to the repository.

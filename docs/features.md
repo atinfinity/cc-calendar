@@ -17,7 +17,8 @@
     - Month cells list the day's busiest projects.
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
-- **Colors** by project, status, model, effort (the level most requests ran at) or cost
+- **Colors** by project, status, model, effort (the level most requests ran at), source (with
+  several config directories) or cost
   (< \$1 / \$1–5 / \$5–20 / \$20–50 / ≥ \$50).
 - **Event marks** on each bar show when prompts, commits, compactions and API errors happened.
     - The tooltip counts them for that block.
@@ -97,9 +98,9 @@
 - **List view**:
     - Search over titles and prompts.
     - Filter by project and status.
-    - Narrow the list further by model, git branch, date range and cost range. The date range
-      keeps sessions that were active on any day in it. These filters apply to the list only;
-      **Clear** resets them.
+    - Narrow the list further by model, git branch, source (with several config directories),
+      date range and cost range. The date range keeps sessions that were active on any day in it.
+      These filters apply to the list only; **Clear** resets them.
     - Sort by any column.
 - **Project page**: click a project name to open it. Project names can be clicked in the list,
   the Summary table, the detail pane, and the project menu (**Page**). The page covers all time
