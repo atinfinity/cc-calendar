@@ -1,0 +1,110 @@
+# Export format
+
+The **Export** buttons in the list view download the sessions shown there as CSV or JSON. The file
+contains the sessions that pass the current filters (search, projects, statuses, "Hide sessions
+without prompts"), in the current sort order.
+
+The file is named `cc-calendar-sessions-YYYY-MM-DD.csv` or `.json`, using the date of the export.
+
+!!! warning "Exports contain your session data"
+
+    Titles are taken from your prompts, and paths come from your machine. Treat exported files like
+    the transcripts themselves.
+
+## Fields
+
+CSV and JSON carry the same fields, in this order.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | Claude Code session ID |
+| `title` | string | Session title: Claude Code's generated title, else the first line of the first prompt |
+| `project` | string | Project name as shown in the app |
+| `project_path` | string | Working directory of the session |
+| `branch` | string or null | Git branch recorded in the log |
+| `status` | string | `running`, `waiting`, `done` or `interrupted` |
+| `start` | string | First activity, ISO 8601 with your UTC offset, e.g. `2026-09-29T20:15:00+09:00` |
+| `end` | string | Last activity, same format |
+| `active_minutes` | number | Active time: the length of the drawn bars, one decimal place |
+| `span_minutes` | number | Minutes from `start` to `end`, idle time included |
+| `prompts` | integer | Prompts you sent |
+| `tokens` | integer | All tokens, subagents included: input, output, cache reads and cache writes |
+| `cost_usd` | number | Cost in US dollars, four decimal places |
+| `cost_estimated` | boolean | `true` when the cost is estimated from token usage (shown with `~` in the app) |
+| `cache_hit_rate` | number or null | Cache reads as a share of input tokens, from 0 to 1 |
+| `model` | string or null | Model used for the most requests |
+| `effort` | string or null | Effort level most requests ran at: `max`, `xhigh`, `high`, `medium` or `low` |
+| `claude_code_version` | string or null | Claude Code version recorded in the log (the latest one if it changed) |
+| `commits` | integer | Commits made in the session |
+
+`active_minutes` depends on the **Split after … idle** setting. Idle gaps longer than that
+setting are not counted.
+
+Costs are rough figures, not billing data. See [About costs](features.md#time-cost-and-usage).
+
+## CSV
+
+- UTF-8 with a byte order mark, so Excel reads non-ASCII titles correctly. Lines end with CRLF.
+- The first row is the header, with the field names above. There are no other metadata rows.
+- Fields containing a comma, a double quote or a line break are quoted, with `"` doubled
+  ([RFC 4180](https://www.rfc-editor.org/rfc/rfc4180)).
+- Empty cells stand for `null`. Booleans are `true` / `false`.
+- Some text values start with `=`, `+`, `-`, `@`, a tab or a carriage return. These are prefixed
+  with `'`, so spreadsheets do not run them as formulas.
+
+## JSON
+
+JSON wraps the records in an object that identifies the format:
+
+```json
+{
+  "format": "cc-calendar.sessions",
+  "schema_version": 1,
+  "generator": "cc-calendar 0.2.0",
+  "exported_at": "2026-10-04T10:00:00+09:00",
+  "sessions": [
+    {
+      "id": "0b6c1a52-…",
+      "title": "Checkout page redesign",
+      "project": "acme-web",
+      "project_path": "/work/acme-web",
+      "branch": "main",
+      "status": "done",
+      "start": "2026-09-29T20:15:00+09:00",
+      "end": "2026-09-29T23:19:00+09:00",
+      "active_minutes": 113,
+      "span_minutes": 184,
+      "prompts": 4,
+      "tokens": 6035399,
+      "cost_usd": 3.4354,
+      "cost_estimated": true,
+      "cache_hit_rate": 0.9712,
+      "model": "claude-sonnet-5-5",
+      "effort": "high",
+      "claude_code_version": "2.1.0",
+      "commits": 2
+    }
+  ]
+}
+```
+
+| Key | Description |
+| --- | --- |
+| `format` | Always `cc-calendar.sessions` |
+| `schema_version` | Version of the field definitions above |
+| `generator` | cc-calendar version that wrote the file, for troubleshooting |
+| `exported_at` | When the file was written |
+| `sessions` | The records, in list order |
+
+Numbers and booleans keep their JSON types. A missing value is `null`.
+
+## Versioning
+
+`schema_version` is bumped when a field is renamed or removed, or when its meaning or unit changes.
+Adding a field does not bump it, so readers should ignore fields they do not know.
+
+CSV has no version field. Read columns by their header names, not by position.
+
+| Schema version | cc-calendar | Changes |
+| --- | --- | --- |
+| 1 | Next release after 0.2.0 | First version |
