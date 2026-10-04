@@ -1,6 +1,7 @@
 // Entry point: state, data loading, filters, list view, live updates.
 import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
+import { exportSessions } from "./export.js";
 import { overviewRange, renderOverview } from "./overview.js";
 import { buildReport, copyText } from "./report.js";
 import { renderToolsPane } from "./toolspane.js";
@@ -32,6 +33,7 @@ export const state = {
   sort: prefs.get("listSort", { key: "start", dir: "desc" }),
   showSummary: prefs.get("summary", false),
   showTools: prefs.get("tools", false),
+  appVersion: null, // cc-calendar version reported by the server
   dataVersion: 0, // bumped on every reload so cached aggregates refresh
   showMarks: prefs.get("marks", true),
   selectedId: null,
@@ -50,6 +52,7 @@ async function fetchJSON(url) {
 async function loadSessions() {
   const data = await fetchJSON(`/api/sessions?gap=${state.gap}`);
   state.sessions = data.sessions;
+  state.appVersion = data.version;
   state.byId = new Map(data.sessions.map((s) => [s.id, s]));
   state.dataVersion++;
   assignColors();
@@ -437,6 +440,9 @@ function bind() {
     clearTimeout(btn.timer);
     btn.timer = setTimeout(() => { btn.textContent = "Copy report"; }, 1500);
   };
+  for (const btn of document.querySelectorAll("#export button")) {
+    btn.onclick = () => exportSessions(sortRows(filtered()), btn.dataset.format, state.appVersion);
+  }
   $("zoom-in").onclick = () => setHourPx(state.hourPx * 1.25);
   $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);
   $("zoom-reset").onclick = () => setHourPx(DEFAULT_HOUR_PX);

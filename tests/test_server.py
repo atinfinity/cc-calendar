@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from cc_calendar import __version__
 from cc_calendar.server import create_app
 
 
@@ -41,6 +42,8 @@ def test_sessions(client):
     assert by_id["s-prev"]["continued_in"] == "s-next"
     assert by_id["s-next"]["cost"] == 1.25 and by_id["s-next"]["cost_estimated"] is False
     assert "readme" in basic["search"].lower()
+    assert basic["version"] == "2.1.0"  # Claude Code version from the log
+    assert data["version"] == __version__
 
 
 def test_session_detail(client):

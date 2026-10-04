@@ -87,5 +87,13 @@
     - Search over titles and prompts.
     - Filter by project and status.
     - Sort by any column.
+- **Export**: download the sessions shown in the list view as CSV or JSON. The file follows
+  the current filters and sort order. It covers:
+    - start and end (ISO 8601 with your UTC offset) and active time
+    - project, branch and status
+    - prompts, tokens, cost and cache hit rate
+    - model, effort, Claude Code version and number of commits
+
+    See [Export format](export.md) for the fields and the JSON envelope.
 
 ![List view](images/list.png)

@@ -76,6 +76,10 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   requests, tokens and cost by model, tool calls and errors by tool).
 - **List view** with search over titles and prompts (a match inside a prompt is shown under the title), project and status filters, and sorting by
   any column (click a header; click again to reverse).
+- **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
+  and sort order: start, end, active time, project, branch, status, prompts, tokens, cost, cache hit
+  rate, model, effort, Claude Code version and commit count. Times are ISO 8601 with your UTC
+  offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Live updates** — new log lines are picked up within a second.
 
 | Session detail | Transcript with stats |

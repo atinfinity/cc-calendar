@@ -73,6 +73,7 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "cache_saved": round(cache_saved, 4),
         "model": models[0] if models else None,
         "effort": s.effort(),
+        "version": s.version,  # Claude Code version
         "commit_list": s.commit_list(),
         "repo_url": gitinfo.repo_url(s.cwd),
         "continued_in": s.continued_in,
@@ -117,7 +118,6 @@ def detail(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str | 
             }
             if s.cost_state
             else None,
-            "version": s.version,
         }
     )
     return out
@@ -189,7 +189,7 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
                 for s in store.sessions.values()
                 if s.start is not None
             ]
-        return {"sessions": items, "claude_dir": str(claude_dir)}
+        return {"sessions": items, "claude_dir": str(claude_dir), "version": __version__}
 
     @app.get("/api/sessions/{sid}")
     def session_detail(sid: str, gap: int = Query(15, ge=1, le=24 * 60)) -> dict:

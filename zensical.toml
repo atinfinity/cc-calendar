@@ -15,6 +15,7 @@ nav = [
   { "Home" = "index.md" },
   { "Getting started" = "getting-started.md" },
   { "Features" = "features.md" },
+  { "Export format" = "export.md" },
   { "Privacy" = "privacy.md" },
   { "Development" = "development.md" },
 ]
