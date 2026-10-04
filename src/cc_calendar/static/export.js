@@ -21,6 +21,7 @@ export function sessionRecords(rows) {
     title: s.title,
     project: s.project_name,
     project_path: s.project,
+    source: s.source,
     branch: s.branch || null,
     status: s.status,
     start: isoLocal(s.start),
@@ -53,7 +54,7 @@ export function toCSV(records, fields) {
 }
 
 export const EXPORT_FIELDS = [
-  "id", "title", "project", "project_path", "branch", "status", "start", "end",
+  "id", "title", "project", "project_path", "source", "branch", "status", "start", "end",
   "active_minutes", "span_minutes", "prompts", "tokens", "cost_usd", "cost_estimated",
   "cache_hit_rate", "model", "effort", "claude_code_version", "commits",
 ];
