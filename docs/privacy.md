@@ -4,8 +4,13 @@ Everything stays on your machine.
 
 - The server listens only on localhost (`127.0.0.1`). It rejects requests addressed to any other
   host name.
-- It reads your Claude Code logs read-only and keeps its index in memory. Nothing is written to
-  disk.
+- It reads your Claude Code logs read-only and keeps its index in memory.
+- The only file it writes is the notes file, which keeps the notes and tags you add to
+  sessions (see [Notes and tags](getting-started.md#notes-and-tags)). It is written only when you
+  change a note or tag. If the file cannot be read, it is never overwritten; notes are turned
+  off until it is fixed.
+- Pages on other websites cannot change your notes: the server accepts changes only as JSON
+  from its own page.
 - It makes no network requests. The page loads no external scripts, fonts or analytics.
 - Some commit hashes do not appear in the logs. Those are looked up with `git log` in the
   session's working directory.

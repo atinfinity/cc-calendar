@@ -151,10 +151,20 @@ export const prefs = {
 const SNIPPET_CONTEXT = 40;
 
 // When a search matches a prompt rather than the title, show where it matched.
+// The text the search box matches: note, tags, title and prompts.
+export function searchText(s) {
+  return [s.note || "", ...(s.tags || []), s.search].join(" ");
+}
+
+// Tags as chips, or null when there are none.
+export function tagChips(tags) {
+  return tags?.length ? h("span", { class: "tags" }, tags.map((t) => h("span", { class: "tag" }, t))) : null;
+}
+
 export function matchSnippet(s, query) {
   const q = query.trim().toLowerCase();
   if (!q || s.title.toLowerCase().includes(q)) return null;
-  const text = s.search.replace(/\s+/g, " ");
+  const text = searchText(s).replace(/\s+/g, " ");
   const i = text.toLowerCase().indexOf(q);
   if (i < 0) return null;
   const from = Math.max(0, i - SNIPPET_CONTEXT);

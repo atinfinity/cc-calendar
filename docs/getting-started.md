@@ -30,6 +30,7 @@ The server binds to `127.0.0.1` on a free port and opens your browser. It reads 
 | `--port N` | Listen on a specific port instead of a free one |
 | `--no-browser` | Do not open a browser window |
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
+| `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](#notes-and-tags)) |
 
 ## Several config directories
 
@@ -58,3 +59,17 @@ A session found in more than one directory is shown once, from the copy with the
 - **Summary**, **Tools** and **Copy report** work on the displayed range.
 - Press `?` for keyboard shortcuts: `←` `→` to move, `j` `k` to step through sessions, `Enter`
   to open the transcript, `Esc` to close. See [Keyboard shortcuts](features.md#keyboard-shortcuts).
+
+## Notes and tags
+
+Notes and tags you add to sessions are saved in one JSON file, keyed by session ID:
+
+| Platform | Default location |
+| --- | --- |
+| macOS | `~/Library/Application Support/cc-calendar/notes.json` |
+| Linux | `$XDG_DATA_HOME/cc-calendar/notes.json` (`~/.local/share/…` when unset) |
+| Windows | `%APPDATA%\cc-calendar\notes.json` |
+
+Point `--notes` at another file to keep it somewhere else, such as a synced folder to share notes
+between machines; changes made to the file elsewhere are picked up. One file serves every
+`--claude-dir`. Notes stay in the file after Claude Code deletes a session's old log.
