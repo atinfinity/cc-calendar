@@ -23,6 +23,9 @@ cc-calendar
 
 Or try it without installing: `uvx cc-calendar`. Update with `uv tool upgrade cc-calendar`.
 
+Installed v0.3.0 or earlier from GitHub? Switch to the PyPI package once with
+`uv tool install --force cc-calendar`; `uv tool upgrade` works from then on.
+
 To run it from a checkout:
 
 ```sh
