@@ -148,4 +148,18 @@ Press ++"?"++ or click **?** in the top bar for this list. Button tooltips show 
 | ++esc++ | Close the topmost thing: shortcut list, transcript, project menu, search box, detail pane, project page |
 
 Keys typed in a form field go to the field, and only ++esc++ works there. Leaving the search
-box with ++esc++ keeps its text. While a transcript is open, only ++esc++ works.
+box with ++esc++ keeps its text.
+
+While a transcript is open, these keys work instead:
+
+| Keys | Action |
+| --- | --- |
+| ++n++ / ++p++ | Next / previous event: prompt, commit, compaction or API error |
+| ++bracket-right++ / ++bracket-left++ | Next / previous prompt |
+| ++s++ | Show or hide Stats |
+| ++e++ | Expand or collapse tool calls |
+| ++b++ | Back to the parent session from a subagent's transcript |
+| ++arrow-up++ / ++arrow-down++, ++page-up++ / ++page-down++, ++space++ | Scroll |
+| ++esc++ | Close the transcript |
+
+++"?"++ shows both lists here too.
