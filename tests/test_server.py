@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from cc_calendar import __version__
 from cc_calendar.server import create_app
+from cc_calendar.store import ClaudeDir
 
 
 @pytest.fixture
@@ -44,6 +45,8 @@ def test_sessions(client):
     assert "readme" in basic["search"].lower()
     assert basic["version"] == "2.1.0"  # Claude Code version from the log
     assert data["version"] == __version__
+    assert basic["source"] == "local"
+    assert [d["name"] for d in data["claude_dirs"]] == ["local"]
 
 
 def test_session_detail(client):
@@ -97,3 +100,28 @@ def test_tools(client):
     data = res.json()
     assert [t["name"] for t in data["tools"]] == ["Agent"]
     assert [(a["type"], a["runs"]) for a in data["subagents"]] == [("Explore", 1)]
+
+
+@pytest.fixture
+def multi_client(claude_dir, laptop_dir):
+    dirs = [ClaudeDir("local", claude_dir), ClaudeDir("laptop", laptop_dir)]
+    with TestClient(create_app(dirs, watch=False), base_url="http://127.0.0.1") as c:
+        yield c
+
+
+def test_sessions_from_several_dirs(multi_client, claude_dir, laptop_dir):
+    data = multi_client.get("/api/sessions").json()
+    assert data["claude_dirs"] == [
+        {"name": "local", "path": str(claude_dir)},
+        {"name": "laptop", "path": str(laptop_dir)},
+    ]
+    by_id = {s["id"]: s for s in data["sessions"]}
+    assert by_id["s-laptop"]["source"] == "laptop"
+    assert by_id["s-basic"]["source"] == "local"  # the newer of the two copies
+
+    d = multi_client.get("/api/sessions/s-laptop").json()
+    assert d["source"] == "laptop" and d["also_in"] == []
+    assert multi_client.get("/api/sessions/s-basic").json()["also_in"] == ["laptop"]
+    log = multi_client.get("/api/sessions/s-laptop/log").json()
+    assert log["entries"][0]["kind"] == "user"
+    assert multi_client.get("/api/sessions/s-laptop/stats").json()["prompts"] == 1

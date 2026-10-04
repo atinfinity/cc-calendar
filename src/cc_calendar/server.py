@@ -19,7 +19,7 @@ from . import __version__, gitinfo
 from .logview import build_entries, log_events
 from .parser import SessionAcc
 from .stats import log_stats
-from .store import Store
+from .store import ClaudeDir, Store
 from .tools import tool_usage
 
 log = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "title": s.title(),
         "project": s.cwd or s.project_dir,
         "project_name": project_name(s),
+        "source": s.source,
         "branch": s.git_branch,
         "status": status,
         "start": s.start,
@@ -141,12 +142,15 @@ class Broadcaster:
             q.put_nowait(payload)
 
 
-def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
-    store = Store(claude_dir)
+def create_app(dirs: Path | list[ClaudeDir], watch: bool = True) -> FastAPI:
+    store = Store(dirs)
     broadcaster = Broadcaster()
+    sessions_dirs = {d.sessions_dir for d in store.dirs}
 
     async def watcher() -> None:
-        targets = [str(p) for p in (store.projects_dir, store.sessions_dir) if p.is_dir()]
+        targets = [
+            str(p) for d in store.dirs for p in (d.projects_dir, d.sessions_dir) if p.is_dir()
+        ]
         if not targets:
             return
         async for changes in awatch(*targets, recursive=True):
@@ -154,7 +158,7 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
             live_changed = False
             for _, raw in changes:
                 path = Path(raw)
-                if path.parent == store.sessions_dir:
+                if path.parent in sessions_dirs:
                     live_changed = True
                     continue
                 if path.suffix == ".jsonl" or path.name.endswith(".meta.json"):
@@ -192,14 +196,20 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
                 for s in store.sessions.values()
                 if s.start is not None
             ]
-        return {"sessions": items, "claude_dir": str(claude_dir), "version": __version__}
+        return {
+            "sessions": items,
+            "claude_dirs": [{"name": d.name, "path": str(d.path)} for d in store.dirs],
+            "version": __version__,
+        }
 
     @app.get("/api/sessions/{sid}")
     def session_detail(sid: str, gap: int = Query(15, ge=1, le=24 * 60)) -> dict:
         live = store.live_sessions()
         with store.lock:
             s = get_session(sid)
-            return detail(s, live.get(sid), gap * 60_000, store.continued_from().get(sid))
+            out = detail(s, live.get(sid), gap * 60_000, store.continued_from().get(sid))
+        out["also_in"] = store.also_in(sid)
+        return out
 
     def log_path(sid: str, agent: str | None) -> tuple[Path, str | None]:
         s = get_session(sid)

@@ -255,3 +255,33 @@ def claude_dir(tmp_path: Path) -> Path:
 
     (root / "sessions").mkdir()
     return root
+
+
+@pytest.fixture
+def laptop_dir(tmp_path: Path) -> Path:
+    """A second config directory, as if synced from another machine.
+
+    It holds one session of its own and an older copy of s-basic.
+    """
+    root = tmp_path / "laptop" / ".claude"
+    proj = root / "projects" / PROJECT
+
+    own = LogBuilder("s-laptop")
+    own.prompt(300, "Fix the build on the laptop")
+    own.assistant(301, [{"type": "text", "text": "Fixed."}], msg_id="l1", stop_reason="end_turn")
+    own.turn_end(301)
+    own.write(proj / "s-laptop.jsonl")
+
+    old = basic_session()
+    old.records = [r for r in old.records if parse_minute(r) is None or parse_minute(r) < 3]
+    old.write(proj / "s-basic.jsonl")
+
+    (root / "sessions").mkdir()
+    return root
+
+
+def parse_minute(rec: dict) -> float | None:
+    if "timestamp" not in rec:
+        return None
+    t = datetime.fromisoformat(rec["timestamp"].replace("Z", "+00:00"))
+    return (t - BASE).total_seconds() / 60

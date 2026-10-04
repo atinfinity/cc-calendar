@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,11 +22,28 @@ class FileState:
     inode: int | None = None
 
 
+@dataclass(frozen=True)
+class ClaudeDir:
+    """A Claude Code config directory and the short name it is shown under."""
+
+    name: str
+    path: Path
+
+    @property
+    def projects_dir(self) -> Path:
+        return self.path / "projects"
+
+    @property
+    def sessions_dir(self) -> Path:
+        return self.path / "sessions"
+
+
 class Store:
-    def __init__(self, claude_dir: Path):
-        self.claude_dir = claude_dir
-        self.projects_dir = claude_dir / "projects"
-        self.sessions_dir = claude_dir / "sessions"
+    def __init__(self, dirs: Path | list[ClaudeDir]):
+        self.dirs = [ClaudeDir("local", dirs)] if isinstance(dirs, Path) else list(dirs)
+        # The same session can be in several directories (e.g. synced copies): every copy
+        # is indexed, and `sessions` holds the one with the newest activity.
+        self.copies: dict[str, dict[str, SessionAcc]] = {}  # sid -> dir name -> session
         self.sessions: dict[str, SessionAcc] = {}
         self.files: dict[Path, FileState] = {}
         self.lock = threading.RLock()
@@ -32,32 +51,36 @@ class Store:
     # ------------------------------------------------------------------ scanning
 
     def scan(self) -> None:
-        if not self.projects_dir.is_dir():
-            log.warning("no projects directory at %s", self.projects_dir)
-            return
         with self.lock:
-            for path in sorted(self.projects_dir.glob("*/*.jsonl")):
-                self.update_file(path)
-            for path in sorted(self.projects_dir.glob("*/*/subagents/*.meta.json")):
-                self.update_file(path)
-            for path in sorted(self.projects_dir.glob("*/*/subagents/*.jsonl")):
-                self.update_file(path)
+            for d in self.dirs:
+                projects = d.projects_dir
+                if not projects.is_dir():
+                    log.warning("no projects directory at %s", projects)
+                    continue
+                for path in sorted(projects.glob("*/*.jsonl")):
+                    self.update_file(path)
+                for path in sorted(projects.glob("*/*/subagents/*.meta.json")):
+                    self.update_file(path)
+                for path in sorted(projects.glob("*/*/subagents/*.jsonl")):
+                    self.update_file(path)
 
-    def classify(self, path: Path) -> tuple[str, str, str | None] | None:
-        """-> (kind, session_id, agent_id) for a path under projects/, or None."""
-        try:
-            rel = path.relative_to(self.projects_dir)
-        except ValueError:
+    def classify(self, path: Path) -> tuple[ClaudeDir, str, str, str | None] | None:
+        """-> (dir, kind, session_id, agent_id) for a path under a projects/, or None."""
+        for d in self.dirs:
+            try:
+                rel = path.relative_to(d.projects_dir)
+            except ValueError:
+                continue
+            parts = rel.parts
+            if len(parts) == 2 and parts[1].endswith(".jsonl"):
+                return d, "main", parts[1][: -len(".jsonl")], None
+            if len(parts) == 4 and parts[2] == "subagents" and parts[3].startswith("agent-"):
+                name = parts[3][len("agent-") :]
+                if name.endswith(".meta.json"):
+                    return d, "meta", parts[1], name[: -len(".meta.json")]
+                if name.endswith(".jsonl"):
+                    return d, "sub", parts[1], name[: -len(".jsonl")]
             return None
-        parts = rel.parts
-        if len(parts) == 2 and parts[1].endswith(".jsonl"):
-            return "main", parts[1][: -len(".jsonl")], None
-        if len(parts) == 4 and parts[2] == "subagents" and parts[3].startswith("agent-"):
-            name = parts[3][len("agent-") :]
-            if name.endswith(".meta.json"):
-                return "meta", parts[1], name[: -len(".meta.json")]
-            if name.endswith(".jsonl"):
-                return "sub", parts[1], name[: -len(".jsonl")]
         return None
 
     def update_file(self, path: Path) -> str | None:
@@ -65,45 +88,77 @@ class Store:
         info = self.classify(path)
         if info is None:
             return None
-        kind, sid, agent_id = info
+        d, kind, sid, agent_id = info
         with self.lock:
-            session = self._session(sid, path)
-            if kind == "meta":
-                try:
-                    session.apply_subagent_meta(agent_id, json.loads(path.read_text()))
-                except (OSError, ValueError):
-                    pass
-                return sid
             try:
-                st = path.stat()
-            except OSError:  # deleted or dangling symlink
-                return None
-            state = self.files.get(path)
-            if state is None or st.st_size < state.offset or st.st_ino != state.inode:
-                if state is not None and kind == "main":
-                    # Rewritten from scratch: rebuild the session but keep subagent data.
-                    subagents = session.subagents
-                    session = self._session(sid, path, reset=True)
-                    session.subagents = subagents
-                state = FileState(0, st.st_ino)
-                self.files[path] = state
-            if st.st_size == state.offset:
-                return sid
-            for rec in self._read_new(path, state):
-                if kind == "main":
-                    session.feed(rec)
-                else:
-                    session.feed_subagent(agent_id, str(path), rec)
-            return sid
+                return self._update(d, kind, sid, agent_id, path)
+            finally:
+                self._pick(sid)
 
-    def _session(self, sid: str, path: Path, reset: bool = False) -> SessionAcc:
-        s = self.sessions.get(sid)
+    def _update(
+        self, d: ClaudeDir, kind: str, sid: str, agent_id: str | None, path: Path
+    ) -> str | None:
+        session = self._session(d, sid, path)
+        if kind == "meta":
+            try:
+                session.apply_subagent_meta(agent_id, json.loads(path.read_text()))
+            except (OSError, ValueError):
+                pass
+            return sid
+        try:
+            st = path.stat()
+        except OSError:  # deleted or dangling symlink
+            return None
+        state = self.files.get(path)
+        if state is None or st.st_size < state.offset or st.st_ino != state.inode:
+            if state is not None and kind == "main":
+                # Rewritten from scratch: rebuild the session but keep subagent data.
+                subagents = session.subagents
+                session = self._session(d, sid, path, reset=True)
+                session.subagents = subagents
+            state = FileState(0, st.st_ino)
+            self.files[path] = state
+        if st.st_size == state.offset:
+            return sid
+        for rec in self._read_new(path, state):
+            if kind == "main":
+                session.feed(rec)
+            else:
+                session.feed_subagent(agent_id, str(path), rec)
+        return sid
+
+    def _session(self, d: ClaudeDir, sid: str, path: Path, reset: bool = False) -> SessionAcc:
+        copies = self.copies.setdefault(sid, {})
+        s = copies.get(d.name)
         if s is None or reset:
-            project_dir = path.relative_to(self.projects_dir).parts[0]
-            main_path = self.projects_dir / project_dir / f"{sid}.jsonl"
-            s = SessionAcc(session_id=sid, path=str(main_path), project_dir=project_dir)
-            self.sessions[sid] = s
+            project_dir = path.relative_to(d.projects_dir).parts[0]
+            main_path = d.projects_dir / project_dir / f"{sid}.jsonl"
+            s = SessionAcc(
+                session_id=sid, path=str(main_path), project_dir=project_dir, source=d.name
+            )
+            copies[d.name] = s
         return s
+
+    def _pick(self, sid: str) -> None:
+        """Show the copy with the newest activity; ties go to the earlier directory."""
+        copies = self.copies.get(sid)
+        if not copies:
+            return
+        if len(copies) == 1:
+            self.sessions[sid] = next(iter(copies.values()))
+            return
+        ordered = [copies[d.name] for d in self.dirs if d.name in copies]
+        self.sessions[sid] = max(ordered, key=lambda s: s.end if s.end is not None else -1)
+
+    def also_in(self, sid: str) -> list[str]:
+        """Names of the other directories that hold a copy of the shown session."""
+        with self.lock:
+            shown = self.sessions.get(sid)
+            return [
+                d.name
+                for d in self.dirs
+                if d.name in self.copies.get(sid, {}) and (shown is None or d.name != shown.source)
+            ]
 
     @staticmethod
     def _read_new(path: Path, state: FileState):
@@ -129,17 +184,22 @@ class Store:
     def live_sessions(self) -> dict[str, dict]:
         """sessionId -> live process info, for Claude Code processes that are still alive."""
         out: dict[str, dict] = {}
-        if not self.sessions_dir.is_dir():
-            return out
-        for p in self.sessions_dir.glob("*.json"):
-            try:
-                data = json.loads(p.read_text())
-            except (OSError, ValueError):
+        for d in self.dirs:
+            if not d.sessions_dir.is_dir():
                 continue
-            pid, sid = data.get("pid"), data.get("sessionId")
-            if not isinstance(pid, int) or not sid or not _pid_alive(pid):
-                continue
-            out[sid] = data
+            for p in d.sessions_dir.glob("*.json"):
+                try:
+                    data = json.loads(p.read_text())
+                except (OSError, ValueError):
+                    continue
+                pid, sid = data.get("pid"), data.get("sessionId")
+                if not isinstance(pid, int) or not sid or sid in out or not _pid_alive(pid):
+                    continue
+                # A synced directory from another machine can name a PID that happens to be
+                # alive here; the recorded start time tells the two processes apart.
+                if not _same_process(pid, data.get("procStart")):
+                    continue
+                out[sid] = data
         return out
 
     # ------------------------------------------------------------------ continuation
@@ -147,6 +207,41 @@ class Store:
     def continued_from(self) -> dict[str, str]:
         with self.lock:
             return {s.continued_in: s.session_id for s in self.sessions.values() if s.continued_in}
+
+
+PROC_START_TTL = 60.0
+_proc_starts: dict[int, tuple[float, str | None]] = {}
+
+
+def _same_process(pid: int, proc_start: object) -> bool:
+    """Whether `pid` was started at `proc_start` (as `ps -o lstart` prints it, in UTC).
+
+    Records without a start time, or a `ps` that cannot answer, fall back to the PID alone.
+    """
+    if not isinstance(proc_start, str) or not proc_start.strip():
+        return True
+    actual = _proc_start(pid)
+    return actual is None or actual.split() == proc_start.split()
+
+
+def _proc_start(pid: int) -> str | None:
+    now = time.monotonic()
+    hit = _proc_starts.get(pid)
+    if hit is not None and now - hit[0] < PROC_START_TTL:
+        return hit[1]
+    try:
+        res = subprocess.run(
+            ["ps", "-o", "lstart=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            env={**os.environ, "LC_ALL": "C", "TZ": "UTC"},
+        )
+        start = res.stdout.strip() if res.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        start = ""
+    _proc_starts[pid] = (now, start or None)
+    return start or None
 
 
 def _pid_alive(pid: int) -> bool:
