@@ -14,7 +14,7 @@ import { majorChange, readHash, stateHash } from "./urlstate.js";
 import {
   CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
   fmtDuration, fmtPct, fmtTokens, h, matchSnippet, paletteColor,
-  prefs, shortModel, startOfDay, startOfWeek, statusColor,
+  prefs, searchText, shortModel, startOfDay, startOfWeek, statusColor, tagChips,
 } from "./util.js";
 
 const $ = (id) => document.getElementById(id);
@@ -48,6 +48,8 @@ export const state = {
   modelColors: new Map(),
   claudeDirs: [], // [{name, path}] of the config directories being read
   sourceColors: new Map(),
+  tags: [], // [{tag, count}] of every tag in use, most used first
+  notesError: null, // why the notes file could not be read, if it could not
 };
 
 // Which config directory a session came from only matters when there are several.
@@ -78,6 +80,8 @@ async function loadSessions() {
   state.sessions = data.sessions;
   state.appVersion = data.version;
   state.claudeDirs = data.claude_dirs || [];
+  state.tags = data.tags || [];
+  state.notesError = data.notes_error || null;
   state.byId = new Map(data.sessions.map((s) => [s.id, s]));
   state.dataVersion++;
   const first = !loaded;
@@ -169,7 +173,7 @@ export function filtered() {
     if (state.hideNoPrompt && s.prompt_count === 0) return false;
     if (!state.statuses.has(s.status)) return false;
     if (state.projects.size && !state.projects.has(s.project)) return false;
-    if (q && !s.search.toLowerCase().includes(q)) return false;
+    if (q && !searchText(s).toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -214,6 +218,7 @@ async function refreshDetail() {
       onOpenProject: () => openProject(d.project),
       showSource: multiSource(),
       sourcePath,
+      notes: { tags: state.tags, error: state.notesError, onSaved: () => loadSessions().catch(() => {}) },
     });
   } catch (e) {
     pane.replaceChildren(h("div", { class: "empty" }, "Session not found."));
@@ -370,6 +375,7 @@ const STATUS_ORDER = Object.keys(STATUS_LABELS);
 const LIST_COLUMNS = [
   ["status", "", (s) => STATUS_ORDER.indexOf(s.status), "asc", false],
   ["title", "Title", (s) => s.title.toLowerCase(), "asc", false],
+  ["tags", "Tags", (s) => (s.tags.length ? s.tags.join(", ").toLowerCase() : null), "asc", false],
   ["project", "Project", (s) => s.project_name.toLowerCase(), "asc", false],
   ["source", "Source", (s) => s.source.toLowerCase(), "asc", false],
   ["start", "Started", (s) => s.start, "desc", true],
@@ -448,7 +454,10 @@ function renderList(visible) {
           onclick: () => select(s.id),
         },
           h("td", {}, h("span", { class: "dot", title: STATUS_LABELS[s.status], style: { background: statusColor(s.status) } })),
-          h("td", { class: "title-cell" }, s.title, matchSnippet(s, state.search)),
+          h("td", { class: "title-cell" }, s.title,
+            s.note ? h("span", { class: "note-mark", title: noteTitle(s.note) }, " 📝") : null,
+            matchSnippet(s, state.search)),
+          h("td", { class: "tags-cell" }, tagChips(s.tags)),
           h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }),
             projectLink(s.project, s.project_name)),
           multiSource()
@@ -465,6 +474,11 @@ function renderList(visible) {
         ))),
     ),
   );
+}
+
+// The start of a note, for a tooltip.
+function noteTitle(note) {
+  return note.length > 300 ? note.slice(0, 300) + "…" : note;
 }
 
 // A project name that opens the project page.

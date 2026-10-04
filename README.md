@@ -32,6 +32,7 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 | `--port N` | Listen on a specific port instead of a free one |
 | `--no-browser` | Do not open a browser window |
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
+| `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](#notes-and-tags)) |
 
 ### Several config directories
 
@@ -49,6 +50,20 @@ parent folder for a path ending in `.claude` (`laptop` above), or the folder its
 where they came from in the list (**Source** column and filter), the detail pane, the calendar
 tooltip and the CSV/JSON export (`source`), and **Color by → Source** colors them by directory.
 A session found in more than one directory is shown once, from the copy with the latest activity.
+
+### Notes and tags
+
+Notes and tags you add to sessions are saved in one JSON file, keyed by session ID:
+
+| Platform | Default location |
+| --- | --- |
+| macOS | `~/Library/Application Support/cc-calendar/notes.json` |
+| Linux | `$XDG_DATA_HOME/cc-calendar/notes.json` (`~/.local/share/…` when unset) |
+| Windows | `%APPDATA%\cc-calendar\notes.json` |
+
+Point `--notes` at another file to keep it somewhere else, such as a synced folder to share notes
+between machines; changes made to the file elsewhere are picked up. One file serves every
+`--claude-dir`. Notes stay in the file after Claude Code deletes a session's old log.
 
 ## Features
 
@@ -98,9 +113,14 @@ A session found in more than one directory is shown once, from the copy with the
 - **Transcript viewer** — Markdown rendering, collapsible tool calls, optional thinking and
   metadata, drill-down into subagent transcripts, and a stats panel per transcript (active time,
   requests, tokens and cost by model, tool calls and errors by tool).
-- **List view** with search over titles and prompts (a match inside a prompt is shown under the title), project and status filters, and sorting by
+- **Notes and tags** — add a note and tags to a session in the detail pane to find it again
+  later. The note saves when you leave the box (or with ⌘/Ctrl+Enter); `Enter` or a comma adds a
+  tag, with suggestions from tags already in use. Tags that differ only in case count as one.
+  Tags show in the list (**Tags** column and filter) and the calendar tooltip, and a 📝 marks
+  sessions with a note. See [where they are saved](#notes-and-tags).
+- **List view** with search over titles, prompts, notes and tags (a match inside a prompt or note is shown under the title), project and status filters, and sorting by
   any column (click a header; click again to reverse). List-only filters narrow it down further
-  by model, git branch, source (with several config directories), date range (sessions active on
+  by model, git branch, source (with several config directories), tag, date range (sessions active on
   any day in the range) and cost range.
 - **Project page** — click a project name (in the list, the Summary table, the detail pane or the
   project menu) to see the project over all time: total active time and cost, activity by month,
@@ -138,7 +158,9 @@ as $0, so it needs updating when new models ship.
 ## Privacy
 
 Everything stays on your machine. The server listens only on localhost, reads your logs read-only,
-keeps its index in memory, and makes no network requests. Commit hashes that do not appear in the
+keeps its index in memory, and makes no network requests. The only file it writes is the notes
+file ([Notes and tags](#notes-and-tags)), and only when you add or change a note or tag; requests
+from other websites cannot change it. Commit hashes that do not appear in the
 logs are looked up with `git log` in the session's working directory.
 
 ## Development

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import uvicorn
 
-from . import __version__
+from . import __version__, notes
 from .server import create_app
 from .store import ClaudeDir
 
@@ -82,15 +82,24 @@ def main(argv: list[str] | None = None) -> None:
         help="Claude Code config directory to read; repeat to show several together "
         "(default: ~/.claude)",
     )
+    parser.add_argument(
+        "--notes",
+        metavar="PATH",
+        type=Path,
+        help=f"file that keeps your session notes and tags (default: {notes.default_path()})",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args(argv)
 
     port = args.port or free_port()
     url = f"http://{HOST}:{port}/"
     dirs = claude_dirs(args.claude_dir or [str(Path.home() / ".claude")])
-    app = create_app(dirs)
+    notes_path = (args.notes or notes.default_path()).expanduser()
+    app = create_app(dirs, notes_path=notes_path)
     reading = ", ".join(f"{d.name} ({d.path})" for d in dirs) or "nothing"
     print(f"cc-calendar {__version__}: reading {reading} — serving {url}")
+    if error := app.state.notes.error:
+        print(f"cc-calendar: warning: notes cannot be saved: {error}", file=sys.stderr)
     if not args.no_browser:
         threading.Thread(target=open_when_ready, args=(url, port), daemon=True).start()
     uvicorn.run(app, host=HOST, port=port, log_level="warning")

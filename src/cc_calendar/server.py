@@ -7,8 +7,9 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -17,6 +18,7 @@ from watchfiles import awatch
 
 from . import __version__, gitinfo
 from .logview import build_entries, log_events
+from .notes import NOTE_LIMIT, TAGS_PER_SESSION, Notes, NotesUnavailable
 from .parser import SessionAcc
 from .stats import log_stats
 from .store import ClaudeDir, Store
@@ -46,7 +48,9 @@ def project_name(s: SessionAcc) -> str:
     return s.project_dir.lstrip("-").rsplit("-", 1)[-1]
 
 
-def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str | None) -> dict:
+def summary(
+    s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str | None, notes: Notes
+) -> dict:
     status, _ = s.state(live)
     cost, estimated = s.cost()
     models = s.models()
@@ -83,11 +87,14 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "continued_in": s.continued_in,
         "continued_from": continued_from,
         "search": search,
+        **notes.get(s.session_id),  # note, tags
     }
 
 
-def detail(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str | None) -> dict:
-    out = summary(s, live, gap_ms, continued_from)
+def detail(
+    s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str | None, notes: Notes
+) -> dict:
+    out = summary(s, live, gap_ms, continued_from, notes)
     _, checks = s.state(live)
     commits = gitinfo.resolve_commits(s.commits)
     checks["committed"] = gitinfo.working_tree_clean(s.cwd)
@@ -133,6 +140,24 @@ class ToolsQuery(BaseModel):
     sessions: list[str] = Field(max_length=100_000)
 
 
+class NotesUpdate(BaseModel):
+    note: str = Field("", max_length=NOTE_LIMIT * 2)  # checked exactly after trimming
+    tags: list[str] = Field(default_factory=list, max_length=TAGS_PER_SESSION * 5)
+
+
+def same_origin_json(request: Request) -> None:
+    """Guard for writes: a page on another site must not be able to change notes.
+
+    Requiring a JSON body makes browsers send a CORS preflight, which this server never
+    answers with permission; an Origin other than this server is refused outright.
+    """
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        raise HTTPException(415, "expected application/json")
+    origin = request.headers.get("origin")
+    if origin and (urlsplit(origin).hostname not in ALLOWED_HOSTS):
+        raise HTTPException(403, "cross-origin request refused")
+
+
 class Broadcaster:
     def __init__(self) -> None:
         self.queues: set[asyncio.Queue] = set()
@@ -142,8 +167,12 @@ class Broadcaster:
             q.put_nowait(payload)
 
 
-def create_app(dirs: Path | list[ClaudeDir], watch: bool = True) -> FastAPI:
+def create_app(
+    dirs: Path | list[ClaudeDir], watch: bool = True, notes_path: Path | None = None
+) -> FastAPI:
+    """`notes_path=None` keeps notes in memory only (used by tests)."""
     store = Store(dirs)
+    notes = Notes(notes_path)
     broadcaster = Broadcaster()
     sessions_dirs = {d.sessions_dir for d in store.dirs}
 
@@ -179,6 +208,7 @@ def create_app(dirs: Path | list[ClaudeDir], watch: bool = True) -> FastAPI:
     app = FastAPI(title="cc-calendar", version=__version__, lifespan=lifespan)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
     app.state.store = store
+    app.state.notes = notes
 
     def get_session(sid: str) -> SessionAcc:
         s = store.sessions.get(sid)
@@ -190,9 +220,10 @@ def create_app(dirs: Path | list[ClaudeDir], watch: bool = True) -> FastAPI:
     def list_sessions(gap: int = Query(15, ge=1, le=24 * 60)) -> dict:
         live = store.live_sessions()
         cont = store.continued_from()
+        notes.refresh()
         with store.lock:
             items = [
-                summary(s, live.get(s.session_id), gap * 60_000, cont.get(s.session_id))
+                summary(s, live.get(s.session_id), gap * 60_000, cont.get(s.session_id), notes)
                 for s in store.sessions.values()
                 if s.start is not None
             ]
@@ -200,15 +231,33 @@ def create_app(dirs: Path | list[ClaudeDir], watch: bool = True) -> FastAPI:
             "sessions": items,
             "claude_dirs": [{"name": d.name, "path": str(d.path)} for d in store.dirs],
             "version": __version__,
+            "tags": notes.all_tags(),
+            "notes_error": notes.error,
         }
 
     @app.get("/api/sessions/{sid}")
     def session_detail(sid: str, gap: int = Query(15, ge=1, le=24 * 60)) -> dict:
         live = store.live_sessions()
+        notes.refresh()
         with store.lock:
             s = get_session(sid)
-            out = detail(s, live.get(sid), gap * 60_000, store.continued_from().get(sid))
+            out = detail(s, live.get(sid), gap * 60_000, store.continued_from().get(sid), notes)
         out["also_in"] = store.also_in(sid)
+        return out
+
+    @app.put("/api/sessions/{sid}/notes", dependencies=[Depends(same_origin_json)])
+    async def update_notes(sid: str, body: NotesUpdate) -> dict:
+        get_session(sid)
+        try:
+            out = await asyncio.to_thread(notes.set, sid, body.note, body.tags)
+        except NotesUnavailable as e:
+            raise HTTPException(409, str(e)) from e
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
+        except OSError as e:
+            raise HTTPException(500, f"could not save notes: {e}") from e
+        # Other open tabs reload the list and this session's details.
+        broadcaster.publish({"sessions": [sid], "live": False})
         return out
 
     def log_path(sid: str, agent: str | None) -> tuple[Path, str | None]:

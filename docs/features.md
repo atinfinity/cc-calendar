@@ -85,6 +85,18 @@
     - files changed and pull requests
     - subagents and background tasks
     - links between a session and the one it was continued in
+- **Notes and tags**: the **Notes** card in the detail pane keeps a note and tags for the
+  session. Click **+ Add note or tags** to start.
+    - The note is plain text, up to 2,000 characters. It saves when you leave the box, with
+      ++cmd+enter++ / ++ctrl+enter++, or with ++esc++.
+    - Type a tag and press ++enter++ or a comma to add it; tags already in use are suggested.
+      Click ✕ on a tag to remove it.
+    - Tags that differ only in case count as one, written the way they were first used.
+    - The list view has a **Tags** column and a **Tag** filter, including "(untagged)". A 📝
+      next to a title marks a note; hover it to read the start.
+    - The calendar tooltip shows the tags, and the search box matches notes and tags.
+    - They are saved in a file of their own; see
+      [Notes and tags](getting-started.md#notes-and-tags) for where.
 - **Resume**: "Copy resume command" copies
   `cd <project dir> && claude --resume <session id>`. Paste it into a terminal to pick the session
   up again. Claude Code looks sessions up by the directory they were started in, so the command
@@ -103,10 +115,10 @@
     - A stats panel per transcript.
     - ‹ › buttons to step through prompts, commits, compactions and errors.
 - **List view**:
-    - Search over titles and prompts.
+    - Search over titles, prompts, notes and tags.
     - Filter by project and status.
     - Narrow the list further by model, git branch, source (with several config directories),
-      date range and cost range. The date range keeps sessions that were active on any day in it.
+      tag, date range and cost range. The date range keeps sessions that were active on any day in it.
       These filters apply to the list only; **Clear** resets them.
     - Sort by any column.
 - **Project page**: click a project name to open it. Project names can be clicked in the list,

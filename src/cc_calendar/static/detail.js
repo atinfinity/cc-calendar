@@ -3,6 +3,7 @@ import {
   STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, compactDetail, fmtEffortMix, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
   shortModel, statusColor,
 } from "./util.js";
+import { notesCard } from "./notes.js";
 import { copyText } from "./report.js";
 
 const CHECKS = [
@@ -62,7 +63,7 @@ function sourceInfo(d, sourcePath) {
   }, ` · from ${d.source}${also.length ? ` (also in ${also.join(", ")})` : ""}`);
 }
 
-export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, showSource, sourcePath }) {
+export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, showSource, sourcePath, notes }) {
   const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
   const ctx = d.context_pct == null ? null : h("span", { class: "stat", title: "Context used by the latest response" },
     "ctx ", h("span", { class: "ctx" }, h("i", { style: { width: `${Math.min(100, d.context_pct)}%` } })), ` ${d.context_pct}%`);
@@ -101,6 +102,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
       d.continued_from && d.continued_in ? " · " : null,
       d.continued_in ? h("a", { href: "#", onclick: (e) => { e.preventDefault(); onSelect(d.continued_in); } }, "Continued in →") : null));
   }
+
+  parts.push(notesCard(d, notes));
 
   parts.push(card("Session state", h("div", { class: "checks" }, CHECKS.map(([key, label, hint]) => {
     const v = d.checks[key];
@@ -170,7 +173,17 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
     `Session ${d.id}${d.version ? " · Claude Code " + d.version : ""}`));
 
   const scroll = pane.scrollTop;
-  pane.replaceChildren(...parts);
+  // A Notes card being edited is reused; moving it would take focus away, so swap the rest
+  // around it instead.
+  const keep = parts.find((el) => el.parentNode === pane);
+  if (keep) {
+    for (const el of [...pane.children]) if (el !== keep) el.remove();
+    const i = parts.indexOf(keep);
+    keep.before(...parts.slice(0, i));
+    keep.after(...parts.slice(i + 1));
+  } else {
+    pane.replaceChildren(...parts);
+  }
   pane.scrollTop = scroll;
 }
 
