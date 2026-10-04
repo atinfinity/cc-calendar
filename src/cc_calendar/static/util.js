@@ -190,7 +190,11 @@ function hitLabel(hit) {
 // button that opens the log there.
 export function hitSnippet(hit, onOpen = null) {
   const { before, match, after } = hit.snippet;
-  const more = hit.count > 1 ? ` · ${hit.count} matches` : "";
+  // The main log does not show matches in subagent logs, so say how many are there.
+  const sub = hit.in_subagents || 0;
+  let more = hit.count > 1 ? ` · ${hit.count} matches` : "";
+  if (hit.count > 1 && sub === hit.count) more += " in subagents";
+  else if (sub > 0 && sub < hit.count) more += ` (${sub} in subagent${sub > 1 ? "s" : ""})`;
   return h("div", { class: "snippet" },
     h("span", { class: "hit-meta" }, `${hitLabel(hit)}${hit.ts ? " · " + fmtDateTime(hit.ts) : ""}${more}: `),
     before, match ? h("mark", {}, match) : null, after,

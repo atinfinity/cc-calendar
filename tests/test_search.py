@@ -142,6 +142,11 @@ def test_search_api(client):
 
     sub = client.get("/api/search", params={"q": "searching"}).json()["hits"]
     assert sub["s-sub"]["agent"] == "a1"
+    assert (sub["s-sub"]["count"], sub["s-sub"]["in_subagents"]) == (1, 1)
+    # "found it" is both the subagent's reply and the Agent tool's output in the main log.
+    both = client.get("/api/search", params={"q": "found it"}).json()["hits"]["s-sub"]
+    assert (both["count"], both["in_subagents"]) == (2, 1)
+    assert data["hits"]["s-basic"]["in_subagents"] == 0
     assert client.get("/api/search", params={"q": "ab"}).json()["hits"] == {}
     assert client.get("/api/search", params={"q": "x" * 501}).status_code == 422
 

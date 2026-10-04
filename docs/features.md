@@ -159,8 +159,9 @@ search the transcripts themselves:
 - Queries need at least 3 characters. Case and line breaks are ignored, and words in Japanese
   and other languages without spaces match too.
 - A matching session shows a snippet of its first hit, with where it was (e.g. "Tool output"),
-  when, and how many matches the session has. The snippet appears in the list, the calendar
-  tooltip and the detail pane.
+  when, and how many matches the session has, including how many are in subagent transcripts
+  (e.g. "11 matches (2 in subagents)"). The snippet appears in the list, the calendar tooltip
+  and the detail pane.
 - **Open ↗** opens the transcript at the hit. **Matches** in the transcript steps through every
   match in it.
 - The toggle is remembered. The other filters still apply, and the status next to the toggle

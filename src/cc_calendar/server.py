@@ -261,7 +261,8 @@ def create_app(
     @app.get("/api/search")
     def search(q: str = Query(..., max_length=QUERY_LIMIT)) -> dict:
         """Sessions whose transcripts contain `q`: per session, the number of matching
-        messages, tool calls and outputs, and the first of them."""
+        messages, tool calls and outputs (and how many of them are in subagents), and the
+        first of them."""
         if store.index is None:
             raise HTTPException(503, "full-text search needs SQLite 3.34 or later with FTS5")
         found = store.index.search(q)
@@ -277,6 +278,7 @@ def create_app(
                     continue
                 hit = hits.get(f.session_id)
                 count = f.count + (hit["count"] if hit else 0)
+                in_subagents = (f.count if f.agent_id else 0) + (hit["in_subagents"] if hit else 0)
                 if hit is None or (f.ts is not None and (hit["ts"] is None or f.ts < hit["ts"])):
                     hit = {
                         "ts": f.ts,
@@ -286,6 +288,7 @@ def create_app(
                         "snippet": snippet(f.text, q),
                     }
                 hit["count"] = count
+                hit["in_subagents"] = in_subagents
                 hits[f.session_id] = hit
         # While transcripts are still being indexed, the hits are incomplete.
         return {"query": q, "min_length": MIN_QUERY, "pending": store.index.pending(), "hits": hits}
