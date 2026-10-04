@@ -68,6 +68,9 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   (e.g. `auto · 168k → 32k tokens`) in the mark tooltip, the transcript and the detail pane.
 - **Status** — Running and Waiting for live sessions, Done or Interrupted for finished ones, with
   the underlying checks (turn ended, no background work left, clean exit, working tree clean).
+- **Notifications** — turn on "Notify" in the top bar to get a desktop notification when a live
+  session goes from Running to Waiting for your input, or ends Interrupted, while the tab is in the
+  background. Off by default; clicking the notification opens the session.
 - **Detail pane** — tokens, cost, context usage, every request you made with the commits that
   followed it, files changed, pull requests, subagents and background tasks, and links between
   a session and the one it was continued in.

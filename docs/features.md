@@ -64,6 +64,13 @@
     - Running and Waiting for live sessions; Done or Interrupted for finished ones.
     - The underlying checks are shown: turn ended, no background work left, clean exit and
       working tree clean.
+- **Notifications**:
+    - Turn on "Notify" in the top bar. The browser asks for permission the first time.
+    - You get a desktop notification when a live session goes from Running to Waiting for your
+      input, or ends Interrupted.
+    - Notifications are sent only while the cc-calendar tab is in the background. Click one to
+      open that session.
+    - Off by default; the setting is remembered in this browser.
 - **Detail pane** shows:
     - tokens, cost and context usage
     - every request you made, with the commits that followed it

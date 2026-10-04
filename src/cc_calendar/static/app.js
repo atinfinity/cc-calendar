@@ -2,6 +2,7 @@
 import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { exportSessions } from "./export.js";
+import { bindNotifyToggle, checkTransitions } from "./notify.js";
 import { overviewRange, renderOverview } from "./overview.js";
 import { buildReport, copyText } from "./report.js";
 import { renderToolsPane } from "./toolspane.js";
@@ -57,6 +58,7 @@ async function loadSessions() {
   state.dataVersion++;
   assignColors();
   renderAll();
+  checkTransitions(data.sessions, select);
 }
 
 function assignColors() {
@@ -423,6 +425,7 @@ function bind() {
   $("go-today").onclick = () => { state.anchor = startOfDay(new Date()); renderMain(); };
   $("go-prev").onclick = () => shift(-1);
   $("go-next").onclick = () => shift(1);
+  bindNotifyToggle($("notify-toggle"));
   $("summary-toggle").onclick = () => {
     state.showSummary = !state.showSummary;
     prefs.set("summary", state.showSummary);
