@@ -12,6 +12,31 @@ from .pricing import cache_hit_rate, cache_savings, context_window, estimate_cos
 
 INTERRUPT_PREFIX = "[Request interrupted"
 GIT_COMMIT_RE = re.compile(r"\bgit\b(?:\s+-[cC]\s+\S+)*[^|;&\n]*?\bcommit\b")
+EFFORT_ORDER = ["max", "xhigh", "high", "medium", "low"]
+
+
+def compact_info(rec: dict) -> dict:
+    """Trigger and context size before/after a compaction, from its compact_boundary record."""
+    meta = rec.get("compactMetadata")
+    meta = meta if isinstance(meta, dict) else {}
+    pre, post, trigger = meta.get("preTokens"), meta.get("postTokens"), meta.get("trigger")
+    return {
+        "trigger": trigger if isinstance(trigger, str) else None,
+        "pre": pre if isinstance(pre, int) else None,
+        "post": post if isinstance(post, int) else None,
+    }
+
+
+def compact_extra(c: dict) -> dict:
+    return {k: c[k] for k in ("trigger", "pre", "post") if c.get(k) is not None}
+
+
+def effort_mix(levels) -> dict[str, int]:
+    counts = Counter(levels)
+    rank = {e: i for i, e in enumerate(EFFORT_ORDER)}
+    return dict(sorted(counts.items(), key=lambda kv: (rank.get(kv[0], len(rank)), kv[0])))
+
+
 COMMIT_OUTPUT_RE = re.compile(r"^\[([^\]\s]+)(?: \([^)]*\))? ([0-9a-f]{7,40})\] (.*)$", re.M)
 COMMIT_MSG_HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?\n(.*?)\n\s*\1", re.S)
 COMMIT_MSG_RE = re.compile(r"""(?:-m|--message)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))""")
@@ -198,7 +223,8 @@ class SessionAcc:
     last_prompt_ts: int | None = None
     last_interrupt_ts: int | None = None
     pending_background: int = 0
-    compactions: list[int] = field(default_factory=list)
+    compactions: list[dict] = field(default_factory=list)  # {ts, trigger, pre, post}
+    efforts: dict[str, str] = field(default_factory=dict)  # API request id -> effort level
     api_errors: list[int] = field(default_factory=list)
     commits: list[dict] = field(default_factory=list)
     files: Counter = field(default_factory=Counter)
@@ -240,7 +266,7 @@ class SessionAcc:
                 self.last_turn_end_ts = ts
                 self.pending_background = rec.get("pendingBackgroundAgentCount") or 0
             elif rec.get("subtype") == "compact_boundary" and ts is not None:
-                self.compactions.append(ts)
+                self.compactions.append({"ts": ts, **compact_info(rec)})
         elif rtype == "attachment":
             # Notifications that arrive mid-turn are queued as attachments, not user records.
             att = rec.get("attachment") or {}
@@ -385,6 +411,8 @@ class SessionAcc:
             self.activity.append(ts)
         mid = msg.get("id") or rec.get("requestId") or rec.get("uuid")
         usage = msg.get("usage") or {}
+        if isinstance(rec.get("effort"), str):
+            self.efforts[mid] = rec["effort"]
         if mid not in self.usages and ts is not None:
             self.density_events.append(ts)
         prev = self.usages.get(mid)
@@ -459,13 +487,25 @@ class SessionAcc:
                 segs[-1][1] = t
         return segs
 
-    def marks(self) -> list[tuple[int, str]]:
-        """Timestamped events drawn on the calendar bars, oldest first."""
-        out = [(p["ts"], "prompt") for p in self.prompts if p["ts"] is not None]
+    def marks(self) -> list[tuple]:
+        """Timestamped events drawn on the calendar bars, oldest first.
+
+        Compactions carry a third element with their trigger and token counts.
+        """
+        out: list[tuple] = [(p["ts"], "prompt") for p in self.prompts if p["ts"] is not None]
         out += [(c["ts"], "commit") for c in self.commits if c.get("ts") is not None]
-        out += [(t, "compact") for t in self.compactions]
+        out += [(c["ts"], "compact", compact_extra(c)) for c in self.compactions]
         out += [(t, "error") for t in self.api_errors]
-        return sorted(out)
+        return sorted(out, key=lambda m: (m[0], m[1]))
+
+    def effort_mix(self) -> dict[str, int]:
+        """API requests per effort level, highest level first."""
+        return effort_mix(self.efforts.values())
+
+    def effort(self) -> str | None:
+        """The effort level most requests ran at."""
+        mix = self.effort_mix()
+        return max(mix, key=mix.get) if mix else None
 
     def density(self) -> dict[int, int]:
         out: Counter = Counter()

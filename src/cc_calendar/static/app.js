@@ -3,7 +3,7 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { openLog } from "./transcript.js";
 import {
-  CACHE_LOW, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
+  CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
   fmtDuration, fmtPct, fmtTokens, h, matchSnippet, paletteColor,
   prefs, shortModel, startOfDay, startOfWeek, statusColor,
 } from "./util.js";
@@ -76,6 +76,7 @@ export function colorFor(s) {
   if (state.colorBy === "cost") return COST_BANDS[costBand(s)].color;
   if (state.colorBy === "status") return statusColor(s.status);
   if (state.colorBy === "model") return state.modelColors.get(s.model) || "#888";
+  if (state.colorBy === "effort") return EFFORT_COLORS[s.effort] || "#888";
   return state.projectColors.get(s.project) || "#888";
 }
 
@@ -89,12 +90,18 @@ export function legendItems(visible) {
       key = s.status; label = STATUS_LABELS[s.status]; color = statusColor(s.status);
     } else if (state.colorBy === "model") {
       key = s.model; label = shortModel(s.model); color = colorFor(s);
+    } else if (state.colorBy === "effort") {
+      key = s.effort || ""; label = s.effort || "unknown"; color = colorFor(s);
     } else {
       key = s.project; label = s.project_name; color = colorFor(s);
     }
     const e = counts.get(key) || { label, color, n: 0, title: key };
     e.n++;
     counts.set(key, e);
+  }
+  if (state.colorBy === "effort") {
+    const rank = (k) => { const i = Object.keys(EFFORT_COLORS).indexOf(k); return i < 0 ? 99 : i; };
+    return [...counts.entries()].sort((a, b) => rank(a[0]) - rank(b[0])).map(([, e]) => ({ ...e, title: "Effort most API requests ran at" }));
   }
   if (state.colorBy === "cost") {
     return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([, e]) => ({ ...e, title: "" }));

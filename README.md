@@ -48,7 +48,11 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   in the detail pane) to open the transcript at that point; the transcript has ‹ › buttons to step
   through each kind of event. Click the key next to the legend to hide the marks.
 - **Activity density** — a heat strip behind each day shows prompts and responses per 10 minutes.
-- **Colors** by project, status, model or cost (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
+- **Colors** by project, status, model, effort (the level most requests ran at) or cost
+  (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
+- **Effort and compactions** — the detail pane and transcript stats show the share of requests
+  per effort level, and each compaction shows its trigger and context size before → after
+  (e.g. `auto · 168k → 32k tokens`) in the mark tooltip, the transcript and the detail pane.
 - **Status** — Running and Waiting for live sessions, Done or Interrupted for finished ones, with
   the underlying checks (turn ended, no background work left, clean exit, working tree clean).
 - **Detail pane** — tokens, cost, context usage, every request you made with the commits that

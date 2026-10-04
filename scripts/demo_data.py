@@ -231,12 +231,17 @@ SESSIONS = [
 MODELS = {"opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "haiku": "claude-haiku-4-5"}
 
 
+# Effort level per prompt, cycled; sessions pick a plan by index.
+EFFORT_PLANS = [("high",), ("medium",), ("high", "low"), ("low",), ("xhigh", "high")]
+
+
 class Writer:
     def __init__(self, sid: str, cwd: str, branch: str, rng: random.Random):
         self.sid, self.cwd, self.branch, self.rng = sid, cwd, branch, rng
         self.records: list[dict] = []
         self.n = 0
         self.context = 18_000
+        self.effort = "high"
 
     def rec(self, rtype: str, t: datetime, **extra) -> dict:
         self.n += 1
@@ -272,7 +277,7 @@ class Writer:
             "stop_reason": stop,
             "usage": usage,
         }
-        self.rec("assistant", t, message=msg)
+        self.rec("assistant", t, message=msg, effort=self.effort)
         return usage
 
     def tool(
@@ -324,8 +329,13 @@ def build_session(i: int, spec: tuple, root: Path, rng: random.Random) -> None:
         if p_idx and extras.get("lunch") == p_idx:
             t += timedelta(minutes=rng.randint(55, 80))  # a break splits the bar
         if p_idx and extras.get("compact") == p_idx:
-            w.rec("system", t, subtype="compact_boundary")
+            post = w.context // 6
+            meta = {"trigger": "auto", "preTokens": w.context, "postTokens": post}
+            w.rec("system", t, subtype="compact_boundary", compactMetadata=meta)
+            w.context = post
             t += timedelta(seconds=30)
+        plan = EFFORT_PLANS[i % len(EFFORT_PLANS)]
+        w.effort = plan[p_idx % len(plan)]
         w.prompt(t, text)
         steps = rng.randint(5, 14)
         for s in range(steps):

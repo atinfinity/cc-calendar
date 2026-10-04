@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .logview import iter_records
-from .parser import classify_user, parse_ts
+from .parser import classify_user, compact_info, effort_mix, parse_ts
 from .pricing import cache_hit_rate, cache_savings, estimate_cost
 
 IDLE_MS = 5 * 60_000  # gaps longer than this do not count as active time
@@ -41,6 +41,8 @@ def _compute(path: Path, session_id: str | None) -> dict:
     # One API response can be written as several records; keep its largest usage.
     usages: dict[str, tuple[str | None, dict]] = {}
     tool_names: dict[str, str] = {}
+    efforts: dict[str, str] = {}
+    compactions: list[dict] = []
     tool_calls: Counter = Counter()
     tool_errors: Counter = Counter()
 
@@ -67,6 +69,8 @@ def _compute(path: Path, session_id: str | None) -> dict:
             if ts is not None:
                 times.append(ts)
             mid = msg.get("id") or rec.get("requestId") or rec.get("uuid")
+            if isinstance(rec.get("effort"), str):
+                efforts[mid] = rec["effort"]
             usage = msg.get("usage") or {}
             prev = usages.get(mid)
             if prev is None or usage.get("output_tokens", 0) >= prev[1].get("output_tokens", 0):
@@ -82,6 +86,8 @@ def _compute(path: Path, session_id: str | None) -> dict:
                     counts["thinking"] += 1
         elif rtype == "system" and rec.get("subtype") == "compact_boundary":
             counts["compact"] += 1
+            if ts is not None:
+                compactions.append({"ts": ts, **compact_info(rec)})
 
     by_model: dict[str, dict] = {}
     for model, usage in usages.values():
@@ -108,6 +114,8 @@ def _compute(path: Path, session_id: str | None) -> dict:
         "commands": counts["command"],
         "interrupts": counts["interrupt"],
         "compactions": max(counts["compact"], counts["compact_summary"]),
+        "compaction_sizes": compactions,
+        "efforts": effort_mix(efforts.values()),
         "notifications": counts["notification"],
         "thinking_blocks": counts["thinking"],
         "api_errors": counts["api_error"],

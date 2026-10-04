@@ -183,3 +183,26 @@ export const MARK_KINDS = [
   ["compact", "Compaction", "compaction"],
   ["error", "API error", "API error"],
 ];
+
+// Effort levels, highest first, with fixed colors for "Color by Effort".
+export const EFFORT_COLORS = {
+  max: "#5b2a86",
+  xhigh: "#8e1b5e",
+  high: "#d63a2f",
+  medium: "#e8801a",
+  low: "#4a90c2",
+};
+
+// {high: 30, low: 10} → "high 75% · low 25%"; a single level is shown bare.
+export function fmtEffortMix(mix) {
+  const total = Object.values(mix || {}).reduce((n, v) => n + v, 0);
+  if (!total) return "";
+  if (Object.keys(mix).length === 1) return Object.keys(mix)[0];
+  return Object.entries(mix).map(([e, n]) => `${e} ${Math.round((100 * n) / total)}%`).join(" · ");
+}
+
+// Compaction details: "auto · 168k → 32k tokens"
+export function compactDetail(c) {
+  const size = c?.pre != null ? `${fmtTokens(c.pre)}${c.post != null ? ` → ${fmtTokens(c.post)}` : ""} tokens` : "";
+  return [c?.trigger, size].filter(Boolean).join(" · ");
+}
