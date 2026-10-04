@@ -36,6 +36,7 @@ def test_sessions(client):
     assert basic["cost_estimated"] is True
     assert basic["prompt_count"] == 1
     assert len(basic["segments"]) == 1
+    assert [(c["sha"], c["subject"]) for c in basic["commit_list"]] == [("abc1234", "Add README")]
     assert by_id["s-next"]["continued_from"] == "s-prev"
     assert by_id["s-prev"]["continued_in"] == "s-next"
     assert by_id["s-next"]["cost"] == 1.25 and by_id["s-next"]["cost_estimated"] is False

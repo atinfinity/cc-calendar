@@ -507,6 +507,17 @@ class SessionAcc:
         mix = self.effort_mix()
         return max(mix, key=mix.get) if mix else None
 
+    def commit_list(self) -> list[dict]:
+        """Commits as {ts, sha, subject}, without asking git (cheap enough for the session list)."""
+        seen, out = set(), []
+        for c in self.commits:
+            key = c.get("sha") or (c.get("subject"), c.get("ts"))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"ts": c.get("ts"), "sha": c.get("sha"), "subject": c.get("subject")})
+        return out
+
     def density(self) -> dict[int, int]:
         out: Counter = Counter()
         for t in self.density_events:

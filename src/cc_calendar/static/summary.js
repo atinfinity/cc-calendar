@@ -5,7 +5,7 @@ import { fmtCost, fmtDuration, h } from "./util.js";
 const BUCKET_MS = 600_000;
 
 // Active time: the drawn segments clipped to [from, to), so it follows the "Split after" setting.
-function activeMs(s, from, to) {
+export function activeMs(s, from, to) {
   let ms = 0;
   for (const [a, b] of s.segments) ms += Math.max(0, Math.min(b, to) - Math.max(a, from));
   return ms;

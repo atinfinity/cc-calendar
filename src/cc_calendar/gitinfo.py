@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ CACHE_TTL = 30.0
 MATCH_WINDOW_S = 15 * 60
 
 _log_cache: dict[str, tuple[float, list[tuple[str, str, int]]]] = {}
+_remote_cache: dict[str, tuple[float, str | None]] = {}
 
 
 def _git(cwd: str, *args: str) -> str | None:
@@ -66,6 +68,32 @@ def resolve_commits(commits: list[dict]) -> list[dict]:
         seen.add(key)
         out.append(c)
     return out
+
+
+def web_url(remote: str) -> str | None:
+    """Browser URL of a git remote: git@host:o/r.git and https://host/o/r.git -> https://host/o/r."""
+    remote = remote.strip()
+    m = re.match(r"^(?:ssh://)?git@([^:/]+)[:/](.+?)(?:\.git)?/?$", remote)
+    if m:
+        return f"https://{m.group(1)}/{m.group(2)}"
+    m = re.match(r"^https?://(?:[^@/]+@)?([^/]+)/(.+?)(?:\.git)?/?$", remote)
+    if m:
+        return f"https://{m.group(1)}/{m.group(2)}"
+    return None
+
+
+def repo_url(cwd: str | None) -> str | None:
+    """Web URL of the origin remote of the repository at cwd, cached briefly."""
+    if not cwd:
+        return None
+    now = time.monotonic()
+    cached = _remote_cache.get(cwd)
+    if cached and now - cached[0] < CACHE_TTL:
+        return cached[1]
+    out = _git(cwd, "remote", "get-url", "origin")
+    url = web_url(out) if out else None
+    _remote_cache[cwd] = (now, url)
+    return url
 
 
 def working_tree_clean(cwd: str | None) -> bool | None:
