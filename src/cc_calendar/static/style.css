@@ -103,8 +103,8 @@ a { color: var(--accent); }
 /* ---------------------------------------------------------------- layout */
 .layout { flex: 1; display: flex; min-height: 0; }
 .main-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-#calendar-view, #list-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-#calendar-view[hidden], #list-view[hidden] { display: none; }
+#calendar-view, #list-view, #project-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#calendar-view[hidden], #list-view[hidden], #project-view[hidden] { display: none; }
 .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; flex-wrap: wrap; }
 .range { font-weight: 600; font-size: 14px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0 14px 8px; font-size: 12px; }
@@ -181,6 +181,22 @@ a { color: var(--accent); }
   content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px;
   border-radius: 50%; background: var(--now);
 }
+
+/* ---------------------------------------------------------------- project page */
+.project-name { font-size: 15px; }
+.project-body { flex: 1; overflow: auto; padding: 0 14px 14px; border-top: 1px solid var(--border); }
+.project-body table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.project-body th { text-align: left; color: var(--muted); font-weight: 600; padding: 3px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.project-body td { padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.project-body .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.project-body .bar-cell { width: 40%; vertical-align: middle; }
+.project-body .hbar { height: 8px; border-radius: 4px; background: var(--accent); min-width: 2px; }
+.project-body tr[data-sid] { cursor: pointer; }
+.project-body tr[data-sid]:hover td { background: var(--bg-hover); }
+.project-body tr.selected td { background: var(--accent-soft); }
+.project-link { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.project-link:hover { background: none; color: var(--accent); text-decoration: underline; }
+.dropdown-menu .open-project { margin-left: auto; padding: 0 6px; font-size: 11px; }
 
 /* ---------------------------------------------------------------- list */
 .list { flex: 1; overflow: auto; border-top: 1px solid var(--border); }

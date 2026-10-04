@@ -54,7 +54,7 @@ function logLink(text, onclick, cls = "") {
   return h("button", { class: `log-link ${cls}`, title: "Open the log here", onclick }, text);
 }
 
-export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
+export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject }) {
   const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
   const ctx = d.context_pct == null ? null : h("span", { class: "stat", title: "Context used by the latest response" },
     "ctx ", h("span", { class: "ctx" }, h("i", { style: { width: `${Math.min(100, d.context_pct)}%` } })), ` ${d.context_pct}%`);
@@ -68,8 +68,9 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
       h("button", { class: "primary", onclick: () => onOpenLog(null) }, "Open log"),
       h("button", { onclick: onClose, "aria-label": "Close" }, "✕")),
     h("h2", {}, d.title),
-    h("div", { class: "muted", title: d.cwd || d.project },
-      `${d.project_name}${d.branch ? " · " + d.branch : ""}${d.permission_mode ? " · " + d.permission_mode : ""}`),
+    h("div", { class: "muted" },
+      h("button", { class: "project-link", title: `${d.cwd || d.project}\nOpen the project page`, onclick: onOpenProject }, d.project_name),
+      `${d.branch ? " · " + d.branch : ""}${d.permission_mode ? " · " + d.permission_mode : ""}`),
     h("div", { class: "muted" },
       `Started ${fmtDateTime(d.start)} · last activity ${fmtAgo(d.end)} · span ${fmtDuration(d.end - d.start)}`),
     h("div", { class: "stats" },

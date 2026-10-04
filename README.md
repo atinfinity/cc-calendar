@@ -82,6 +82,9 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   requests, tokens and cost by model, tool calls and errors by tool).
 - **List view** with search over titles and prompts (a match inside a prompt is shown under the title), project and status filters, and sorting by
   any column (click a header; click again to reverse).
+- **Project page** — click a project name (in the list, the Summary table, the detail pane or the
+  project menu) to see the project over all time: total active time and cost, activity by month,
+  every session, and its commit history with links to the repository.
 - **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
   and sort order: start, end, active time, project, branch, status, prompts, tokens, cost, cache hit
   rate, model, effort, Claude Code version and commit count. Times are ISO 8601 with your UTC

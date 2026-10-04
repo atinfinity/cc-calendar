@@ -117,6 +117,11 @@ def shoot(url: str) -> None:
         page.click('#span-toggle button[data-span="month"]')
         page.wait_for_selector(".month-day")
         page.screenshot(path=OUT / "month.png")
+
+        page.click('#view-toggle button[data-view="list"]')
+        page.locator("#list .project-link", has_text="acme-web").first.click()
+        page.wait_for_selector("#project-view .project-body")
+        page.screenshot(path=OUT / "project.png")
         browser.close()
     for f in sorted(OUT.glob("*.png")):
         print(f"{f}  {f.stat().st_size // 1024} KB")

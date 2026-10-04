@@ -1,5 +1,5 @@
 // Active time and cost per day and per project for the displayed range.
-import { state } from "./app.js";
+import { projectLink, state } from "./app.js";
 import { fmtCost, fmtDuration, h } from "./util.js";
 
 const BUCKET_MS = 600_000;
@@ -85,8 +85,8 @@ export function renderSummary(container, summary, dayLabels) {
         h("th", { class: "num" }, "Sessions"))),
       h("tbody", {}, rows.map((r) =>
         h("tr", {},
-          h("td", { title: r.project },
-            h("span", { class: "dot", style: { background: state.projectColors.get(r.project) } }), r.name),
+          h("td", {},
+            h("span", { class: "dot", style: { background: state.projectColors.get(r.project) } }), projectLink(r.project, r.name)),
           ...dayCells(r.days),
           h("td", { class: "num strong" }, fmtDuration(r.ms)),
           h("td", { class: "num" }, fmtCost(r.cost, r.estimated)),
