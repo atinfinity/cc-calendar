@@ -252,7 +252,7 @@ function renderStats(panel, st) {
       st.tools.length ? toolTable : null));
 }
 
-function closeLog() {
+export function closeLog() {
   $("log-modal").hidden = true;
   view.token++;
 }

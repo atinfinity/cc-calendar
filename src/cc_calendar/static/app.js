@@ -9,7 +9,8 @@ import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
 import { bindShortcuts } from "./shortcuts.js";
 import { renderToolsPane } from "./toolspane.js";
-import { openLog } from "./transcript.js";
+import { closeLog, openLog } from "./transcript.js";
+import { majorChange, readHash, stateHash } from "./urlstate.js";
 import {
   CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
   fmtDuration, fmtPct, fmtTokens, h, matchSnippet, paletteColor,
@@ -79,8 +80,16 @@ async function loadSessions() {
   state.claudeDirs = data.claude_dirs || [];
   state.byId = new Map(data.sessions.map((s) => [s.id, s]));
   state.dataVersion++;
+  const first = !loaded;
+  loaded = true;
+  if (first) dropUnknown();
   assignColors();
   renderAll();
+  if (first) {
+    restoring = false;
+    await refreshDetail();
+    document.querySelector(`[data-sid="${state.selectedId}"]`)?.scrollIntoView({ block: "nearest" });
+  }
   checkTransitions(data.sessions, select);
 }
 
@@ -169,6 +178,7 @@ export function filtered() {
 
 export async function select(id) {
   state.selectedId = id;
+  syncURL();
   document.querySelectorAll(".bar.selected, tr.selected").forEach((el) => el.classList.remove("selected"));
   document.querySelectorAll(`[data-sid="${id}"]`).forEach((el) => el.classList.add("selected"));
   await refreshDetail();
@@ -230,6 +240,7 @@ function closeProject() {
 }
 
 function renderMain() {
+  syncURL();
   $("calendar-view").hidden = state.view !== "calendar" || state.project != null;
   $("list-view").hidden = state.view !== "list" || state.project != null;
   $("project-view").hidden = state.project == null;
@@ -661,6 +672,56 @@ function bindKeys() {
   ]);
 }
 
+// ------------------------------------------------------------------ URL
+
+let loaded = false; // the first session list has arrived
+let restoring = true; // the state comes from the URL, so do not add history entries
+
+// Put the current view in the URL hash: a new history entry when the view changes, so Back
+// returns to it, but selecting a session only replaces the current entry.
+function syncURL() {
+  const hash = stateHash(state);
+  if (hash === location.hash) return;
+  if (restoring || !majorChange(hash, location.hash)) history.replaceState(null, "", hash);
+  else history.pushState(null, "", hash);
+}
+
+// Take the view from the URL hash. Keys it does not name keep their remembered value.
+function applyHash() {
+  const u = readHash();
+  if (u.view) {
+    state.view = u.view;
+    prefs.set("view", u.view);
+  }
+  if (u.span) {
+    state.span = u.span;
+    prefs.set("span", u.span);
+  }
+  state.anchor = u.anchor || startOfDay(new Date());
+  state.selectedId = u.selectedId || null;
+  state.project = u.project ?? null;
+  dropUnknown();
+}
+
+// Forget a session or project the URL names but the logs do not have.
+function dropUnknown() {
+  if (!loaded) return; // checked once the sessions arrive
+  if (state.selectedId && !state.byId.has(state.selectedId)) state.selectedId = null;
+  if (state.project != null && !state.sessions.some((s) => s.project === state.project)) state.project = null;
+}
+
+window.addEventListener("popstate", () => {
+  const before = state.selectedId;
+  restoring = true;
+  applyHash();
+  // The transcript and menu belong to the view being left.
+  closeLog();
+  $("project-menu").hidden = true;
+  renderAll();
+  restoring = false;
+  if (state.selectedId !== before) refreshDetail();
+});
+
 // ------------------------------------------------------------------ live updates
 
 function connectEvents() {
@@ -685,6 +746,7 @@ function connectEvents() {
 // Keep "now" line and relative times fresh even when nothing is written.
 setInterval(() => { if (state.view === "calendar") renderMain(); }, 60_000);
 
+applyHash();
 bind();
 loadSessions().catch((e) => {
   $("calendar").replaceChildren(h("div", { class: "empty" }, `Failed to load sessions: ${e.message}`));
