@@ -25,6 +25,13 @@
     - Click a mark to open the transcript at that point.
 - **Activity density**: a heat strip behind each day shows prompts and responses per 10 minutes.
 - **Live updates**: new log lines are picked up within a second.
+- **Views in the URL**: the address keeps the calendar or list view, the span, the date, the
+  selected session and the open project page.
+    - Reloading the page keeps your place, and you can bookmark a view.
+    - The browser's Back and Forward buttons step through range, span and view changes and the
+      project page. Selecting a session does not add a step.
+    - A bookmark shows the same view on any day. A session or project the logs no longer have is
+      left out.
 
 ![Month view](images/month.png)
 
