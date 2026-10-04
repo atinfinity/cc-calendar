@@ -71,6 +71,9 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 - **Detail pane** — tokens, cost, context usage, every request you made with the commits that
   followed it, files changed, pull requests, subagents and background tasks, and links between
   a session and the one it was continued in.
+- **Resume** — "Copy resume command" in the detail pane copies
+  `cd <project dir> && claude --resume <session id>`, so you can pick a session up again from a
+  terminal.
 - **Transcript viewer** — Markdown rendering, collapsible tool calls, optional thinking and
   metadata, drill-down into subagent transcripts, and a stats panel per transcript (active time,
   requests, tokens and cost by model, tool calls and errors by tool).
