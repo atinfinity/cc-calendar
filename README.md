@@ -6,6 +6,8 @@ A Google Calendar-style weekly view of your [Claude Code](https://claude.com/cla
 when you worked, on what, what it cost, and what came out of it — commits, changed files and pull
 requests — in a local web UI that updates live while sessions run.
 
+**Project site:** <https://atinfinity.github.io/cc-calendar/>
+
 ![Week calendar colored by project](docs/images/calendar.png)
 
 ## Install
@@ -114,6 +116,13 @@ your installed Google Chrome:
 
 ```sh
 uv run --with playwright python scripts/screenshots.py
+```
+
+The project site is built with [Zensical](https://zensical.org/) from `docs/` and `zensical.toml`,
+and deployed to GitHub Pages on every push to `main`. Preview it locally:
+
+```sh
+uv run --group docs zensical serve
 ```
 
 ## Acknowledgements
