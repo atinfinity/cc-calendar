@@ -124,3 +124,21 @@
     See [Export format](export.md) for the fields and the JSON envelope.
 
 ![List view](images/list.png)
+
+## Keyboard shortcuts
+
+Press ++"?"++ or click **?** in the top bar for this list. Button tooltips show their key too.
+
+| Keys | Action |
+| --- | --- |
+| ++arrow-left++ / ++arrow-right++ | Previous / next day, week, month or year (calendar view) |
+| ++t++ | Back to today, this week, month or year (calendar view) |
+| ++d++ / ++w++ / ++m++ / ++y++ | Day / week / month / year span, switching to the calendar view |
+| ++c++ / ++l++ | Calendar / list view |
+| ++slash++ | Focus the search box |
+| ++j++ / ++k++ | Next / previous session: by start time in the day and week views, in row order in the list |
+| ++enter++ / ++o++ | Open the selected session's transcript |
+| ++esc++ | Close the topmost thing: shortcut list, transcript, project menu, search box, detail pane, project page |
+
+Keys typed in a form field go to the field, and only ++esc++ works there. Leaving the search
+box with ++esc++ keeps its text. While a transcript is open, only ++esc++ works.

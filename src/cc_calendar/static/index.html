@@ -14,10 +14,10 @@
   <header class="topbar">
     <div class="brand">cc-calendar</div>
     <div class="seg" id="view-toggle">
-      <button data-view="calendar">Calendar</button>
-      <button data-view="list">List</button>
+      <button data-view="calendar" title="Calendar (c)">Calendar</button>
+      <button data-view="list" title="List (l)">List</button>
     </div>
-    <input id="search" type="search" placeholder="Search titles and prompts…" autocomplete="off">
+    <input id="search" type="search" placeholder="Search titles and prompts…" title="Search (/)" autocomplete="off">
     <div class="dropdown" id="project-filter">
       <button class="dropdown-btn" id="project-btn">All projects ▾</button>
       <div class="dropdown-menu" id="project-menu" hidden></div>
@@ -28,6 +28,7 @@
     <button id="notify-toggle">Notify</button>
     <span class="live" id="live-indicator" title="Live updates">● live</span>
     <button id="reload" title="Reload">Reload</button>
+    <button id="help-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
   </header>
 
   <main class="layout">
@@ -35,14 +36,14 @@
       <div id="calendar-view">
         <div class="toolbar">
           <div class="seg small" id="span-toggle">
-            <button data-span="day">Day</button>
-            <button data-span="week">Week</button>
-            <button data-span="month">Month</button>
-            <button data-span="year">Year</button>
+            <button data-span="day" title="Day (d)">Day</button>
+            <button data-span="week" title="Week (w)">Week</button>
+            <button data-span="month" title="Month (m)">Month</button>
+            <button data-span="year" title="Year (y)">Year</button>
           </div>
-          <button id="go-today">This week</button>
-          <button id="go-prev" aria-label="Previous">◀</button>
-          <button id="go-next" aria-label="Next">▶</button>
+          <button id="go-today" title="Go to the current day, week, month or year (t)">This week</button>
+          <button id="go-prev" aria-label="Previous" title="Previous (←)">◀</button>
+          <button id="go-next" aria-label="Next" title="Next (→)">▶</button>
           <span class="range" id="range-label"></span>
           <span class="muted" id="range-count"></span>
           <button id="summary-toggle" title="Active time and cost per project">Summary</button>
@@ -111,6 +112,16 @@
       <div class="log-events" id="log-events" hidden></div>
       <div class="log-stats" id="log-stats" hidden></div>
       <div class="log-body" id="log-body"></div>
+    </div>
+  </div>
+  <div class="modal" id="help-modal" hidden>
+    <div class="modal-box help-box" role="dialog" aria-labelledby="help-title">
+      <div class="modal-head">
+        <strong id="help-title">Keyboard shortcuts</strong>
+        <div class="spacer"></div>
+        <button id="help-close" aria-label="Close">✕</button>
+      </div>
+      <table class="help-keys" id="help-keys"></table>
     </div>
   </div>
   <div class="tooltip" id="tooltip" hidden></div>
