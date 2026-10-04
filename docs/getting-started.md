@@ -14,6 +14,9 @@ automatically if needed.
 
     Update it later with `uv tool upgrade cc-calendar`.
 
+    If you installed v0.3.0 or earlier from GitHub, switch to the PyPI package once with
+    `uv tool install --force cc-calendar`. `uv tool upgrade` works from then on.
+
 === "Run without installing"
 
     ```sh

@@ -64,6 +64,8 @@ uv tool install cc-calendar
 cc-calendar
 ```
 
+Or try it without installing: `uvx cc-calendar`.
+
 The server opens your browser on a free localhost port. See [Getting started](getting-started.md)
 for options.
 

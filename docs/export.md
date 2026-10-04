@@ -63,7 +63,7 @@ JSON wraps the records in an object that identifies the format:
 {
   "format": "cc-calendar.sessions",
   "schema_version": 1,
-  "generator": "cc-calendar 0.3.0",
+  "generator": "cc-calendar 0.4.0",
   "exported_at": "2026-10-04T10:00:00+09:00",
   "sessions": [
     {
