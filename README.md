@@ -44,6 +44,10 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
   table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.
+- **Markdown report** — "Copy report" copies the displayed day, week, month or year as Markdown:
+  active time and cost per project, each session's title and the commits made in the range. Ready
+  to paste into a standup note or a daily report; it follows the current filters. Issue and PR
+  numbers such as `#12` become links to the repository's `origin` remote.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).

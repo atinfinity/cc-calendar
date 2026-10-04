@@ -2,6 +2,7 @@
 import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { overviewRange, renderOverview } from "./overview.js";
+import { buildReport, copyText } from "./report.js";
 import { openLog } from "./transcript.js";
 import {
   CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
@@ -406,6 +407,13 @@ function bind() {
     state.showSummary = !state.showSummary;
     prefs.set("summary", state.showSummary);
     renderAll();
+  };
+  $("copy-report").onclick = async () => {
+    const btn = $("copy-report");
+    const ok = await copyText(buildReport(filtered(), rangeDays(), $("range-label").textContent));
+    btn.textContent = ok ? "Copied ✓" : "Copy failed";
+    clearTimeout(btn.timer);
+    btn.timer = setTimeout(() => { btn.textContent = "Copy report"; }, 1500);
   };
   $("zoom-in").onclick = () => setHourPx(state.hourPx * 1.25);
   $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);

@@ -71,6 +71,8 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "cache_saved": round(cache_saved, 4),
         "model": models[0] if models else None,
         "effort": s.effort(),
+        "commit_list": s.commit_list(),
+        "repo_url": gitinfo.repo_url(s.cwd),
         "continued_in": s.continued_in,
         "continued_from": continued_from,
         "search": search,
