@@ -2,8 +2,8 @@
 
 ## Install
 
-cc-calendar requires [uv](https://docs.astral.sh/uv/). uv fetches Python 3.12 or later
-automatically if needed.
+The recommended way is [uv](https://docs.astral.sh/uv/), which fetches Python 3.12 or later
+automatically if needed. pipx and pip work too.
 
 === "Install as a tool"
 
@@ -21,6 +21,24 @@ automatically if needed.
 
     ```sh
     uvx cc-calendar
+    ```
+
+=== "pipx or pip"
+
+    These need Python 3.12 or later already installed.
+
+    ```sh
+    pipx install cc-calendar
+    cc-calendar
+    ```
+
+    Update it later with `pipx upgrade cc-calendar`. Without pipx, install it into a virtual
+    environment with pip:
+
+    ```sh
+    python3 -m venv .venv
+    .venv/bin/pip install cc-calendar
+    .venv/bin/cc-calendar
     ```
 
 === "Run from a checkout"

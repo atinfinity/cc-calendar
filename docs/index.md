@@ -64,7 +64,8 @@ uv tool install cc-calendar
 cc-calendar
 ```
 
-Or try it without installing: `uvx cc-calendar`.
+Or try it without installing: `uvx cc-calendar`. With Python 3.12+ already installed,
+`pipx install cc-calendar` works too.
 
 The server opens your browser on a free localhost port. See [Getting started](getting-started.md)
 for options.
