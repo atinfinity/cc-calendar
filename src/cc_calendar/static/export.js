@@ -37,6 +37,8 @@ export function sessionRecords(rows) {
     effort: s.effort || null,
     claude_code_version: s.version || null,
     commits: (s.commit_list || []).length,
+    tags: [...(s.tags || [])],
+    note: s.note || "",
   }));
 }
 
@@ -49,14 +51,16 @@ function csvCell(v) {
 }
 
 export function toCSV(records, fields) {
-  const lines = [fields.join(","), ...records.map((r) => fields.map((f) => csvCell(r[f])).join(","))];
+  // Tags cannot contain commas, but ";" keeps the cell readable without quotes.
+  const cell = (v) => csvCell(Array.isArray(v) ? v.join(";") : v);
+  const lines = [fields.join(","), ...records.map((r) => fields.map((f) => cell(r[f])).join(","))];
   return lines.join("\r\n") + "\r\n";
 }
 
 export const EXPORT_FIELDS = [
   "id", "title", "project", "project_path", "source", "branch", "status", "start", "end",
   "active_minutes", "span_minutes", "prompts", "tokens", "cost_usd", "cost_estimated",
-  "cache_hit_rate", "model", "effort", "claude_code_version", "commits",
+  "cache_hit_rate", "model", "effort", "claude_code_version", "commits", "tags", "note",
 ];
 
 // Bump when a field is renamed, removed or changes meaning; adding fields does not need it.

@@ -19,7 +19,9 @@ export function buildReport(visible, days, label) {
   for (const r of rows) {
     lines.push(`### ${r.name} (${fmtDuration(r.ms)} · ${fmtCost(r.cost, r.estimated)})`, "");
     for (const s of sessions.filter((x) => x.project === r.project)) {
-      lines.push(`- ${linkRefs(oneLine(s.title), s.repo_url)} (${fmtDuration(activeMs(s, from, to))})`);
+      // Tags only: notes are often private, and the report is meant to be shared.
+      const tags = (s.tags || []).map((t) => ` \`${t.replaceAll("`", "'")}\``).join("");
+      lines.push(`- ${linkRefs(oneLine(s.title), s.repo_url)}${tags} (${fmtDuration(activeMs(s, from, to))})`);
       for (const c of (s.commit_list || []).filter((c) => c.ts == null || (c.ts >= from && c.ts < to))) {
         const sha = c.sha ? `\`${c.sha.slice(0, 7)}\` ` : "";
         lines.push(`  - ${sha}${linkRefs(oneLine(c.subject || "(no message)"), s.repo_url)}`);

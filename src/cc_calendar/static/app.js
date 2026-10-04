@@ -48,6 +48,7 @@ export const state = {
   modelColors: new Map(),
   claudeDirs: [], // [{name, path}] of the config directories being read
   sourceColors: new Map(),
+  tagColors: new Map(),
   tags: [], // [{tag, count}] of every tag in use, most used first
   notesError: null, // why the notes file could not be read, if it could not
 };
@@ -57,10 +58,15 @@ export function multiSource() {
   return state.claudeDirs.length > 1;
 }
 
-// The saved choice stays "source" across a single-directory run, but colors by project there.
+// The saved choice stays "source" across a single-directory run, but colors by project there;
+// likewise "tag" while no session has a tag.
 export function colorMode() {
-  return state.colorBy === "source" && !multiSource() ? "project" : state.colorBy;
+  if (state.colorBy === "source" && !multiSource()) return "project";
+  if (state.colorBy === "tag" && !state.tags.length) return "project";
+  return state.colorBy;
 }
+
+const UNTAGGED_COLOR = "#9aa0a6";
 
 // Likewise, a saved source filter is ignored while only one directory is read.
 function listFilter() {
@@ -106,6 +112,8 @@ function assignColors() {
   state.projectColors = new Map(count("project").map((p, i) => [p, paletteColor(i)]));
   state.modelColors = new Map(count("model").map((m, i) => [m, paletteColor(i + 2)]));
   state.sourceColors = new Map(state.claudeDirs.map((d, i) => [d.name, paletteColor(i)]));
+  // state.tags is already most used first.
+  state.tagColors = new Map(state.tags.map((t, i) => [t.tag, paletteColor(i)]));
 }
 
 // Fixed thresholds so a color means the same amount in every week.
@@ -128,6 +136,8 @@ export function colorFor(s) {
   if (mode === "model") return state.modelColors.get(s.model) || "#888";
   if (mode === "effort") return EFFORT_COLORS[s.effort] || "#888";
   if (mode === "source") return state.sourceColors.get(s.source) || "#888";
+  // A session with several tags takes its first one's color.
+  if (mode === "tag") return s.tags.length ? state.tagColors.get(s.tags[0]) || "#888" : UNTAGGED_COLOR;
   return state.projectColors.get(s.project) || "#888";
 }
 
@@ -150,6 +160,8 @@ export function legendItems(visible) {
       key = s.effort || ""; label = s.effort || "unknown"; color = colorFor(s);
     } else if (mode === "source") {
       key = sourcePath(s.source); label = s.source; color = colorFor(s);
+    } else if (mode === "tag") {
+      key = s.tags[0] ?? ""; label = s.tags[0] ?? "(untagged)"; color = colorFor(s);
     } else {
       key = s.project; label = s.project_name; color = colorFor(s);
     }
@@ -160,6 +172,11 @@ export function legendItems(visible) {
   if (mode === "effort") {
     const rank = (k) => { const i = Object.keys(EFFORT_COLORS).indexOf(k); return i < 0 ? 99 : i; };
     return [...counts.entries()].sort((a, b) => rank(a[0]) - rank(b[0])).map(([, e]) => ({ ...e, title: "Effort most API requests ran at" }));
+  }
+  if (mode === "tag") {
+    // Untagged last; the color follows the first tag of sessions with several.
+    return [...counts.entries()].sort((a, b) => (a[0] === "") - (b[0] === "") || b[1].n - a[1].n)
+      .map(([k, e]) => ({ ...e, title: k ? "Sessions whose first tag is this one" : "Sessions without tags" }));
   }
   if (mode === "cost") {
     return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([, e]) => ({ ...e, title: "" }));
@@ -305,6 +322,7 @@ function renderToolbar() {
   document.querySelectorAll("#color-by button").forEach((b) =>
     b.classList.toggle("active", b.dataset.color === colorMode()));
   document.querySelector('#color-by [data-color="source"]').hidden = !multiSource();
+  document.querySelector('#color-by [data-color="tag"]').hidden = !state.tags.length;
   document.querySelectorAll("#span-toggle button").forEach((b) =>
     b.classList.toggle("active", b.dataset.span === state.span));
   $("go-today").textContent = { day: "Today", week: "This week", month: "This month", year: "This year" }[state.span];

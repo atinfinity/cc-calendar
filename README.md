@@ -79,7 +79,7 @@ between machines; changes made to the file elsewhere are picked up. One file ser
   table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.
 - **Markdown report** — "Copy report" copies the displayed day, week, month or year as Markdown:
-  active time and cost per project, each session's title and the commits made in the range. Ready
+  active time and cost per project, each session's title and tags (not notes) and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR
   numbers such as `#12` become links to the repository's `origin` remote.
 - **Tool usage** — the Tools pane aggregates tool calls in the displayed range: most used tools,
@@ -94,7 +94,7 @@ between machines; changes made to the file elsewhere are picked up. One file ser
   through each kind of event. Click the key next to the legend to hide the marks.
 - **Activity density** — a heat strip behind each day shows prompts and responses per 10 minutes.
 - **Colors** by project, status, model, effort (the level most requests ran at), source (with
-  several config directories) or cost
+  several config directories), tag (the first tag of each session) or cost
   (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
 - **Effort and compactions** — the detail pane and transcript stats show the share of requests
   per effort level, and each compaction shows its trigger and context size before → after
@@ -127,7 +127,7 @@ between machines; changes made to the file elsewhere are picked up. One file ser
   every session, and its commit history with links to the repository.
 - **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
   and sort order: start, end, active time, project, source directory, branch, status, prompts,
-  tokens, cost, cache hit rate, model, effort, Claude Code version and commit count. Times are
+  tokens, cost, cache hit rate, model, effort, Claude Code version, commit count, tags and note. Times are
   ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
   `c` / `l` calendar / list, `/` search, `j` / `k` next / previous session, `Enter` open its

@@ -18,8 +18,10 @@
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
 - **Colors** by project, status, model, effort (the level most requests ran at), source (with
-  several config directories) or cost
+  several config directories), tag or cost
   (< \$1 / \$1–5 / \$5–20 / \$20–50 / ≥ \$50).
+    - **Tag** colors a session by its first tag, so put the main one first. Sessions without tags
+      are gray. The button shows once any session has a tag.
 - **Event marks** on each bar show when prompts, commits, compactions and API errors happened.
     - The tooltip counts them for that block.
     - Click a mark to open the transcript at that point.
@@ -43,7 +45,7 @@
     - A session's cost is split across days by when its requests ran.
 - **Markdown report**: "Copy report" copies the displayed range as Markdown. The report covers:
     - active time and cost per project
-    - each session's title
+    - each session's title and tags (notes are left out)
     - the commits made in the range
 
     Issue and PR numbers such as `#12` become links to the repository's `origin` remote.
@@ -139,6 +141,7 @@
     - project, source config directory, branch and status
     - prompts, tokens, cost and cache hit rate
     - model, effort, Claude Code version and number of commits
+    - tags and note
 
     See [Export format](export.md) for the fields and the JSON envelope.
 

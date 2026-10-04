@@ -8,8 +8,8 @@ The file is named `cc-calendar-sessions-YYYY-MM-DD.csv` or `.json`, using the da
 
 !!! warning "Exports contain your session data"
 
-    Titles are taken from your prompts, and paths come from your machine. Treat exported files like
-    the transcripts themselves.
+    Titles are taken from your prompts, paths come from your machine, and your notes are included.
+    Treat exported files like the transcripts themselves.
 
 ## Fields
 
@@ -37,6 +37,8 @@ CSV and JSON carry the same fields, in this order.
 | `effort` | string or null | Effort level most requests ran at: `max`, `xhigh`, `high`, `medium` or `low` |
 | `claude_code_version` | string or null | Claude Code version recorded in the log (the latest one if it changed) |
 | `commits` | integer | Commits made in the session |
+| `tags` | array of strings | Tags you gave the session, in the order shown. In CSV, joined with `;` (tags cannot contain commas). Empty when there are none. See [Notes and tags](getting-started.md#notes-and-tags) |
+| `note` | string | Your note on the session; empty when there is none. Line breaks are kept |
 
 `active_minutes` depends on the **Split after … idle** setting. Idle gaps longer than that
 setting are not counted.
@@ -84,7 +86,9 @@ JSON wraps the records in an object that identifies the format:
       "model": "claude-sonnet-5-5",
       "effort": "high",
       "claude_code_version": "2.1.0",
-      "commits": 2
+      "commits": 2,
+      "tags": ["redesign", "PR review"],
+      "note": "Waiting for design sign-off"
     }
   ]
 }
@@ -110,4 +114,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | Schema version | cc-calendar | Changes |
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
-| 1 | Unreleased | Added `source` |
+| 1 | Unreleased | Added `source`, `tags` and `note` |
