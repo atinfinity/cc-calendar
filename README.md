@@ -109,6 +109,9 @@ A session found in more than one directory is shown once, from the copy with the
   and sort order: start, end, active time, project, source directory, branch, status, prompts,
   tokens, cost, cache hit rate, model, effort, Claude Code version and commit count. Times are
   ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
+- **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
+  `c` / `l` calendar / list, `/` search, `j` / `k` next / previous session, `Enter` open its
+  transcript, `Esc` close. Press `?` (or click **?** in the top bar) for the full list.
 - **Live updates** — new log lines are picked up within a second.
 
 | Session detail | Transcript with stats |

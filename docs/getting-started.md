@@ -56,3 +56,5 @@ A session found in more than one directory is shown once, from the copy with the
   reports follow these filters.
 - Click a session to open its detail pane. From the detail pane, open the transcript.
 - **Summary**, **Tools** and **Copy report** work on the displayed range.
+- Press `?` for keyboard shortcuts: `←` `→` to move, `j` `k` to step through sessions, `Enter`
+  to open the transcript, `Esc` to close. See [Keyboard shortcuts](features.md#keyboard-shortcuts).

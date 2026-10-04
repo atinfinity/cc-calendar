@@ -7,6 +7,7 @@ import { bindNotifyToggle, checkTransitions } from "./notify.js";
 import { overviewRange, renderOverview } from "./overview.js";
 import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
+import { bindShortcuts } from "./shortcuts.js";
 import { renderToolsPane } from "./toolspane.js";
 import { openLog } from "./transcript.js";
 import {
@@ -173,6 +174,12 @@ export async function select(id) {
   await refreshDetail();
 }
 
+function closeDetail() {
+  state.selectedId = null;
+  refreshDetail();
+  renderMain();
+}
+
 // Select the session and open its log at the event closest to `ts`.
 async function openEvent(id, ts, kind) {
   await select(id);
@@ -191,7 +198,7 @@ async function refreshDetail() {
     if (d.id !== state.selectedId) return;
     state.detail = d;
     renderDetail(pane, d, {
-      onClose: () => { state.selectedId = null; refreshDetail(); renderMain(); },
+      onClose: closeDetail,
       onOpenLog: (agent, target) => openLog(d, agent, target),
       onSelect: (sid) => select(sid),
       onOpenProject: () => openProject(d.project),
@@ -472,6 +479,13 @@ export function rangeDays() {
   return [...Array(7)].map((_, i) => addDays(start, i));
 }
 
+function setView(view) {
+  state.view = view;
+  state.project = null;
+  prefs.set("view", view);
+  renderAll();
+}
+
 function setSpan(span, day) {
   state.span = span;
   if (day) state.anchor = startOfDay(day);
@@ -496,6 +510,11 @@ function shift(dir) {
   renderMain();
 }
 
+function goToday() {
+  state.anchor = startOfDay(new Date());
+  renderMain();
+}
+
 function setHourPx(px) {
   state.hourPx = Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, Math.round(px)));
   prefs.set("hourPx", state.hourPx);
@@ -504,12 +523,7 @@ function setHourPx(px) {
 
 function bind() {
   document.querySelectorAll("#view-toggle button").forEach((b) =>
-    b.addEventListener("click", () => {
-      state.view = b.dataset.view;
-      state.project = null;
-      prefs.set("view", state.view);
-      renderAll();
-    }));
+    b.addEventListener("click", () => setView(b.dataset.view)));
   document.querySelectorAll("#color-by button").forEach((b) =>
     b.addEventListener("click", () => {
       state.colorBy = b.dataset.color;
@@ -518,7 +532,7 @@ function bind() {
     }));
   document.querySelectorAll("#span-toggle button").forEach((b) =>
     b.addEventListener("click", () => setSpan(b.dataset.span)));
-  $("go-today").onclick = () => { state.anchor = startOfDay(new Date()); renderMain(); };
+  $("go-today").onclick = goToday;
   $("go-prev").onclick = () => shift(-1);
   $("go-next").onclick = () => shift(1);
   bindNotifyToggle($("notify-toggle"));
@@ -575,16 +589,76 @@ function bind() {
   document.addEventListener("click", (e) => {
     if (!$("project-filter").contains(e.target)) $("project-menu").hidden = true;
   });
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || !$("log-modal").hidden) return;
-    if (state.selectedId) {
-      state.selectedId = null;
-      refreshDetail();
-      renderMain();
-    } else if (state.project != null) {
-      closeProject();
-    }
-  });
+  bindKeys();
+}
+
+// ------------------------------------------------------------------ keyboard
+
+// The sessions j / k move through, in order, or null where they do not apply: the list's rows,
+// or the sessions drawn in the day or week calendar by start time.
+function sessionOrder() {
+  if (state.project != null) return null;
+  const visible = filtered();
+  if (state.view === "list") return listRows(visible);
+  if (state.span !== "day" && state.span !== "week") return null;
+  const days = rangeDays();
+  const start = days[0].getTime();
+  const end = addDays(days[days.length - 1], 1).getTime();
+  return visible
+    .filter((s) => s.segments.some(([a, b]) => b >= start && a < end))
+    .sort((a, b) => a.start - b.start);
+}
+
+function step(dir) {
+  const rows = sessionOrder();
+  if (!rows?.length) return false;
+  const i = rows.findIndex((s) => s.id === state.selectedId);
+  const next = i < 0
+    ? rows[dir > 0 ? 0 : rows.length - 1]
+    : rows[Math.min(rows.length - 1, Math.max(0, i + dir))];
+  select(next.id);
+  document.querySelector(`[data-sid="${next.id}"]`)?.scrollIntoView({ block: "nearest" });
+}
+
+function openSelectedLog() {
+  if (!state.selectedId) return false;
+  (async () => {
+    if (state.detail?.id !== state.selectedId) await refreshDetail();
+    if (state.detail?.id === state.selectedId) openLog(state.detail, null);
+  })();
+}
+
+function bindKeys() {
+  const inCalendar = () => state.view === "calendar" && state.project == null;
+  const nav = (fn) => () => (inCalendar() ? fn() : false);
+  const span = (name) => () => {
+    state.view = "calendar";
+    state.project = null;
+    prefs.set("view", state.view);
+    setSpan(name);
+  };
+  bindShortcuts({
+    ArrowLeft: nav(() => shift(-1)),
+    ArrowRight: nav(() => shift(1)),
+    t: nav(goToday),
+    d: span("day"),
+    w: span("week"),
+    m: span("month"),
+    y: span("year"),
+    c: () => setView("calendar"),
+    l: () => setView("list"),
+    "/": () => $("search").focus(),
+    j: () => step(1),
+    k: () => step(-1),
+    Enter: openSelectedLog,
+    o: openSelectedLog,
+  }, [
+    // Esc closes one thing per press, topmost first (the overlay and transcript come before).
+    () => !$("project-menu").hidden && ($("project-menu").hidden = true),
+    () => document.activeElement === $("search") && ($("search").blur(), true),
+    () => state.selectedId != null && (closeDetail(), true),
+    () => state.project != null && (closeProject(), true),
+  ]);
 }
 
 // ------------------------------------------------------------------ live updates
