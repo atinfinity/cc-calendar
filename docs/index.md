@@ -51,7 +51,7 @@ requests. It runs as a local web UI that updates live while sessions run.
     ---
 
     The server listens only on localhost and reads your logs read-only. It makes no network
-    requests, and the only file it writes holds your session notes.
+    requests. It writes only your session notes and a search index cached from your logs.
 
     [:octicons-arrow-right-24: Privacy](privacy.md)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -17,9 +18,10 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
 from . import __version__, gitinfo
-from .logview import build_entries, log_events
+from .logview import build_entries, find_entries, log_events
 from .notes import NOTE_LIMIT, TAGS_PER_SESSION, Notes, NotesUnavailable
 from .parser import SessionAcc
+from .search import MIN_QUERY, SearchIndex, snippet
 from .stats import log_stats
 from .store import ClaudeDir, Store
 from .tools import tool_usage
@@ -27,6 +29,7 @@ from .tools import tool_usage
 log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
 SEARCH_TEXT_LIMIT = 4000
+QUERY_LIMIT = 500
 # Always revalidate: without this, browsers cache ES modules heuristically and keep
 # running stale code after an upgrade.
 NO_CACHE = {"Cache-Control": "no-cache"}
@@ -167,11 +170,29 @@ class Broadcaster:
             q.put_nowait(payload)
 
 
+def open_index(path: Path | None) -> SearchIndex | None:
+    """The full-text index at `path`, else in memory; None if this SQLite cannot do it."""
+    try:
+        return SearchIndex(path)
+    except (OSError, sqlite3.Error) as e:
+        if path is not None:
+            log.warning("keeping the search index in memory: cannot open %s: %s", path, e)
+    try:
+        return SearchIndex(None)
+    except sqlite3.Error as e:  # no FTS5 or no trigram tokenizer (SQLite < 3.34)
+        log.warning("full-text search unavailable: %s", e)
+        return None
+
+
 def create_app(
-    dirs: Path | list[ClaudeDir], watch: bool = True, notes_path: Path | None = None
+    dirs: Path | list[ClaudeDir],
+    watch: bool = True,
+    notes_path: Path | None = None,
+    index_path: Path | None = None,
 ) -> FastAPI:
-    """`notes_path=None` keeps notes in memory only (used by tests)."""
-    store = Store(dirs)
+    """`notes_path=None` and `index_path=None` keep notes and the search index in memory only
+    (used by tests)."""
+    store = Store(dirs, open_index(index_path))
     notes = Notes(notes_path)
     broadcaster = Broadcaster()
     sessions_dirs = {d.sessions_dir for d in store.dirs}
@@ -204,6 +225,8 @@ def create_app(
         yield
         if task:
             task.cancel()
+        if store.index is not None:
+            store.index.close()
 
     app = FastAPI(title="cc-calendar", version=__version__, lifespan=lifespan)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
@@ -234,6 +257,41 @@ def create_app(
             "tags": notes.all_tags(),
             "notes_error": notes.error,
         }
+
+    @app.get("/api/search")
+    def search(q: str = Query(..., max_length=QUERY_LIMIT)) -> dict:
+        """Sessions whose transcripts contain `q`: per session, the number of matching
+        messages, tool calls and outputs (and how many of them are in subagents), and the
+        first of them."""
+        if store.index is None:
+            raise HTTPException(503, "full-text search needs SQLite 3.34 or later with FTS5")
+        found = store.index.search(q)
+        hits: dict[str, dict] = {}
+        with store.lock:
+            for f in found:
+                s = store.sessions.get(f.session_id)
+                if s is None:
+                    continue
+                # Hits in another copy of the session would not be in the log the viewer opens.
+                sa = s.subagents.get(f.agent_id) if f.agent_id else None
+                if f.path != (sa.path if f.agent_id else s.path):
+                    continue
+                hit = hits.get(f.session_id)
+                count = f.count + (hit["count"] if hit else 0)
+                in_subagents = (f.count if f.agent_id else 0) + (hit["in_subagents"] if hit else 0)
+                if hit is None or (f.ts is not None and (hit["ts"] is None or f.ts < hit["ts"])):
+                    hit = {
+                        "ts": f.ts,
+                        "kind": f.kind,
+                        "name": f.name,
+                        "agent": f.agent_id,
+                        "snippet": snippet(f.text, q),
+                    }
+                hit["count"] = count
+                hit["in_subagents"] = in_subagents
+                hits[f.session_id] = hit
+        # While transcripts are still being indexed, the hits are incomplete.
+        return {"query": q, "min_length": MIN_QUERY, "pending": store.index.pending(), "hits": hits}
 
     @app.get("/api/sessions/{sid}")
     def session_detail(sid: str, gap: int = Query(15, ge=1, le=24 * 60)) -> dict:
@@ -283,6 +341,7 @@ def create_app(
         agent: str | None = None,
         offset: int = Query(0, ge=0),
         limit: int = Query(300, ge=1, le=2000),
+        q: str | None = Query(None, max_length=QUERY_LIMIT),
     ) -> dict:
         path, filter_sid = log_path(sid, agent)
         try:
@@ -297,6 +356,9 @@ def create_app(
         if offset == 0:
             # Lets the viewer jump to an event that is not loaded yet.
             out["events"] = log_events(entries)
+            if q:
+                # Where a full-text search matched, to jump there.
+                out["matches"] = find_entries(entries, q)
         return out
 
     # POST: the filtered session ids can be too many for a query string.

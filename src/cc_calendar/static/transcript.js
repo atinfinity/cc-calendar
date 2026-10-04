@@ -14,6 +14,8 @@ const view = {
   entries: [],
   total: 0,
   events: [], // [index, ts, kind] of entries matching the calendar's event marks
+  query: null, // full-text search the log was opened for
+  matches: [], // [index, ts] of the entries containing it
   focus: null, // index of the entry last jumped to
   loading: false,
   token: 0, // guards against responses for a log we already navigated away from
@@ -74,7 +76,8 @@ function onKey(e) {
   if (handler && handler() !== false) e.preventDefault();
 }
 
-// `target` ({ts, kind}) scrolls to the event nearest to that moment once the log loads.
+// `target` ({ts, kind}) scrolls to the event nearest to that moment once the log loads;
+// {ts, query} scrolls to the entry containing `query` that is nearest to `ts`.
 export async function openLog(detail, agentId, target = null) {
   bind();
   view.detail = detail;
@@ -82,6 +85,8 @@ export async function openLog(detail, agentId, target = null) {
   view.entries = [];
   view.total = 0;
   view.events = [];
+  view.query = target?.query || null;
+  view.matches = [];
   view.focus = null;
   view.loading = false;
   view.token++;
@@ -102,9 +107,23 @@ export async function openLog(detail, agentId, target = null) {
   const token = view.token;
   await loadMore();
   if (target && token === view.token) {
-    const near = nearestEvent(target);
-    if (near) jumpTo(near[0]);
+    const near = view.query ? nearest(view.matches, target.ts) : nearestEvent(target);
+    if (near) jumpTo(near[0], { open: !!view.query });
   }
+}
+
+function nearest(list, ts) {
+  let best = null;
+  for (const m of list) {
+    if (!best || (m[1] != null && (best[1] == null || Math.abs(m[1] - ts) < Math.abs(best[1] - ts)))) best = m;
+  }
+  return best;
+}
+
+function stepMatch(dir) {
+  const at = anchorIndex();
+  const m = dir > 0 ? view.matches.find((x) => x[0] > at) : view.matches.findLast((x) => x[0] < at);
+  if (m) jumpTo(m[0], { open: true });
 }
 
 // ------------------------------------------------------------------ events
@@ -142,18 +161,26 @@ function step(kind, dir) {
   if (ev) jumpTo(ev[0]);
 }
 
-async function jumpTo(i) {
+// `open` expands a tool call, to show the input or output that matched.
+async function jumpTo(i, { open = false } = {}) {
   const token = view.token;
   while (view.entries.length <= i && view.entries.length < view.total) {
     await loadMore(Math.min(2000, Math.max(PAGE, i + 1 - view.entries.length)));
     if (token !== view.token) return;
   }
-  // Tool results are drawn inside their call, so fall back to the nearest drawn entry before i.
+  // Tool results are drawn inside their call; otherwise fall back to the nearest drawn entry before i.
+  const e = view.entries[i];
+  if (e?.kind === "tool_result") {
+    const use = view.entries.find((x) => x.kind === "tool_use" && x.id === e.tool_use_id);
+    if (use) i = use.i;
+  }
   const body = $("log-body");
   let el = body.querySelector(`[data-i="${i}"]`);
   if (!el) el = [...body.querySelectorAll("[data-i]")].filter((x) => Number(x.dataset.i) <= i).pop();
   if (!el) return;
   view.focus = Number(el.dataset.i);
+  const details = open && el.querySelector("details");
+  if (details && !details.open) details.open = true;
   body.querySelectorAll(".entry.flash").forEach((x) => x.classList.remove("flash"));
   el.scrollIntoView({ block: "center" });
   // Restart the animation even when jumping to the same entry twice.
@@ -176,6 +203,15 @@ function renderEventNav() {
       h("button", { title: `Previous ${plural.toLowerCase()}${key("[")}`, onclick: () => step(kind, -1) }, "‹"),
       h("button", { title: `Next ${plural.toLowerCase()}${key("]")}`, onclick: () => step(kind, 1) }, "›"));
   }).filter(Boolean);
+  if (view.query) {
+    const pos = view.matches.findIndex((m) => m[0] === view.focus);
+    parts.push(h("span", { class: "ev-nav", title: `Entries containing “${view.query}”` },
+      h("i", { class: "mark-sample match" }),
+      h("span", {}, "Matches ", h("span", { class: "muted" },
+        pos >= 0 ? `${pos + 1}/${view.matches.length}` : view.matches.length)),
+      h("button", { title: "Previous match", onclick: () => stepMatch(-1) }, "‹"),
+      h("button", { title: "Next match", onclick: () => stepMatch(1) }, "›")));
+  }
   bar.hidden = !parts.length;
   bar.replaceChildren(...parts);
 }
@@ -291,6 +327,7 @@ async function loadMore(limit = PAGE) {
   view.loading = true;
   const params = new URLSearchParams({ offset: view.entries.length, limit });
   if (view.agent) params.set("agent", view.agent);
+  if (view.query && !view.entries.length) params.set("q", view.query);
   try {
     const res = await fetch(`/api/sessions/${encodeURIComponent(view.detail.id)}/log?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -299,6 +336,7 @@ async function loadMore(limit = PAGE) {
     view.total = data.total;
     if (data.events) {
       view.events = data.events;
+      view.matches = data.matches || [];
       renderEventNav();
     }
     const start = view.entries.length;

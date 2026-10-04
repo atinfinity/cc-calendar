@@ -115,9 +115,11 @@
     - Optional thinking and metadata.
     - Drill-down into subagent transcripts.
     - A stats panel per transcript.
-    - ‹ › buttons to step through prompts, commits, compactions and errors.
+    - ‹ › buttons to step through prompts, commits, compactions and errors, and through
+      search matches when opened from a full-text hit.
 - **List view**:
-    - Search over titles, prompts, notes and tags.
+    - Search over titles, prompts, notes and tags, or the whole transcripts with
+      [full-text search](#full-text-search).
     - Filter by project and status.
     - Narrow the list further by model, git branch, source (with several config directories),
       tag, date range and cost range. The date range keeps sessions that were active on any day in it.
@@ -146,6 +148,40 @@
     See [Export format](export.md) for the fields and the JSON envelope.
 
 ![List view](images/list.png)
+
+## Full-text search
+
+The search box matches titles, prompts, notes and tags. Tick **Full text** next to it to also
+search the transcripts themselves:
+
+- What is searched: prompts, assistant replies, tool inputs (commands, file paths, edits), tool
+  output, errors, and subagent transcripts. Thinking is not searched.
+- Queries need at least 3 characters. Case and line breaks are ignored, and words in Japanese
+  and other languages without spaces match too.
+- A matching session shows a snippet of its first hit, with where it was (e.g. "Tool output"),
+  when, and how many matches the session has, including how many are in subagent transcripts
+  (e.g. "11 matches (2 in subagents)"). The snippet appears in the list, the calendar tooltip
+  and the detail pane.
+- **Open ↗** opens the transcript at the hit. **Matches** in the transcript steps through every
+  match in it.
+- The toggle is remembered. The other filters still apply, and the status next to the toggle
+  counts hits over all sessions.
+
+The text is kept in a SQLite index on disk. It is built in the background the first time, which
+takes a while for large logs; until it is done the status says "indexing" and results fill in as
+it goes. After that it is updated as logs grow, and a restart reads only new lines. The index is a
+cache and safe to delete; it is rebuilt on the next start.
+
+| Platform | Default location |
+| --- | --- |
+| macOS | `~/Library/Caches/cc-calendar/search.db` |
+| Linux | `$XDG_CACHE_HOME/cc-calendar/search.db` (`~/.cache/…` when unset) |
+| Windows | `%LOCALAPPDATA%\cc-calendar\search.db` |
+
+`--search-index PATH` puts it elsewhere. It takes a little under half the space of the logs it
+covers. If the file cannot be written, the index is kept in memory and rebuilt on each start; if
+your Python's SQLite lacks FTS5, the status reads "Full text unavailable" and the
+rest of the search still works.
 
 ## Keyboard shortcuts
 

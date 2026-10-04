@@ -181,6 +181,7 @@ a { color: var(--accent); }
 .mark-sample.compact::after { left: 0; right: 0; top: 3.5px; height: 4px; background: #f5a524; }
 .mark-sample.commit::after { left: 3px; top: 1.5px; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2.5px solid #1f2328; }
 .mark-sample.error::after { left: 3.5px; top: 2px; width: 7px; height: 7px; background: #e5484d; border: 1.5px solid #fff; transform: rotate(45deg); }
+.mark-sample.match { background: var(--accent-soft); outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
 .now-line { position: absolute; left: 0; right: 0; border-top: 2px solid var(--now); z-index: 4; pointer-events: none; }
 .now-line::before {
   content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px;
@@ -222,6 +223,12 @@ a { color: var(--accent); }
 .snippet { font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
 .snippet mark { background: var(--accent-soft); color: var(--text); border-radius: 2px; padding: 0 1px; }
 .tooltip .snippet { margin-top: 4px; }
+.snippet .hit-meta { font-weight: 600; }
+.snippet .hit-open { margin-left: 6px; }
+.detail-hit { margin-top: 6px; }
+.detail-hit .snippet { font-size: 12.5px; }
+.ft-status { font-size: 12px; white-space: nowrap; }
+.ft-status:empty { display: none; }
 .list .tags-cell { min-width: 60px; max-width: 240px; }
 .note-mark { font-size: 12px; cursor: help; }
 .tags { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }

@@ -175,6 +175,36 @@ export function matchSnippet(s, query) {
     text.slice(i + q.length, to), to < text.length ? "…" : "");
 }
 
+// What a full-text hit is, e.g. "Bash call", "Tool output", "Subagent reply".
+const HIT_KINDS = {
+  prompt: "Prompt", assistant: "Reply", tool_use: "Tool call", tool_result: "Tool output",
+  error: "API error", notification: "Background task",
+};
+
+function hitLabel(hit) {
+  const label = hit.kind === "tool_use" && hit.name ? `${hit.name} call` : HIT_KINDS[hit.kind] || hit.kind;
+  return hit.agent ? `Subagent ${label[0].toLowerCase()}${label.slice(1)}` : label;
+}
+
+// A full-text search hit: where and when it matched, and the text around it. `onOpen` adds a
+// button that opens the log there.
+export function hitSnippet(hit, onOpen = null) {
+  const { before, match, after } = hit.snippet;
+  // The main log does not show matches in subagent logs, so say how many are there.
+  const sub = hit.in_subagents || 0;
+  let more = hit.count > 1 ? ` · ${hit.count} matches` : "";
+  if (hit.count > 1 && sub === hit.count) more += " in subagents";
+  else if (sub > 0 && sub < hit.count) more += ` (${sub} in subagent${sub > 1 ? "s" : ""})`;
+  return h("div", { class: "snippet" },
+    h("span", { class: "hit-meta" }, `${hitLabel(hit)}${hit.ts ? " · " + fmtDateTime(hit.ts) : ""}${more}: `),
+    before, match ? h("mark", {}, match) : null, after,
+    onOpen ? h("button", {
+      class: "log-link hit-open",
+      title: "Open the log at this match",
+      onclick: (e) => { e.stopPropagation(); onOpen(); },
+    }, "Open ↗") : null);
+}
+
 export function renderMarkdown(text) {
   const div = h("div", { class: "md" });
   if (window.marked && window.DOMPurify) {
