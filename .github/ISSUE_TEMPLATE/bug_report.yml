@@ -46,3 +46,12 @@ body:
       label: Redacted log excerpt (optional)
       description: The smallest set of JSONL lines that shows the problem, with private content replaced.
       render: json
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Steps needed to fix this, as a checkbox list. Can be filled in later.
+      placeholder: |
+        - [ ] Reproduce with a synthetic log
+        - [ ] Fix
+        - [ ] Add a test

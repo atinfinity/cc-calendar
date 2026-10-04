@@ -17,3 +17,11 @@ body:
     id: alternatives
     attributes:
       label: Alternatives or workarounds you have tried
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Steps needed to ship this, as a checkbox list. Can be filled in later.
+      placeholder: |
+        - [ ] First step
+        - [ ] Second step
