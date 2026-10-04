@@ -74,7 +74,10 @@ def summary(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str |
         "model": models[0] if models else None,
         "effort": s.effort(),
         "version": s.version,  # Claude Code version
-        "commit_list": s.commit_list(),
+        "commit_list": [
+            {"ts": c.get("ts"), "sha": c.get("sha"), "subject": c.get("subject")}
+            for c in gitinfo.resolve_commits(s.commits)
+        ],
         "repo_url": gitinfo.repo_url(s.cwd),
         "continued_in": s.continued_in,
         "continued_from": continued_from,

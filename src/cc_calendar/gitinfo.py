@@ -10,7 +10,9 @@ from pathlib import Path
 CACHE_TTL = 30.0
 MATCH_WINDOW_S = 15 * 60
 
-_log_cache: dict[str, tuple[float, list[tuple[str, str, int]]]] = {}
+Entry = tuple[str, str, int]  # (sha, subject, commit_time_s)
+
+_log_cache: dict[str, tuple[float, LogIndex]] = {}
 _remote_cache: dict[str, tuple[float, str | None]] = {}
 
 
@@ -24,8 +26,32 @@ def _git(cwd: str, *args: str) -> str | None:
     return out.stdout if out.returncode == 0 else None
 
 
-def _log(cwd: str) -> list[tuple[str, str, int]]:
-    """[(sha, subject, commit_time_s)] across all refs, cached briefly."""
+class LogIndex:
+    """Commits of a repository, looked up by SHA prefix or by subject."""
+
+    def __init__(self, entries: list[Entry]):
+        self.by_short: dict[str, list[Entry]] = {}
+        self.by_subject: dict[str, list[Entry]] = {}
+        for e in entries:
+            self.by_short.setdefault(e[0][:7], []).append(e)
+            self.by_subject.setdefault(e[1], []).append(e)
+
+    def find_sha(self, sha: str) -> Entry | None:
+        return next((e for e in self.by_short.get(sha[:7], []) if e[0].startswith(sha)), None)
+
+    def find_subject(self, subject: str, ts_s: float) -> Entry | None:
+        """The commit with this subject closest in time, within MATCH_WINDOW_S."""
+        candidates = [
+            e for e in self.by_subject.get(subject, []) if abs(e[2] - ts_s) <= MATCH_WINDOW_S
+        ]
+        return min(candidates, key=lambda e: abs(e[2] - ts_s)) if candidates else None
+
+
+_EMPTY = LogIndex([])
+
+
+def _log(cwd: str) -> LogIndex:
+    """Commits across all refs, cached briefly."""
     now = time.monotonic()
     cached = _log_cache.get(cwd)
     if cached and now - cached[0] < CACHE_TTL:
@@ -36,8 +62,9 @@ def _log(cwd: str) -> list[tuple[str, str, int]]:
         parts = line.split("\x1f")
         if len(parts) == 3 and parts[2].isdigit():
             entries.append((parts[0], parts[1], int(parts[2])))
-    _log_cache[cwd] = (now, entries)
-    return entries
+    index = LogIndex(entries)
+    _log_cache[cwd] = (now, index)
+    return index
 
 
 def resolve_commits(commits: list[dict]) -> list[dict]:
@@ -45,19 +72,15 @@ def resolve_commits(commits: list[dict]) -> list[dict]:
     resolved = []
     for c in commits:
         c = dict(c)
-        entries = _log(c["cwd"]) if c.get("cwd") else []
+        index = _log(c["cwd"]) if c.get("cwd") else _EMPTY
         if c.get("sha"):
-            match = next((e for e in entries if e[0].startswith(c["sha"])), None)
+            match = index.find_sha(c["sha"])
             if match:
                 c["sha"], c["subject"] = match[0], c.get("subject") or match[1]
         elif c.get("subject") and c.get("ts"):
-            ts_s = c["ts"] / 1000
-            candidates = [
-                e for e in entries if e[1] == c["subject"] and abs(e[2] - ts_s) <= MATCH_WINDOW_S
-            ]
-            if candidates:
-                best = min(candidates, key=lambda e: abs(e[2] - ts_s))
-                c["sha"] = best[0]
+            match = index.find_subject(c["subject"], c["ts"] / 1000)
+            if match:
+                c["sha"] = match[0]
         resolved.append(c)
     # Drop duplicates (e.g. both gitOperation and regex picked up the same commit).
     seen, out = set(), []
