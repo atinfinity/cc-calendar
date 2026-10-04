@@ -44,7 +44,24 @@ export const state = {
   project: null, // path of the project whose page is open, or null
   projectColors: new Map(),
   modelColors: new Map(),
+  claudeDirs: [], // [{name, path}] of the config directories being read
+  sourceColors: new Map(),
 };
+
+// Which config directory a session came from only matters when there are several.
+export function multiSource() {
+  return state.claudeDirs.length > 1;
+}
+
+// The saved choice stays "source" across a single-directory run, but colors by project there.
+export function colorMode() {
+  return state.colorBy === "source" && !multiSource() ? "project" : state.colorBy;
+}
+
+// Likewise, a saved source filter is ignored while only one directory is read.
+function listFilter() {
+  return multiSource() ? state.listFilter : { ...state.listFilter, source: "" };
+}
 
 // ------------------------------------------------------------------ data
 
@@ -58,6 +75,7 @@ async function loadSessions() {
   const data = await fetchJSON(`/api/sessions?gap=${state.gap}`);
   state.sessions = data.sessions;
   state.appVersion = data.version;
+  state.claudeDirs = data.claude_dirs || [];
   state.byId = new Map(data.sessions.map((s) => [s.id, s]));
   state.dataVersion++;
   assignColors();
@@ -73,6 +91,7 @@ function assignColors() {
   };
   state.projectColors = new Map(count("project").map((p, i) => [p, paletteColor(i)]));
   state.modelColors = new Map(count("model").map((m, i) => [m, paletteColor(i + 2)]));
+  state.sourceColors = new Map(state.claudeDirs.map((d, i) => [d.name, paletteColor(i)]));
 }
 
 // Fixed thresholds so a color means the same amount in every week.
@@ -89,25 +108,34 @@ function costBand(s) {
 }
 
 export function colorFor(s) {
-  if (state.colorBy === "cost") return COST_BANDS[costBand(s)].color;
-  if (state.colorBy === "status") return statusColor(s.status);
-  if (state.colorBy === "model") return state.modelColors.get(s.model) || "#888";
-  if (state.colorBy === "effort") return EFFORT_COLORS[s.effort] || "#888";
+  const mode = colorMode();
+  if (mode === "cost") return COST_BANDS[costBand(s)].color;
+  if (mode === "status") return statusColor(s.status);
+  if (mode === "model") return state.modelColors.get(s.model) || "#888";
+  if (mode === "effort") return EFFORT_COLORS[s.effort] || "#888";
+  if (mode === "source") return state.sourceColors.get(s.source) || "#888";
   return state.projectColors.get(s.project) || "#888";
 }
 
+function sourcePath(name) {
+  return state.claudeDirs.find((d) => d.name === name)?.path || name;
+}
+
 export function legendItems(visible) {
+  const mode = colorMode();
   const counts = new Map();
   for (const s of visible) {
     let key, label, color;
-    if (state.colorBy === "cost") {
+    if (mode === "cost") {
       key = costBand(s); label = COST_BANDS[key].label; color = COST_BANDS[key].color;
-    } else if (state.colorBy === "status") {
+    } else if (mode === "status") {
       key = s.status; label = STATUS_LABELS[s.status]; color = statusColor(s.status);
-    } else if (state.colorBy === "model") {
+    } else if (mode === "model") {
       key = s.model; label = shortModel(s.model); color = colorFor(s);
-    } else if (state.colorBy === "effort") {
+    } else if (mode === "effort") {
       key = s.effort || ""; label = s.effort || "unknown"; color = colorFor(s);
+    } else if (mode === "source") {
+      key = sourcePath(s.source); label = s.source; color = colorFor(s);
     } else {
       key = s.project; label = s.project_name; color = colorFor(s);
     }
@@ -115,11 +143,11 @@ export function legendItems(visible) {
     e.n++;
     counts.set(key, e);
   }
-  if (state.colorBy === "effort") {
+  if (mode === "effort") {
     const rank = (k) => { const i = Object.keys(EFFORT_COLORS).indexOf(k); return i < 0 ? 99 : i; };
     return [...counts.entries()].sort((a, b) => rank(a[0]) - rank(b[0])).map(([, e]) => ({ ...e, title: "Effort most API requests ran at" }));
   }
-  if (state.colorBy === "cost") {
+  if (mode === "cost") {
     return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([, e]) => ({ ...e, title: "" }));
   }
   return [...counts.values()].sort((a, b) => b.n - a.n);
@@ -167,6 +195,8 @@ async function refreshDetail() {
       onOpenLog: (agent, target) => openLog(d, agent, target),
       onSelect: (sid) => select(sid),
       onOpenProject: () => openProject(d.project),
+      showSource: multiSource(),
+      sourcePath,
     });
   } catch (e) {
     pane.replaceChildren(h("div", { class: "empty" }, "Session not found."));
@@ -250,7 +280,8 @@ function renderToolbar() {
   document.querySelectorAll("#view-toggle button").forEach((b) =>
     b.classList.toggle("active", state.project == null && b.dataset.view === state.view));
   document.querySelectorAll("#color-by button").forEach((b) =>
-    b.classList.toggle("active", b.dataset.color === state.colorBy));
+    b.classList.toggle("active", b.dataset.color === colorMode()));
+  document.querySelector('#color-by [data-color="source"]').hidden = !multiSource();
   document.querySelectorAll("#span-toggle button").forEach((b) =>
     b.classList.toggle("active", b.dataset.span === state.span));
   $("go-today").textContent = { day: "Today", week: "This week", month: "This month", year: "This year" }[state.span];
@@ -322,6 +353,7 @@ const LIST_COLUMNS = [
   ["status", "", (s) => STATUS_ORDER.indexOf(s.status), "asc", false],
   ["title", "Title", (s) => s.title.toLowerCase(), "asc", false],
   ["project", "Project", (s) => s.project_name.toLowerCase(), "asc", false],
+  ["source", "Source", (s) => s.source.toLowerCase(), "asc", false],
   ["start", "Started", (s) => s.start, "desc", true],
   ["end", "Last activity", (s) => s.end, "desc", true],
   ["length", "Length", (s) => s.end - s.start, "desc", true],
@@ -331,8 +363,12 @@ const LIST_COLUMNS = [
   ["cache", "Cache", (s) => s.cache_hit, "asc", true],
 ];
 
+function listColumns() {
+  return multiSource() ? LIST_COLUMNS : LIST_COLUMNS.filter((c) => c[0] !== "source");
+}
+
 function sortRows(rows) {
-  const col = LIST_COLUMNS.find((c) => c[0] === state.sort.key) || LIST_COLUMNS[3];
+  const col = listColumns().find((c) => c[0] === state.sort.key) || LIST_COLUMNS[3];
   const value = col[2];
   const sign = state.sort.dir === "asc" ? 1 : -1;
   const start = (s) => s.start || 0;
@@ -355,7 +391,8 @@ function setSort(key) {
 
 // The list view's rows: the shared filters, then the list-only ones, in the chosen order.
 function listRows(visible) {
-  return sortRows(visible.filter((s) => matchesListFilter(s, state.listFilter)));
+  const f = listFilter();
+  return sortRows(visible.filter((s) => matchesListFilter(s, f)));
 }
 
 function setListFilter(changes) {
@@ -367,15 +404,15 @@ function setListFilter(changes) {
 
 function renderList(visible) {
   const rows = listRows(visible);
-  renderListFilters($("list-filters"), visible, state.listFilter, setListFilter);
-  $("list-count").textContent = activeFilterCount(state.listFilter)
+  renderListFilters($("list-filters"), visible, listFilter(), setListFilter, { sources: multiSource() });
+  $("list-count").textContent = activeFilterCount(listFilter())
     ? `${rows.length} of ${visible.length} sessions`
     : `${rows.length} sessions`;
   if (!rows.length) {
     $("list").replaceChildren(h("div", { class: "empty" }, "No sessions match the filters."));
     return;
   }
-  const header = LIST_COLUMNS.map(([key, label, , , numeric]) => {
+  const header = listColumns().map(([key, label, , , numeric]) => {
     const sorted = state.sort.key === key;
     return h("th", {
       class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
@@ -396,6 +433,9 @@ function renderList(visible) {
           h("td", { class: "title-cell" }, s.title, matchSnippet(s, state.search)),
           h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }),
             projectLink(s.project, s.project_name)),
+          multiSource()
+            ? h("td", { title: sourcePath(s.source) }, h("span", { class: "dot", style: { background: state.sourceColors.get(s.source), marginRight: "5px" } }), s.source)
+            : null,
           h("td", { class: "num" }, fmtDateTime(s.start)),
           h("td", { class: "num", title: fmtDateTime(s.end) }, fmtAgo(s.end)),
           h("td", { class: "num" }, fmtDuration(s.end - s.start)),

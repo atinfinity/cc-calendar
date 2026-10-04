@@ -1,7 +1,7 @@
-// Extra filters of the list view: model, branch, date range and cost range.
+// Extra filters of the list view: model, branch, source, date range and cost range.
 import { h, shortModel } from "./util.js";
 
-export const EMPTY_FILTER = { model: "", branch: "", from: "", to: "", costMin: "", costMax: "" };
+export const EMPTY_FILTER = { model: "", branch: "", source: "", from: "", to: "", costMin: "", costMax: "" };
 
 // Local midnight at the start of a "YYYY-MM-DD" date input value, plus `days`, in ms.
 function midnight(value, days = 0) {
@@ -14,6 +14,7 @@ function midnight(value, days = 0) {
 export function matchesListFilter(s, f) {
   if (f.model && s.model !== f.model) return false;
   if (f.branch && s.branch !== f.branch) return false;
+  if (f.source && s.source !== f.source) return false;
   if (f.from && (s.end == null || s.end < midnight(f.from))) return false;
   if (f.to && (s.start == null || s.start >= midnight(f.to, 1))) return false;
   if (f.costMin !== "" && !((s.cost || 0) >= Number(f.costMin))) return false;
@@ -33,9 +34,10 @@ function options(sessions, key, selected) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-// Renders the filter controls; `sessions` supply the model and branch choices.
+// Renders the filter controls; `sessions` supply the model, branch and source choices.
 // `onChange(changes)` merges into the current filter, so a control rendered earlier stays correct.
-export function renderListFilters(container, sessions, f, onChange) {
+// The source filter is offered only when `sources` is set (several config directories).
+export function renderListFilters(container, sessions, f, onChange, { sources = false } = {}) {
   const set = (key) => (e) => onChange({ [key]: e.target.value });
   const select = (key, label, all, fmt) => h("label", { class: "muted" }, label + " ",
     h("select", { "data-key": key, onchange: set(key) },
@@ -50,6 +52,7 @@ export function renderListFilters(container, sessions, f, onChange) {
   container.replaceChildren(
     select("model", "Model", "All models", shortModel),
     select("branch", "Branch", "All branches", (v) => v),
+    sources ? select("source", "Source", "All sources", (v) => v) : null,
     h("label", { class: "muted", title: "Sessions active on any day in this range" }, "Active ",
       input("from", { type: "date", "aria-label": "From date", max: f.to || null }), " – ",
       input("to", { type: "date", "aria-label": "To date", min: f.from || null })),

@@ -54,7 +54,15 @@ function logLink(text, onclick, cls = "") {
   return h("button", { class: `log-link ${cls}`, title: "Open the log here", onclick }, text);
 }
 
-export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject }) {
+// Which config directory the shown copy came from, and where other copies are.
+function sourceInfo(d, sourcePath) {
+  const also = d.also_in || [];
+  return h("span", {
+    title: [`Read from ${sourcePath(d.source)}`, ...also.map((n) => `Also in ${sourcePath(n)}`)].join("\n"),
+  }, ` · from ${d.source}${also.length ? ` (also in ${also.join(", ")})` : ""}`);
+}
+
+export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, showSource, sourcePath }) {
   const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
   const ctx = d.context_pct == null ? null : h("span", { class: "stat", title: "Context used by the latest response" },
     "ctx ", h("span", { class: "ctx" }, h("i", { style: { width: `${Math.min(100, d.context_pct)}%` } })), ` ${d.context_pct}%`);
@@ -70,7 +78,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
     h("h2", {}, d.title),
     h("div", { class: "muted" },
       h("button", { class: "project-link", title: `${d.cwd || d.project}\nOpen the project page`, onclick: onOpenProject }, d.project_name),
-      `${d.branch ? " · " + d.branch : ""}${d.permission_mode ? " · " + d.permission_mode : ""}`),
+      `${d.branch ? " · " + d.branch : ""}${d.permission_mode ? " · " + d.permission_mode : ""}`,
+      showSource ? sourceInfo(d, sourcePath) : null),
     h("div", { class: "muted" },
       `Started ${fmtDateTime(d.start)} · last activity ${fmtAgo(d.end)} · span ${fmtDuration(d.end - d.start)}`),
     h("div", { class: "stats" },

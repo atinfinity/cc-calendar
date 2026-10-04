@@ -81,6 +81,9 @@ a { color: var(--accent); }
 .seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
 .seg button:last-child { border-radius: 0 6px 6px 0; }
 .seg.small button { padding: 2px 8px; }
+/* A hidden last button (e.g. Source with one config directory) must not leave a square corner. */
+.seg button[hidden] { display: none; }
+.seg button:has(+ button[hidden]:last-child) { border-radius: 0 6px 6px 0; }
 .chips { display: inline-flex; gap: 6px; }
 .chip {
   border-radius: 999px; padding: 2px 10px; border: 1px solid var(--border);
