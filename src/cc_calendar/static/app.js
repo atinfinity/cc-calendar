@@ -3,6 +3,7 @@ import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { overviewRange, renderOverview } from "./overview.js";
 import { buildReport, copyText } from "./report.js";
+import { renderToolsPane } from "./toolspane.js";
 import { openLog } from "./transcript.js";
 import {
   CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
@@ -30,6 +31,8 @@ export const state = {
   hideNoPrompt: prefs.get("hideNoPrompt", true),
   sort: prefs.get("listSort", { key: "start", dir: "desc" }),
   showSummary: prefs.get("summary", false),
+  showTools: prefs.get("tools", false),
+  dataVersion: 0, // bumped on every reload so cached aggregates refresh
   showMarks: prefs.get("marks", true),
   selectedId: null,
   projectColors: new Map(),
@@ -48,6 +51,7 @@ async function loadSessions() {
   const data = await fetchJSON(`/api/sessions?gap=${state.gap}`);
   state.sessions = data.sessions;
   state.byId = new Map(data.sessions.map((s) => [s.id, s]));
+  state.dataVersion++;
   assignColors();
   renderAll();
 }
@@ -198,6 +202,18 @@ function renderMain() {
   } else {
     renderList(visible);
   }
+  renderTools(visible);
+}
+
+function renderTools(visible) {
+  const pane = $("tools-pane");
+  pane.hidden = !(state.showTools && state.view === "calendar");
+  if (pane.hidden) return;
+  const days = rangeDays();
+  const start = days[0].getTime();
+  const end = addDays(days[days.length - 1], 1).getTime();
+  const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
+  renderToolsPane(pane, { start, end, ids, key: `${start}|${end}|${state.dataVersion}|${ids.join(",")}` });
 }
 
 function renderToolbar() {
@@ -209,6 +225,7 @@ function renderToolbar() {
     b.classList.toggle("active", b.dataset.span === state.span));
   $("go-today").textContent = { day: "Today", week: "This week", month: "This month", year: "This year" }[state.span];
   $("summary-toggle").classList.toggle("active", state.showSummary);
+  $("tools-toggle").classList.toggle("active", state.showTools);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
 
@@ -406,6 +423,11 @@ function bind() {
   $("summary-toggle").onclick = () => {
     state.showSummary = !state.showSummary;
     prefs.set("summary", state.showSummary);
+    renderAll();
+  };
+  $("tools-toggle").onclick = () => {
+    state.showTools = !state.showTools;
+    prefs.set("tools", state.showTools);
     renderAll();
   };
   $("copy-report").onclick = async () => {

@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
@@ -19,6 +20,7 @@ from .logview import build_entries, log_events
 from .parser import SessionAcc
 from .stats import log_stats
 from .store import Store
+from .tools import tool_usage
 
 log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
@@ -119,6 +121,12 @@ def detail(s: SessionAcc, live: dict | None, gap_ms: int, continued_from: str | 
         }
     )
     return out
+
+
+class ToolsQuery(BaseModel):
+    start: int
+    end: int
+    sessions: list[str] = Field(max_length=100_000)
 
 
 class Broadcaster:
@@ -228,6 +236,13 @@ def create_app(claude_dir: Path, watch: bool = True) -> FastAPI:
             # Lets the viewer jump to an event that is not loaded yet.
             out["events"] = log_events(entries)
         return out
+
+    # POST: the filtered session ids can be too many for a query string.
+    @app.post("/api/tools")
+    def tools(q: ToolsQuery) -> dict:
+        with store.lock:
+            picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
+            return tool_usage(picked, q.start, q.end)
 
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:

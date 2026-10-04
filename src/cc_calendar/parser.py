@@ -232,6 +232,9 @@ class SessionAcc:
     subagents: dict[str, SubagentAcc] = field(default_factory=dict)
     background: dict[str, dict] = field(default_factory=dict)
     pending_tools: dict[str, dict] = field(default_factory=dict)
+    # Every tool call, including subagents': [ts, name, is_error, agent_id or None].
+    tool_calls: list[list] = field(default_factory=list)
+    pending_sub_calls: dict[str, int] = field(default_factory=dict)  # tool_use id -> index
     version: str | None = None
 
     # ------------------------------------------------------------------ feeding
@@ -341,6 +344,8 @@ class SessionAcc:
                 continue
             is_error = bool(b.get("is_error"))
             name = pending["name"]
+            if is_error:
+                self.tool_calls[pending["call"]][2] = True
             if name == "Bash":
                 self._bash_result(pending, tur, tool_result_text(b.get("content")), is_error, ts)
             elif name in ("Agent", "Task") and isinstance(tur, dict):
@@ -428,17 +433,28 @@ class SessionAcc:
                 self.pending_tools[b.get("id")] = {
                     "name": b.get("name"),
                     "input": b.get("input") if isinstance(b.get("input"), dict) else {},
+                    "call": len(self.tool_calls),
                 }
+                self.tool_calls.append([ts, b.get("name") or "?", False, None])
 
     def feed_subagent(self, agent_id: str, path: str, rec: dict) -> None:
         sa = self.subagents.setdefault(agent_id, SubagentAcc(agent_id))
         sa.path = path
-        if rec.get("type") != "assistant":
-            return
         msg = rec.get("message") or {}
-        if msg.get("model") == "<synthetic>":
+        content = msg.get("content")
+        if rec.get("type") == "user" and isinstance(content, list):
+            for b in content:
+                if isinstance(b, dict) and b.get("type") == "tool_result":
+                    i = self.pending_sub_calls.pop(b.get("tool_use_id"), None)
+                    if i is not None and b.get("is_error"):
+                        self.tool_calls[i][2] = True
+        if rec.get("type") != "assistant" or msg.get("model") == "<synthetic>":
             return
         ts = parse_ts(rec.get("timestamp"))
+        for b in content if isinstance(content, list) else []:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                self.pending_sub_calls[b.get("id")] = len(self.tool_calls)
+                self.tool_calls.append([ts, b.get("name") or "?", False, agent_id])
         if ts is not None:
             sa.first_ts = ts if sa.first_ts is None else min(sa.first_ts, ts)
             sa.last_ts = ts if sa.last_ts is None else max(sa.last_ts, ts)

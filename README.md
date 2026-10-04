@@ -48,6 +48,9 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   active time and cost per project, each session's title and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR
   numbers such as `#12` become links to the repository's `origin` remote.
+- **Tool usage** — the Tools pane aggregates tool calls in the displayed range: most used tools,
+  error counts and rates (10% or more is highlighted), calls made inside subagents, MCP servers,
+  and subagent runs by type with their tool calls, tokens and cost. It follows the current filters.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).
