@@ -2,6 +2,7 @@
 import { renderCalendar } from "./calendar.js";
 import { renderDetail } from "./detail.js";
 import { exportSessions } from "./export.js";
+import { EMPTY_FILTER, activeFilterCount, matchesListFilter, renderListFilters } from "./listfilter.js";
 import { bindNotifyToggle, checkTransitions } from "./notify.js";
 import { overviewRange, renderOverview } from "./overview.js";
 import { renderProject } from "./project.js";
@@ -33,6 +34,7 @@ export const state = {
   statuses: new Set(prefs.get("statuses", Object.keys(STATUS_LABELS))),
   hideNoPrompt: prefs.get("hideNoPrompt", true),
   sort: prefs.get("listSort", { key: "start", dir: "desc" }),
+  listFilter: { ...EMPTY_FILTER, ...prefs.get("listFilter", {}) }, // list view only
   showSummary: prefs.get("summary", false),
   showTools: prefs.get("tools", false),
   appVersion: null, // cc-calendar version reported by the server
@@ -351,9 +353,24 @@ function setSort(key) {
   renderMain();
 }
 
+// The list view's rows: the shared filters, then the list-only ones, in the chosen order.
+function listRows(visible) {
+  return sortRows(visible.filter((s) => matchesListFilter(s, state.listFilter)));
+}
+
+function setListFilter(changes) {
+  state.listFilter = { ...state.listFilter, ...changes };
+  prefs.set("listFilter", state.listFilter);
+  // "change" fires before Tab moves focus; render after the move so focus lands on the next control.
+  setTimeout(renderMain, 0);
+}
+
 function renderList(visible) {
-  const rows = sortRows(visible);
-  $("list-count").textContent = `${rows.length} sessions`;
+  const rows = listRows(visible);
+  renderListFilters($("list-filters"), visible, state.listFilter, setListFilter);
+  $("list-count").textContent = activeFilterCount(state.listFilter)
+    ? `${rows.length} of ${visible.length} sessions`
+    : `${rows.length} sessions`;
   if (!rows.length) {
     $("list").replaceChildren(h("div", { class: "empty" }, "No sessions match the filters."));
     return;
@@ -483,7 +500,7 @@ function bind() {
     btn.timer = setTimeout(() => { btn.textContent = "Copy report"; }, 1500);
   };
   for (const btn of document.querySelectorAll("#export button")) {
-    btn.onclick = () => exportSessions(sortRows(filtered()), btn.dataset.format, state.appVersion);
+    btn.onclick = () => exportSessions(listRows(filtered()), btn.dataset.format, state.appVersion);
   }
   $("zoom-in").onclick = () => setHourPx(state.hourPx * 1.25);
   $("zoom-out").onclick = () => setHourPx(state.hourPx / 1.25);

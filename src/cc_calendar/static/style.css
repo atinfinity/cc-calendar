@@ -58,7 +58,7 @@ button {
 }
 button:hover { background: var(--bg-hover); }
 button.active { background: var(--accent-soft); border-color: var(--accent); }
-select, input[type="search"] {
+select, input[type="search"], input[type="date"], input[type="number"] {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -199,6 +199,8 @@ a { color: var(--accent); }
 .dropdown-menu .open-project { margin-left: auto; padding: 0 6px; font-size: 11px; }
 
 /* ---------------------------------------------------------------- list */
+.list-filters { padding-top: 0; font-size: 12px; }
+.list-filters input[type="number"] { width: 72px; }
 .list { flex: 1; overflow: auto; border-top: 1px solid var(--border); }
 .list table { width: 100%; border-collapse: collapse; }
 .list th, .list td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }

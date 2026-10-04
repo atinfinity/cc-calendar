@@ -97,6 +97,9 @@
 - **List view**:
     - Search over titles and prompts.
     - Filter by project and status.
+    - Narrow the list further by model, git branch, date range and cost range. The date range
+      keeps sessions that were active on any day in it. These filters apply to the list only;
+      **Clear** resets them.
     - Sort by any column.
 - **Project page**: click a project name to open it. Project names can be clicked in the list,
   the Summary table, the detail pane, and the project menu (**Page**). The page covers all time
