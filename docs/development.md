@@ -29,6 +29,32 @@ Preview it locally:
 uv run --group docs zensical serve
 ```
 
+## Releasing
+
+Pushing a version tag publishes the package to [PyPI](https://pypi.org/project/cc-calendar/)
+through `.github/workflows/release.yml`:
+
+1. Bump the version on `main` (it lives in `pyproject.toml` only) and merge it:
+
+    ```sh
+    uv version --bump minor   # or --bump patch, or uv version 1.2.3
+    ```
+
+2. Tag the merged commit and push the tag:
+
+    ```sh
+    git tag v1.2.3
+    git push origin v1.2.3
+    ```
+
+The workflow checks that the tag matches the version, runs the lint and tests, builds the wheel
+and sdist, and smoke-tests the wheel. It then publishes to PyPI with trusted publishing (the
+`pypi` environment) and attaches the files to the GitHub release. It creates the release as a
+draft if it does not exist yet, so you can write the release notes and publish it.
+
+PyPI does not accept the same version twice. If publishing fails after the upload, bump the
+version again instead of moving the tag.
+
 ## Acknowledgements
 
 Inspired by the tool shown in [this post by @tokkyo](https://x.com/tokkyo/status/2106240136778575897).

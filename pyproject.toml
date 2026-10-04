@@ -1,6 +1,6 @@
 [project]
 name = "cc-calendar"
-version = "0.3.0"
+version = "0.4.0"
 description = "Google Calendar-style weekly view of your Claude Code sessions"
 readme = "README.md"
 license = "MIT"
@@ -8,11 +8,32 @@ authors = [
     { name = "atinfinity", email = "dandelion1124@gmail.com" }
 ]
 requires-python = ">=3.12"
+keywords = ["claude", "claude-code", "calendar", "sessions", "transcripts", "dashboard"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
 dependencies = [
     "fastapi>=0.142.2",
     "uvicorn[standard]>=0.54.0",
     "watchfiles>=1.3.0",
 ]
+
+[project.urls]
+Homepage = "https://atinfinity.github.io/cc-calendar/"
+Documentation = "https://atinfinity.github.io/cc-calendar/"
+Repository = "https://github.com/atinfinity/cc-calendar"
+Issues = "https://github.com/atinfinity/cc-calendar/issues"
 
 [project.scripts]
 cc-calendar = "cc_calendar.cli:main"
@@ -20,6 +41,9 @@ cc-calendar = "cc_calendar.cli:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "README.md", "LICENSE"]
 
 [dependency-groups]
 dev = [
