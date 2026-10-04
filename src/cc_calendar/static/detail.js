@@ -22,6 +22,11 @@ function shaTag(ref) {
   return h("span", { class: "sha", title: ref }, isSha ? ref.slice(0, 7) : "(unresolved) " + ref.slice(0, 40));
 }
 
+// A timestamp that opens the log scrolled to that moment.
+function logLink(text, onclick, cls = "") {
+  return h("button", { class: `log-link ${cls}`, title: "Open the log here", onclick }, text);
+}
+
 export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
   const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
   const ctx = d.context_pct == null ? null : h("span", { class: "stat", title: "Context used by the latest response" },
@@ -70,7 +75,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
     h("summary", {}, `Commits (${d.commits.length})`),
     d.commits.length
       ? h("ul", { class: "plain-list" }, d.commits.map((c) =>
-          h("li", {}, shaTag(c.sha) || h("span", { class: "sha" }, "?"), c.subject || "", h("span", { class: "muted" }, ` ${fmtTime(c.ts)}`))))
+          h("li", {}, shaTag(c.sha) || h("span", { class: "sha" }, "?"), c.subject || "", " ",
+            c.ts ? logLink(fmtTime(c.ts), () => onOpenLog(null, { ts: c.ts, kind: "commit" })) : null)))
       : h("div", { class: "muted" }, "No commits detected.")));
   outcome.push(h("details", {},
     h("summary", {}, `Files changed (${d.files.length})`),
@@ -93,7 +99,7 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
           const text = h("div", { class: "text", onclick: (e) => e.currentTarget.classList.toggle("open") }, p.text);
           return h("div", { class: "prompt" },
             h("div", {},
-              h("span", { class: "when" }, fmtDateTime(p.ts)),
+              p.ts ? logLink(fmtDateTime(p.ts), () => onOpenLog(null, { ts: p.ts, kind: "prompt" }), "when") : null,
               p.kind === "command" ? h("span", { class: "kind" }, "command") : null,
               ...p.commits.map(shaTag)),
             text);

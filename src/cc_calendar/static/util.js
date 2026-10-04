@@ -175,3 +175,11 @@ export function renderMarkdown(text) {
   }
   return div;
 }
+
+export const MARK_KINDS = [
+  // [kind, label, noun in running text]
+  ["prompt", "Prompt", "prompt"],
+  ["commit", "Commit", "commit"],
+  ["compact", "Compaction", "compaction"],
+  ["error", "API error", "API error"],
+];

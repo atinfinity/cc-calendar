@@ -1,6 +1,6 @@
 // Modal transcript viewer with lazy loading and subagent drill-down.
 import {
-  cacheTitle, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
+  MARK_KINDS, cacheTitle, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
   shortModel,
 } from "./util.js";
 
@@ -12,6 +12,8 @@ const view = {
   agent: null, // subagent id, or null for the main transcript
   entries: [],
   total: 0,
+  events: [], // [index, ts, kind] of entries matching the calendar's event marks
+  focus: null, // index of the entry last jumped to
   loading: false,
   token: 0, // guards against responses for a log we already navigated away from
 };
@@ -42,7 +44,7 @@ function bind() {
   });
   $("log-body").addEventListener("scroll", (e) => {
     const b = e.currentTarget;
-    if (b.scrollTop + b.clientHeight > b.scrollHeight - 400) loadMore();
+    if (!view.loading && b.scrollTop + b.clientHeight > b.scrollHeight - 400) loadMore();
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("log-modal").hidden) {
@@ -52,12 +54,15 @@ function bind() {
   });
 }
 
-export function openLog(detail, agentId) {
+// `target` ({ts, kind}) scrolls to the event nearest to that moment once the log loads.
+export async function openLog(detail, agentId, target = null) {
   bind();
   view.detail = detail;
   view.agent = agentId || null;
   view.entries = [];
   view.total = 0;
+  view.events = [];
+  view.focus = null;
   view.loading = false;
   view.token++;
 
@@ -70,8 +75,85 @@ export function openLog(detail, agentId) {
   $("log-body").scrollTop = 0;
   $("log-modal").hidden = false;
   $("log-stats").replaceChildren();
+  $("log-events").replaceChildren();
   loadStats();
-  loadMore();
+  const token = view.token;
+  await loadMore();
+  if (target && token === view.token) {
+    const near = nearestEvent(target);
+    if (near) jumpTo(near[0]);
+  }
+}
+
+// ------------------------------------------------------------------ events
+
+function nearestEvent({ ts, kind }) {
+  let best = null;
+  for (const ev of view.events) {
+    if (ev[2] !== kind || ev[1] == null) continue;
+    if (!best || Math.abs(ev[1] - ts) < Math.abs(best[1] - ts)) best = ev;
+  }
+  return best;
+}
+
+// The entry the reader is looking at: the last jump target while it is on screen,
+// otherwise the first entry at the top of the viewport.
+function anchorIndex() {
+  const body = $("log-body");
+  const top = body.getBoundingClientRect().top;
+  const focused = view.focus != null && body.querySelector(`[data-i="${view.focus}"]`);
+  if (focused) {
+    const r = focused.getBoundingClientRect();
+    if (r.bottom > top && r.top < top + body.clientHeight) return view.focus;
+  }
+  for (const el of body.querySelectorAll("[data-i]")) {
+    if (el.getBoundingClientRect().bottom > top) return Number(el.dataset.i);
+  }
+  return -1;
+}
+
+function step(kind, dir) {
+  const list = view.events.filter((ev) => ev[2] === kind);
+  const at = anchorIndex();
+  const ev = dir > 0 ? list.find((x) => x[0] > at) : list.findLast((x) => x[0] < at);
+  if (ev) jumpTo(ev[0]);
+}
+
+async function jumpTo(i) {
+  const token = view.token;
+  while (view.entries.length <= i && view.entries.length < view.total) {
+    await loadMore(Math.min(2000, Math.max(PAGE, i + 1 - view.entries.length)));
+    if (token !== view.token) return;
+  }
+  // Tool results are drawn inside their call, so fall back to the nearest drawn entry before i.
+  const body = $("log-body");
+  let el = body.querySelector(`[data-i="${i}"]`);
+  if (!el) el = [...body.querySelectorAll("[data-i]")].filter((x) => Number(x.dataset.i) <= i).pop();
+  if (!el) return;
+  view.focus = Number(el.dataset.i);
+  body.querySelectorAll(".entry.flash").forEach((x) => x.classList.remove("flash"));
+  el.scrollIntoView({ block: "center" });
+  // Restart the animation even when jumping to the same entry twice.
+  void el.offsetWidth;
+  el.classList.add("flash");
+  renderEventNav();
+}
+
+function renderEventNav() {
+  const bar = $("log-events");
+  const parts = MARK_KINDS.map(([kind, label]) => {
+    const plural = `${label}s`;
+    const list = view.events.filter((ev) => ev[2] === kind);
+    if (!list.length) return null;
+    const pos = list.findIndex((ev) => ev[0] === view.focus);
+    return h("span", { class: "ev-nav" },
+      h("i", { class: `mark-sample ${kind}` }),
+      h("span", {}, `${plural} `, h("span", { class: "muted" }, pos >= 0 ? `${pos + 1}/${list.length}` : list.length)),
+      h("button", { title: `Previous ${plural.toLowerCase()}`, onclick: () => step(kind, -1) }, "‹"),
+      h("button", { title: `Next ${plural.toLowerCase()}`, onclick: () => step(kind, 1) }, "›"));
+  }).filter(Boolean);
+  bar.hidden = !parts.length;
+  bar.replaceChildren(...parts);
 }
 
 // ------------------------------------------------------------------ stats
@@ -169,11 +251,13 @@ function closeLog() {
   view.token++;
 }
 
-async function loadMore() {
-  if (view.loading || (view.total && view.entries.length >= view.total)) return;
-  view.loading = true;
+async function loadMore(limit = PAGE) {
   const token = view.token;
-  const params = new URLSearchParams({ offset: view.entries.length, limit: PAGE });
+  // A jump may need pages while a scroll-triggered load is in flight: wait for it.
+  while (view.loading) await new Promise((r) => setTimeout(r, 30));
+  if (token !== view.token || (view.total && view.entries.length >= view.total)) return;
+  view.loading = true;
+  const params = new URLSearchParams({ offset: view.entries.length, limit });
   if (view.agent) params.set("agent", view.agent);
   try {
     const res = await fetch(`/api/sessions/${encodeURIComponent(view.detail.id)}/log?${params}`);
@@ -181,6 +265,10 @@ async function loadMore() {
     const data = await res.json();
     if (token !== view.token) return;
     view.total = data.total;
+    if (data.events) {
+      view.events = data.events;
+      renderEventNav();
+    }
     const start = view.entries.length;
     view.entries.push(...data.entries);
     appendEntries(start);
@@ -223,6 +311,12 @@ function appendEntries(from) {
     }
     const node = renderEntry(e, results, opts);
     if (!node) continue;
+    node.dataset.i = e.i;
+    if (e.event) node.classList.add(`ev-${e.event}`);
+    if (e.event && e.event !== "prompt") {
+      const label = MARK_KINDS.find(([k]) => k === e.event)[1];
+      node.prepend(h("span", { class: `ev-badge ${e.event}` }, label));
+    }
     const day = e.ts ? new Date(e.ts).toDateString() : lastDay;
     if (day && day !== lastDay) {
       frag.append(h("div", { class: "entry compact" }, fmtDateTime(e.ts)));

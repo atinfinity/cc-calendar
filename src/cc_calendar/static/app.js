@@ -122,6 +122,12 @@ export async function select(id) {
   await refreshDetail();
 }
 
+// Select the session and open its log at the event closest to `ts`.
+async function openEvent(id, ts, kind) {
+  await select(id);
+  if (state.detail?.id === id) openLog(state.detail, null, { ts, kind });
+}
+
 async function refreshDetail() {
   const pane = $("detail");
   if (!state.selectedId) {
@@ -132,9 +138,10 @@ async function refreshDetail() {
   try {
     const d = await fetchJSON(`/api/sessions/${state.selectedId}?gap=${state.gap}`);
     if (d.id !== state.selectedId) return;
+    state.detail = d;
     renderDetail(pane, d, {
       onClose: () => { state.selectedId = null; refreshDetail(); renderMain(); },
-      onOpenLog: (agent) => openLog(d, agent),
+      onOpenLog: (agent, target) => openLog(d, agent, target),
       onSelect: (sid) => select(sid),
     });
   } catch (e) {
@@ -156,6 +163,7 @@ function renderMain() {
   if (state.view === "calendar") {
     renderCalendar($("calendar"), visible, {
       onSelect: select,
+      onOpenEvent: openEvent,
       legend: $("legend"),
       rangeLabel: $("range-label"),
       rangeCount: $("range-count"),

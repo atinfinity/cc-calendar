@@ -1,6 +1,7 @@
 import pytest
 from conftest import BASE, LogBuilder, basic_session
 
+from cc_calendar.logview import build_entries, log_events
 from cc_calendar.parser import (
     DENSITY_BUCKET_MS,
     SessionAcc,
@@ -264,3 +265,16 @@ def test_marks():
     assert (T0 + 3 * MIN, "compact") in s.marks()
     assert (T0 + 4 * MIN, "error") in s.marks()
     assert s.marks() == sorted(s.marks())
+
+
+def test_log_events_match_marks(tmp_path):
+    b = basic_session()
+    b._base("system", 3, subtype="compact_boundary")
+    b.assistant(4, [{"type": "text", "text": "API Error"}], msg_id="e1", model="<synthetic>")
+    entries = build_entries(b.write(tmp_path / "s.jsonl"), b.sid)
+    events = log_events(entries)
+    assert sorted(k for _, _, k in events) == sorted(k for _, k in feed(b).marks())
+    for i, _, kind in events:
+        assert entries[i]["event"] == kind
+    commit = next(entries[i] for i, _, k in events if k == "commit")
+    assert commit["kind"] == "tool_use" and commit["name"] == "Bash"
