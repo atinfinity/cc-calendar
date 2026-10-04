@@ -14,7 +14,7 @@ requests — in a local web UI that updates live while sessions run.
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/) (Python 3.12+ is fetched automatically).
+With [uv](https://docs.astral.sh/uv/) (Python 3.12+ is fetched automatically):
 
 ```sh
 uv tool install cc-calendar
@@ -22,6 +22,8 @@ cc-calendar
 ```
 
 Or try it without installing: `uvx cc-calendar`. Update with `uv tool upgrade cc-calendar`.
+
+With Python 3.12+ already installed, `pipx install cc-calendar` works too.
 
 Installed v0.3.0 or earlier from GitHub? Switch to the PyPI package once with
 `uv tool install --force cc-calendar`; `uv tool upgrade` works from then on.
