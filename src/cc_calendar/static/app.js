@@ -13,7 +13,7 @@ import { closeLog, openLog } from "./transcript.js";
 import { majorChange, readHash, stateHash } from "./urlstate.js";
 import {
   CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
-  fmtDuration, fmtPct, fmtTokens, h, matchSnippet, paletteColor,
+  fmtDuration, fmtPct, fmtTokens, h, hitSnippet, matchSnippet, paletteColor,
   prefs, searchText, shortModel, startOfDay, startOfWeek, statusColor, tagChips,
 } from "./util.js";
 
@@ -32,6 +32,8 @@ export const state = {
   colorBy: prefs.get("colorBy", "project"),
   gap: prefs.get("gap", 15),
   search: "",
+  fullText: prefs.get("fullText", false), // also search the transcripts on the server
+  ft: null, // the last full-text result: {query, hits: Map(id → hit), pending}, or {error}
   projects: new Set(prefs.get("projects", [])), // empty = all
   statuses: new Set(prefs.get("statuses", Object.keys(STATUS_LABELS))),
   hideNoPrompt: prefs.get("hideNoPrompt", true),
@@ -190,9 +192,103 @@ export function filtered() {
     if (state.hideNoPrompt && s.prompt_count === 0) return false;
     if (!state.statuses.has(s.status)) return false;
     if (state.projects.size && !state.projects.has(s.project)) return false;
-    if (q && !searchText(s).toLowerCase().includes(q)) return false;
+    if (q && !searchText(s).toLowerCase().includes(q) && !ftHit(s)) return false;
     return true;
   });
+}
+
+// ------------------------------------------------------------------ full-text search
+
+const FT_MIN = 3; // the index matches substrings of at least three characters
+const FT_POLL_MS = 2000;
+let ftToken = 0;
+let ftTimer = null;
+
+// The full-text hit for a session under the current query, or null.
+export function ftHit(s) {
+  const ft = state.ft;
+  if (!state.fullText || !ft?.hits || ft.query !== state.search.trim()) return null;
+  return ft.hits.get(s.id) || null;
+}
+
+// Where the search box matched: titles and prompts first, else the full-text hit.
+export function searchSnippet(s, { openable = false } = {}) {
+  const local = matchSnippet(s, state.search);
+  if (local) return local;
+  const hit = ftHit(s);
+  return hit ? hitSnippet(hit, openable ? () => openHit(s.id) : null) : null;
+}
+
+// Ask the server for the query in the search box; repeats while the index is still being built.
+async function runFullText() {
+  clearTimeout(ftTimer);
+  const token = ++ftToken;
+  const q = state.search.trim();
+  if (!state.fullText || q.length < FT_MIN) {
+    const changed = state.ft?.hits?.size;
+    state.ft = null;
+    renderFullTextStatus();
+    if (changed) renderMain();
+    return;
+  }
+  renderFullTextStatus(true);
+  let ft;
+  try {
+    const data = await fetchJSON(`/api/search?q=${encodeURIComponent(q)}`);
+    ft = { query: q, hits: new Map(Object.entries(data.hits)), pending: data.pending };
+  } catch (e) {
+    ft = { error: e.message };
+  }
+  if (token !== ftToken) return;
+  const sel = state.selectedId;
+  const before = sel && JSON.stringify(state.ft?.query === q ? state.ft.hits?.get(sel) : null);
+  state.ft = ft;
+  if (ft.pending) ftTimer = setTimeout(runFullText, FT_POLL_MS);
+  renderFullTextStatus();
+  renderMain();
+  // The detail pane shows the selected session's hit.
+  if (sel && JSON.stringify(ft.hits?.get(sel) || null) !== before) refreshDetail();
+}
+
+function renderFullTextStatus(searching = false) {
+  const el = $("full-text-status");
+  const q = state.search.trim();
+  const ft = state.ft;
+  let text = "";
+  let title = "";
+  if (state.fullText && q) {
+    if (q.length < FT_MIN) text = `Full text needs ${FT_MIN}+ characters`;
+    else if (searching && !ft?.hits) text = "Searching…";
+    else if (ft?.error) {
+      text = "Full text unavailable";
+      title = ft.error;
+    } else if (ft?.hits) {
+      text = `${ft.hits.size} in transcripts`;
+      if (ft.pending) {
+        text += ` · indexing (${ft.pending} files left)`;
+        title = "Transcripts are still being indexed, so more sessions may match";
+      }
+    }
+  }
+  el.textContent = text;
+  el.title = title;
+}
+
+function setFullText(on) {
+  state.fullText = on;
+  prefs.set("fullText", on);
+  $("search").placeholder = on ? "Search titles, prompts and transcripts…" : "Search titles and prompts…";
+  renderMain();
+  runFullText();
+}
+
+// Select the session and open its log at the full-text hit.
+async function openHit(id) {
+  const hit = ftHit(state.byId.get(id) || { id });
+  if (!hit) return;
+  const query = state.ft.query;
+  await select(id);
+  if (state.detail?.id === id) openLog(state.detail, hit.agent, { ts: hit.ts, query });
 }
 
 // ------------------------------------------------------------------ selection
@@ -233,6 +329,7 @@ async function refreshDetail() {
       onOpenLog: (agent, target) => openLog(d, agent, target),
       onSelect: (sid) => select(sid),
       onOpenProject: () => openProject(d.project),
+      searchHit: state.byId.has(d.id) ? searchHitFor(d.id) : null,
       showSource: multiSource(),
       sourcePath,
       notes: { tags: state.tags, error: state.notesError, onSaved: () => loadSessions().catch(() => {}) },
@@ -240,6 +337,11 @@ async function refreshDetail() {
   } catch (e) {
     pane.replaceChildren(h("div", { class: "empty" }, "Session not found."));
   }
+}
+
+function searchHitFor(id) {
+  const hit = ftHit(state.byId.get(id));
+  return hit ? hitSnippet(hit, () => openHit(id)) : null;
 }
 
 // ------------------------------------------------------------------ rendering
@@ -474,7 +576,7 @@ function renderList(visible) {
           h("td", {}, h("span", { class: "dot", title: STATUS_LABELS[s.status], style: { background: statusColor(s.status) } })),
           h("td", { class: "title-cell" }, s.title,
             s.note ? h("span", { class: "note-mark", title: noteTitle(s.note) }, " 📝") : null,
-            matchSnippet(s, state.search)),
+            searchSnippet(s, { openable: true })),
           h("td", { class: "tags-cell" }, tagChips(s.tags)),
           h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }),
             projectLink(s.project, s.project_name)),
@@ -620,8 +722,15 @@ function bind() {
   let searchTimer;
   $("search").addEventListener("input", (e) => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { state.search = e.target.value; renderMain(); }, 150);
+    searchTimer = setTimeout(() => {
+      state.search = e.target.value;
+      renderMain();
+      runFullText();
+    }, 150);
   });
+  $("full-text").checked = state.fullText;
+  $("full-text").onchange = (e) => setFullText(e.target.checked);
+  if (state.fullText) $("search").placeholder = "Search titles, prompts and transcripts…";
   $("reload").onclick = () => { loadSessions(); refreshDetail(); };
   $("project-btn").onclick = (e) => {
     e.stopPropagation();
@@ -771,6 +880,8 @@ function connectEvents() {
       if (state.selectedId && (payload.live || payload.sessions.includes(state.selectedId))) {
         refreshDetail();
       }
+      // New transcript lines may match; the index catches up in the background.
+      if (state.ft?.hits && payload.sessions.length) setTimeout(runFullText, FT_POLL_MS);
     }, 300);
   };
 }

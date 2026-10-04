@@ -13,7 +13,7 @@ from pathlib import Path
 
 import uvicorn
 
-from . import __version__, notes
+from . import __version__, notes, search
 from .server import create_app
 from .store import ClaudeDir
 
@@ -88,6 +88,13 @@ def main(argv: list[str] | None = None) -> None:
         type=Path,
         help=f"file that keeps your session notes and tags (default: {notes.default_path()})",
     )
+    parser.add_argument(
+        "--search-index",
+        metavar="PATH",
+        type=Path,
+        help="file that caches the full-text search index "
+        f"(default: {search.default_path()}; safe to delete)",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args(argv)
 
@@ -95,7 +102,8 @@ def main(argv: list[str] | None = None) -> None:
     url = f"http://{HOST}:{port}/"
     dirs = claude_dirs(args.claude_dir or [str(Path.home() / ".claude")])
     notes_path = (args.notes or notes.default_path()).expanduser()
-    app = create_app(dirs, notes_path=notes_path)
+    index_path = (args.search_index or search.default_path()).expanduser()
+    app = create_app(dirs, notes_path=notes_path, index_path=index_path)
     reading = ", ".join(f"{d.name} ({d.path})" for d in dirs) or "nothing"
     print(f"cc-calendar {__version__}: reading {reading} — serving {url}")
     if error := app.state.notes.error:

@@ -65,6 +65,28 @@ Point `--notes` at another file to keep it somewhere else, such as a synced fold
 between machines; changes made to the file elsewhere are picked up. One file serves every
 `--claude-dir`. Notes stay in the file after Claude Code deletes a session's old log.
 
+### Full-text search
+
+Tick **Full text** next to the search box to also search what Claude wrote: assistant replies,
+tool inputs (commands, file paths, edits), tool output, and subagent transcripts. Thinking is not
+searched. Queries need at least 3 characters, ignore case and line breaks, and work for Japanese
+and other languages without spaces. Matching sessions show a snippet of the first hit in the list,
+the calendar tooltip and the detail pane; **Open ↗** opens the transcript at that hit, and
+**Matches** in the transcript steps through the others.
+
+The text is kept in a SQLite index, built in the background on first start and updated as logs
+grow, so later starts only read new lines. Until it is complete, the status next to the toggle
+says so and results fill in as it goes. The index is a cache and safe to delete:
+
+| Platform | Default location |
+| --- | --- |
+| macOS | `~/Library/Caches/cc-calendar/search.db` |
+| Linux | `$XDG_CACHE_HOME/cc-calendar/search.db` (`~/.cache/…` when unset) |
+| Windows | `%LOCALAPPDATA%\cc-calendar\search.db` |
+
+Point `--search-index` at another file to keep it elsewhere. It takes a little under half the space of
+the logs it covers.
+
 ## Features
 
 - **Week and day calendar** — each session is drawn as bars covering its active periods; a session is
@@ -118,7 +140,8 @@ between machines; changes made to the file elsewhere are picked up. One file ser
   tag, with suggestions from tags already in use. Tags that differ only in case count as one.
   Tags show in the list (**Tags** column and filter) and the calendar tooltip, and a 📝 marks
   sessions with a note. See [where they are saved](#notes-and-tags).
-- **List view** with search over titles, prompts, notes and tags (a match inside a prompt or note is shown under the title), project and status filters, and sorting by
+- **List view** with search over titles, prompts, notes and tags (a match inside a prompt or note is shown under the title), optional
+  [full-text search](#full-text-search) over the whole transcripts, project and status filters, and sorting by
   any column (click a header; click again to reverse). List-only filters narrow it down further
   by model, git branch, source (with several config directories), tag, date range (sessions active on
   any day in the range) and cost range.
@@ -158,9 +181,10 @@ as $0, so it needs updating when new models ship.
 ## Privacy
 
 Everything stays on your machine. The server listens only on localhost, reads your logs read-only,
-keeps its index in memory, and makes no network requests. The only file it writes is the notes
-file ([Notes and tags](#notes-and-tags)), and only when you add or change a note or tag; requests
-from other websites cannot change it. Commit hashes that do not appear in the
+and makes no network requests. It writes two files: the notes file
+([Notes and tags](#notes-and-tags)), only when you add or change a note or tag, and the
+[full-text search index](#full-text-search), a cache built from your logs. Requests from other
+websites cannot change either. Commit hashes that do not appear in the
 logs are looked up with `git log` in the session's working directory.
 
 ## Development

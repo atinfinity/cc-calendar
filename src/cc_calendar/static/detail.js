@@ -63,7 +63,8 @@ function sourceInfo(d, sourcePath) {
   }, ` · from ${d.source}${also.length ? ` (also in ${also.join(", ")})` : ""}`);
 }
 
-export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, showSource, sourcePath, notes }) {
+// `searchHit`: where a full-text search matched this session, as an element, or null.
+export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, showSource, sourcePath, notes, searchHit }) {
   const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
   const ctx = d.context_pct == null ? null : h("span", { class: "stat", title: "Context used by the latest response" },
     "ctx ", h("span", { class: "ctx" }, h("i", { style: { width: `${Math.min(100, d.context_pct)}%` } })), ` ${d.context_pct}%`);
@@ -95,6 +96,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
       d.compactions.length ? h("span", { class: "stat", title: d.compactions.map((c) => `${fmtTime(c.ts)}  ${compactDetail(c)}`).join("\n") },
         `${d.compactions.length} compaction${d.compactions.length > 1 ? "s" : ""}`) : null),
   ];
+
+  if (searchHit) parts.push(h("div", { class: "detail-hit" }, searchHit));
 
   if (d.continued_from || d.continued_in) {
     parts.push(h("div", { class: "muted" },

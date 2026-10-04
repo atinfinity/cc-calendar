@@ -18,6 +18,7 @@ from .parser import (
     parse_ts,
     tool_result_text,
 )
+from .search import normalize
 
 MAX_TEXT = 20_000
 MAX_INPUT = 4_000
@@ -86,6 +87,30 @@ def _tag_commits(entries: list[dict], commit_calls: set[str]) -> None:
         call = calls.get(e.get("tool_use_id")) if e["kind"] == "tool_result" else None
         if call and not e["is_error"] and not e.get("interrupted"):
             call["event"] = "commit"
+
+
+# Entry kinds full-text search covers, and the fields it looks in.
+SEARCHED = {
+    "user": ("text",),
+    "assistant": ("text",),
+    "tool_use": ("summary", "input"),
+    "tool_result": ("text",),
+    "error": ("text",),
+    "notification": ("text",),
+}
+
+
+def find_entries(entries: list[dict], query: str) -> list[tuple[int, int | None]]:
+    """(index, ts) of the entries containing `query`, ignoring case and whitespace."""
+    q = normalize(query).casefold()
+    if not q:
+        return []
+    out = []
+    for e in entries:
+        fields = SEARCHED.get(e["kind"], ())
+        if any(q in normalize(e.get(f) or "").casefold() for f in fields):
+            out.append((e["i"], e["ts"]))
+    return out
 
 
 def log_events(entries: list[dict]) -> list[tuple[int, int | None, str]]:

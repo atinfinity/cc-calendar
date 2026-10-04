@@ -54,7 +54,8 @@ A session found in more than one directory is shown once, from the copy with the
 - **Calendar / List** at the top switches between the calendar and a sortable table of sessions.
 - **Day / Week / Month / Year** picks the span. Use ◀ ▶ to move and **Today** to come back.
 - Use the search box, the project filter and the status chips to narrow every view. Totals and
-  reports follow these filters.
+  reports follow these filters. Tick **Full text** to search the whole transcripts, not just
+  titles and prompts; see [Full-text search](features.md#full-text-search).
 - Click a session to open its detail pane. From the detail pane, open the transcript.
 - **Summary**, **Tools** and **Copy report** work on the displayed range.
 - Press `?` for keyboard shortcuts: `←` `→` to move, `j` `k` to step through sessions, `Enter`

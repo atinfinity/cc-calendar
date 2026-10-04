@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .parser import SessionAcc
+from .search import SearchIndex
 
 log = logging.getLogger(__name__)
 
@@ -39,8 +40,9 @@ class ClaudeDir:
 
 
 class Store:
-    def __init__(self, dirs: Path | list[ClaudeDir]):
+    def __init__(self, dirs: Path | list[ClaudeDir], index: SearchIndex | None = None):
         self.dirs = [ClaudeDir("local", dirs)] if isinstance(dirs, Path) else list(dirs)
+        self.index = index  # full-text index, told about every transcript that changes
         # The same session can be in several directories (e.g. synced copies): every copy
         # is indexed, and `sessions` holds the one with the newest activity.
         self.copies: dict[str, dict[str, SessionAcc]] = {}  # sid -> dir name -> session
@@ -63,6 +65,10 @@ class Store:
                     self.update_file(path)
                 for path in sorted(projects.glob("*/*/subagents/*.jsonl")):
                     self.update_file(path)
+            if self.index is not None:
+                # Forget transcripts Claude Code has deleted since the last run.
+                keep = {str(p) for p in self.files}
+                self.index.prune([d.projects_dir for d in self.dirs], keep)
 
     def classify(self, path: Path) -> tuple[ClaudeDir, str, str, str | None] | None:
         """-> (dir, kind, session_id, agent_id) for a path under a projects/, or None."""
@@ -120,6 +126,8 @@ class Store:
             self.files[path] = state
         if st.st_size == state.offset:
             return sid
+        if self.index is not None:
+            self.index.enqueue(path, sid, None if kind == "main" else agent_id)
         for rec in self._read_new(path, state):
             if kind == "main":
                 session.feed(rec)

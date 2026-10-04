@@ -4,8 +4,10 @@ Everything stays on your machine.
 
 - The server listens only on localhost (`127.0.0.1`). It rejects requests addressed to any other
   host name.
-- It reads your Claude Code logs read-only and keeps its index in memory.
-- The only file it writes is the notes file, which keeps the notes and tags you add to
+- It reads your Claude Code logs read-only.
+- It writes two files. The full-text search index is a cache of the text in your logs, kept in
+  your user cache directory (see [Full-text search](features.md#full-text-search)); it is safe to
+  delete and is rebuilt on the next start. The notes file keeps the notes and tags you add to
   sessions (see [Notes and tags](getting-started.md#notes-and-tags)). It is written only when you
   change a note or tag. If the file cannot be read, it is never overwritten; notes are turned
   off until it is fixed.
