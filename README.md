@@ -81,7 +81,8 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   metadata, drill-down into subagent transcripts, and a stats panel per transcript (active time,
   requests, tokens and cost by model, tool calls and errors by tool).
 - **List view** with search over titles and prompts (a match inside a prompt is shown under the title), project and status filters, and sorting by
-  any column (click a header; click again to reverse).
+  any column (click a header; click again to reverse). List-only filters narrow it down further
+  by model, git branch, date range (sessions active on any day in the range) and cost range.
 - **Project page** — click a project name (in the list, the Summary table, the detail pane or the
   project menu) to see the project over all time: total active time and cost, activity by month,
   every session, and its commit history with links to the repository.
