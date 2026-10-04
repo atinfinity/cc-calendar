@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import re
 import socket
+import sys
 import threading
 import time
 import webbrowser
@@ -13,8 +15,10 @@ import uvicorn
 
 from . import __version__
 from .server import create_app
+from .store import ClaudeDir
 
 HOST = "127.0.0.1"
+NAME_RE = re.compile(r"[\w.-]+")
 
 
 def free_port() -> int:
@@ -35,6 +39,36 @@ def open_when_ready(url: str, port: int, timeout: float = 60.0) -> None:
             time.sleep(0.2)
 
 
+def claude_dirs(specs: list[str]) -> list[ClaudeDir]:
+    """Parse `[NAME=]PATH` specs; skip missing or repeated directories with a warning."""
+    home_claude = (Path.home() / ".claude").resolve()
+    out: list[ClaudeDir] = []
+    for spec in specs:
+        name, sep, rest = spec.partition("=")
+        if not (sep and NAME_RE.fullmatch(name)):
+            name, rest = "", spec
+        path = Path(rest).expanduser().resolve()
+        if not path.is_dir():
+            print(f"cc-calendar: warning: skipping {rest}: not a directory", file=sys.stderr)
+            continue
+        if any(d.path == path for d in out):
+            print(f"cc-calendar: warning: skipping {rest}: given twice", file=sys.stderr)
+            continue
+        if not name:
+            if path == home_claude:
+                name = "local"
+            elif path.name == ".claude":
+                name = path.parent.name or "claude"
+            else:
+                name = path.name or "claude"
+        taken = {d.name for d in out}
+        unique, n = name, 2
+        while unique in taken:
+            unique, n = f"{name}-{n}", n + 1
+        out.append(ClaudeDir(unique, path))
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="cc-calendar", description="Weekly calendar view of your Claude Code sessions."
@@ -43,17 +77,20 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--no-browser", action="store_true", help="do not open a browser")
     parser.add_argument(
         "--claude-dir",
-        type=Path,
-        default=Path.home() / ".claude",
-        help="Claude Code config directory (default: ~/.claude)",
+        action="append",
+        metavar="[NAME=]PATH",
+        help="Claude Code config directory to read; repeat to show several together "
+        "(default: ~/.claude)",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args(argv)
 
     port = args.port or free_port()
     url = f"http://{HOST}:{port}/"
-    app = create_app(args.claude_dir.expanduser())
-    print(f"cc-calendar {__version__}: reading {args.claude_dir} — serving {url}")
+    dirs = claude_dirs(args.claude_dir or [str(Path.home() / ".claude")])
+    app = create_app(dirs)
+    reading = ", ".join(f"{d.name} ({d.path})" for d in dirs) or "nothing"
+    print(f"cc-calendar {__version__}: reading {reading} — serving {url}")
     if not args.no_browser:
         threading.Thread(target=open_when_ready, args=(url, port), daemon=True).start()
     uvicorn.run(app, host=HOST, port=port, log_level="warning")

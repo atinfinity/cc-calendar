@@ -203,6 +203,7 @@ class SessionAcc:
     session_id: str
     path: str
     project_dir: str
+    source: str = ""  # name of the Claude config directory the log was read from
     cwd: str | None = None
     git_branch: str | None = None
     seen_uuids: set[str] = field(default_factory=set)
