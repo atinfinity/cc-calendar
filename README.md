@@ -46,9 +46,9 @@ cc-calendar --claude-dir ~/.claude --claude-dir ~/sync/laptop/.claude --claude-d
 
 Each directory gets a name: the one you give with `NAME=`, otherwise `local` for `~/.claude`, the
 parent folder for a path ending in `.claude` (`laptop` above), or the folder itself. Sessions show
-where they came from in the list (**Source** column and filter), the detail pane and the calendar
-tooltip, and **Color by → Source** colors them by directory. A session found in more than one
-directory is shown once, from the copy with the latest activity.
+where they came from in the list (**Source** column and filter), the detail pane, the calendar
+tooltip and the CSV/JSON export (`source`), and **Color by → Source** colors them by directory.
+A session found in more than one directory is shown once, from the copy with the latest activity.
 
 ## Features
 
@@ -106,9 +106,9 @@ directory is shown once, from the copy with the latest activity.
   project menu) to see the project over all time: total active time and cost, activity by month,
   every session, and its commit history with links to the repository.
 - **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
-  and sort order: start, end, active time, project, branch, status, prompts, tokens, cost, cache hit
-  rate, model, effort, Claude Code version and commit count. Times are ISO 8601 with your UTC
-  offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
+  and sort order: start, end, active time, project, source directory, branch, status, prompts,
+  tokens, cost, cache hit rate, model, effort, Claude Code version and commit count. Times are
+  ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Live updates** — new log lines are picked up within a second.
 
 | Session detail | Transcript with stats |

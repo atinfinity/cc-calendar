@@ -21,6 +21,7 @@ CSV and JSON carry the same fields, in this order.
 | `title` | string | Session title: Claude Code's generated title, else the first line of the first prompt |
 | `project` | string | Project name as shown in the app |
 | `project_path` | string | Working directory of the session |
+| `source` | string | Name of the Claude config directory the session was read from, as in the Source column (`local` with the default `~/.claude`). See [Several config directories](getting-started.md#several-config-directories) |
 | `branch` | string or null | Git branch recorded in the log |
 | `status` | string | `running`, `waiting`, `done` or `interrupted` |
 | `start` | string | First activity, ISO 8601 with your UTC offset, e.g. `2026-09-29T20:15:00+09:00` |
@@ -68,6 +69,7 @@ JSON wraps the records in an object that identifies the format:
       "title": "Checkout page redesign",
       "project": "acme-web",
       "project_path": "/work/acme-web",
+      "source": "local",
       "branch": "main",
       "status": "done",
       "start": "2026-09-29T20:15:00+09:00",
@@ -108,3 +110,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | Schema version | cc-calendar | Changes |
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
+| 1 | Unreleased | Added `source` |

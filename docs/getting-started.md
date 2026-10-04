@@ -44,9 +44,9 @@ cc-calendar --claude-dir ~/.claude --claude-dir ~/sync/laptop/.claude --claude-d
 
 Each directory gets a name: the one you give with `NAME=`, otherwise `local` for `~/.claude`, the
 parent folder for a path ending in `.claude` (`laptop` above), or the folder itself. Sessions show
-where they came from in the list (**Source** column and filter), the detail pane and the calendar
-tooltip, and **Color by → Source** colors them by directory. A session found in more than one
-directory is shown once, from the copy with the latest activity.
+where they came from in the list (**Source** column and filter), the detail pane, the calendar
+tooltip and the CSV/JSON export (`source`), and **Color by → Source** colors them by directory.
+A session found in more than one directory is shown once, from the copy with the latest activity.
 
 ## Finding your way around
 
