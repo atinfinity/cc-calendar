@@ -346,3 +346,14 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .year-day.today { outline: 2px solid var(--now); outline-offset: -1px; }
 .year-months { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .year-month-total { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 12px; min-width: 110px; }
+
+/* Tool usage pane */
+.tools-pane { max-height: 45vh; }
+.tools-head { margin-bottom: 6px; }
+.tools-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.tools-grid table { min-width: 0; }
+.tools-side { display: flex; flex-direction: column; gap: 12px; }
+.tools-pane td:first-child { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.tools-pane td.warn { color: var(--interrupted); font-weight: 600; }
+.usage-bar { display: inline-block; height: 8px; border-radius: 2px; background: var(--accent); vertical-align: middle; }
+.tools-pane .link-btn { margin-top: 6px; }

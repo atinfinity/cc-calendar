@@ -281,7 +281,15 @@ class Writer:
         return usage
 
     def tool(
-        self, t: datetime, model: str, name: str, inp: dict, output: str, tur: dict | None = None
+        self,
+        t: datetime,
+        model: str,
+        name: str,
+        inp: dict,
+        output: str,
+        tur: dict | None = None,
+        is_error: bool = False,
+        delay: int | None = None,
     ):
         tid = f"tool-{self.sid}-{self.n}"
         usage = self.assistant(
@@ -289,7 +297,7 @@ class Writer:
         )
         self.rec(
             "user",
-            t + timedelta(seconds=self.rng.randint(2, 40)),
+            t + timedelta(seconds=delay if delay is not None else self.rng.randint(2, 40)),
             message={
                 "role": "user",
                 "content": [
@@ -297,7 +305,7 @@ class Writer:
                         "type": "tool_result",
                         "tool_use_id": tid,
                         "content": output,
-                        "is_error": False,
+                        "is_error": is_error,
                     }
                 ],
             },
@@ -352,8 +360,15 @@ def build_session(i: int, spec: tuple, root: Path, rng: random.Random) -> None:
                 inp, out = {"file_path": f"{cwd}/{f}", "old_string": "a", "new_string": "b"}, "ok"
                 added += rng.randint(3, 60)
                 removed += rng.randint(0, 25)
-            _, u = w.tool(t, model, kind, inp, out)
+            # Some test runs fail, so the Tools pane has errors to show.
+            failed = kind == "Bash" and (i + s) % 5 == 0
+            _, u = w.tool(t, model, kind, inp, "1 failed" if failed else out, is_error=failed)
             usages.append((model, u))
+            if s == 1 and i % 3 == 0:
+                # Fictional MCP servers: an issue tracker and a docs search.
+                name = "mcp__issues__get_issue" if p_idx % 2 == 0 else "mcp__docs__search"
+                _, u = w.tool(t, model, name, {"query": "spec"}, "…", delay=5)
+                usages.append((model, u))
             if s == 2 and extras.get("error") == p_idx:
                 w.rec(
                     "assistant",

@@ -82,3 +82,15 @@ def test_stats(client):
     agent = client.get("/api/sessions/s-sub/stats", params={"agent": "a1"}).json()
     assert agent["requests"] == 2 and agent["models"][0]["model"] == "claude-haiku-4-5"
     assert client.get("/api/sessions/s-sub/stats", params={"agent": "zzz"}).status_code == 404
+
+
+def test_tools(client):
+    sessions = client.get("/api/sessions").json()["sessions"]
+    start = min(s["start"] for s in sessions)
+    end = max(s["end"] for s in sessions) + 1
+    res = client.post(
+        "/api/tools", json={"start": start, "end": end, "sessions": ["s-sub", "missing"]}
+    )
+    data = res.json()
+    assert [t["name"] for t in data["tools"]] == ["Agent"]
+    assert [(a["type"], a["runs"]) for a in data["subagents"]] == [("Explore", 1)]
