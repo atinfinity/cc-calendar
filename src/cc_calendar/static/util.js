@@ -205,10 +205,33 @@ export function hitSnippet(hit, onOpen = null) {
     }, "Open ↗") : null);
 }
 
+// Images in a transcript can point at any host. Strip their URLs while sanitizing (in an inert
+// document, so nothing is fetched) and show them as links instead; the server's
+// Content-Security-Policy blocks whatever else slips through.
+if (window.DOMPurify) {
+  window.DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.nodeName !== "IMG") return;
+    const src = node.getAttribute("src") || "";
+    node.removeAttribute("srcset");
+    if (src.startsWith("data:image/")) return;
+    node.removeAttribute("src");
+    node.setAttribute("data-remote-src", src);
+  });
+}
+
+function remoteImageLink(img) {
+  const src = img.dataset.remoteSrc;
+  const label = `Image: ${img.getAttribute("alt") || src || "no address"}`;
+  const title = "Remote image, not loaded";
+  if (!/^https?:\/\//i.test(src)) return h("span", { class: "remote-img", title }, label);
+  return h("a", { class: "remote-img", href: src, target: "_blank", rel: "noopener noreferrer", title: `${title}: ${src}` }, label);
+}
+
 export function renderMarkdown(text) {
   const div = h("div", { class: "md" });
   if (window.marked && window.DOMPurify) {
     div.innerHTML = window.DOMPurify.sanitize(window.marked.parse(text, { breaks: true }));
+    for (const img of div.querySelectorAll("img[data-remote-src]")) img.replaceWith(remoteImageLink(img));
   } else {
     div.style.whiteSpace = "pre-wrap";
     div.textContent = text;

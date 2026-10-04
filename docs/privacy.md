@@ -14,6 +14,9 @@ Everything stays on your machine.
 - Pages on other websites cannot change your notes: the server accepts changes only as JSON
   from its own page.
 - It makes no network requests. The page loads no external scripts, fonts or analytics.
+- Viewing a log never contacts another host. Images linked in a transcript (`![](https://…)` or
+  an `<img>` tag) are not loaded; they show as a link you can open yourself. The page's
+  Content-Security-Policy stops the browser from loading anything else from other sites.
 - Some commit hashes do not appear in the logs. Those are looked up with `git log` in the
   session's working directory. The detail pane also runs `git status --porcelain` there to show
   whether the working tree is clean.

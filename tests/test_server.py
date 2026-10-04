@@ -26,6 +26,13 @@ def test_index_and_static(client):
     assert js.headers["cache-control"] == "no-cache"
 
 
+def test_content_security_policy(client):
+    # Nothing from other hosts may load, e.g. an image linked in a transcript.
+    for path in ("/", "/static/app.js", "/api/sessions"):
+        csp = client.get(path).headers["content-security-policy"]
+        assert "default-src 'self'" in csp and "img-src 'self' data:" in csp
+
+
 def test_sessions(client):
     data = client.get("/api/sessions", params={"gap": 15}).json()
     by_id = {s["id"]: s for s in data["sessions"]}

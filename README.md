@@ -191,7 +191,7 @@ as $0, so it needs updating when new models ship.
 ## Privacy
 
 Everything stays on your machine. The server listens only on localhost, reads your logs read-only,
-and makes no network requests. It writes two files: the notes file
+and makes no network requests; images linked in transcripts are shown as links, not loaded. It writes two files: the notes file
 ([Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)), only when you add or change a note or tag, and the
 [full-text search index](https://atinfinity.github.io/cc-calendar/features/#full-text-search), a cache built from your logs. Requests from other
 websites cannot change either. Commit hashes that do not appear in the
