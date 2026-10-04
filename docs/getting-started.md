@@ -8,7 +8,7 @@ automatically if needed.
 === "Install as a tool"
 
     ```sh
-    uv tool install git+https://github.com/atinfinity/cc-calendar@v0.2.0
+    uv tool install git+https://github.com/atinfinity/cc-calendar@v0.3.0
     cc-calendar
     ```
 
