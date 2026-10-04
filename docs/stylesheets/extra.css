@@ -1,0 +1,22 @@
+/* The app's accent colour (the favicon's terracotta). */
+:root,
+[data-md-color-primary="custom"],
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #c96442;
+  --md-primary-fg-color--light: #d97757;
+  --md-primary-fg-color--dark: #a9512f;
+  --md-accent-fg-color: #d97757;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-typeset-a-color: #e8957a;
+}
+
+.md-typeset img {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 6px;
+}
+
+.md-typeset .grid.cards img {
+  margin-top: 0.4rem;
+}
