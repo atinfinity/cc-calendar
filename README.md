@@ -1,6 +1,6 @@
 # cc-calendar
 
-[![PyPI](https://img.shields.io/pypi/v/cc-calendar)](https://pypi.org/project/cc-calendar/)
+[![PyPI](https://img.shields.io/pypi/v/cc-calendar?label=PyPI)](https://pypi.org/project/cc-calendar/)
 
 A Google Calendar-style weekly view of your [Claude Code](https://claude.com/claude-code) sessions.
 
