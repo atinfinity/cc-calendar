@@ -1,7 +1,7 @@
 """Write a fictional ~/.claude directory for demos and README screenshots.
 
     uv run python scripts/demo_data.py /tmp/cc-demo
-    uv run cc-calendar --claude-dir /tmp/cc-demo
+    uv run cc-calendar --claude-dir /tmp/cc-demo --notes /tmp/cc-demo/notes.json
 
 Every project, prompt and file name here is made up. The week shown is
 Mon 28 Sep - Sun 4 Oct 2026 (UTC); see NOW for the moment it is captured at.
@@ -41,6 +41,26 @@ TEST_COMMANDS = {
     "cli-tool": "cargo test",
     "infra": "terraform plan",
     "docs-site": "mkdocs build --strict",
+}
+
+# Session number (1-based, as in SESSIONS) -> tags and note, written to notes.json.
+NOTES = {
+    1: (["bug"], ""),
+    2: (["perf"], ""),
+    4: (["feature"], ""),
+    5: (["ops"], ""),
+    6: (
+        ["feature", "needs review"],
+        "Waiting on design sign-off for the mobile layout. The narrow-screen fix is in 8923b7f.",
+    ),
+    7: (["bug"], "Fails on CI only. Probably the shared temp dir; retry with a fixed seed."),
+    9: (["feature"], ""),
+    10: (["bug"], ""),
+    11: (["feature"], ""),
+    12: (["ops"], ""),
+    13: (["release"], "v1.4.0 tagged and the changelog posted."),
+    14: (["feature"], ""),
+    15: (["ops"], ""),
 }
 
 # day, start (HH:MM), project, title, prompts, model, extras
@@ -480,6 +500,12 @@ def main() -> None:
     for i, spec in enumerate(SESSIONS, 1):
         build_session(i, spec, root, rng)
     (root / "sessions").mkdir(parents=True, exist_ok=True)
+    updated = NOW.isoformat(timespec="seconds")
+    notes = {
+        session_id(i): {"note": note, "tags": tags, "updated": updated}
+        for i, (tags, note) in NOTES.items()
+    }
+    (root / "notes.json").write_text(json.dumps({"version": 1, "sessions": notes}, indent=1) + "\n")
     print(f"wrote {len(SESSIONS)} sessions to {root}")
 
 

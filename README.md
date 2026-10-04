@@ -41,6 +41,7 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
 | `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)) |
 | `--search-index PATH` | File that keeps the full-text search index (default: see [Full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search)) |
+| `--version` | Print the version and exit |
 
 ### Several config directories
 
@@ -76,14 +77,14 @@ between machines; changes made to the file elsewhere are picked up. One file ser
 ### Full-text search
 
 Tick **Full text** next to the search box to also search what Claude wrote: assistant replies,
-tool inputs (commands, file paths, edits), tool output, and subagent transcripts. Thinking is not
-searched. Queries need at least 3 characters, ignore case and line breaks, and work for Japanese
+tool inputs (commands, file paths, edits), tool output, background task results and subagent
+transcripts. Thinking is not searched. Queries need at least 3 characters, ignore case and line breaks, and work for Japanese
 and other languages without spaces. Matching sessions show a snippet of the first hit in the list,
 the calendar tooltip and the detail pane; **Open ↗** opens the transcript at that hit, and
 **Matches** in the transcript steps through the others.
 
 The text is kept in a SQLite index, built in the background on first start and updated as logs
-grow, so later starts only read new lines. Until it is complete, the status next to the toggle
+grow, so later starts only read new lines. Until it is complete, the status in the search box
 says so and results fill in as it goes. The index is a cache and safe to delete:
 
 | Platform | Default location |
@@ -98,9 +99,9 @@ the logs it covers.
 ## Features
 
 - **Week and day calendar** — each session is drawn as bars covering its active periods; a session is
-  split wherever it sat idle longer than the chosen threshold (15 minutes by default). Overlapping
+  split wherever it sat idle longer than the **Split after** threshold (15 minutes by default). Overlapping
   sessions sit side by side. Click a date in the week view to open that day on its own. Zoom with
-  the − / + buttons or Ctrl + mouse wheel.
+  the − / + buttons or Ctrl/⌘ + mouse wheel.
 - **Month and year views** — a month calendar and a GitHub-style yearly heatmap, one cell per day
   shaded by active time or cost (switch with "Shade by"). Month cells list the day's busiest
   projects; the year view adds per-month totals. Click a day to open it in the day view, or a
@@ -142,13 +143,14 @@ the logs it covers.
   terminal.
 - **Transcript viewer** — Markdown rendering, collapsible tool calls, optional thinking and
   metadata, drill-down into subagent transcripts, and a stats panel per transcript (active time,
-  requests, tokens and cost by model, tool calls and errors by tool).
+  requests, tokens and cost by model, tool calls and errors by tool). The panel's active time counts
+  gaps of up to 5 minutes, whatever the calendar's **Split after** setting.
 - **Notes and tags** — add a note and tags to a session in the detail pane to find it again
   later. The note saves when you leave the box (or with ⌘/Ctrl+Enter); `Enter` or a comma adds a
   tag, with suggestions from tags already in use. Tags that differ only in case count as one.
   Tags show in the list (**Tags** column and filter) and the calendar tooltip, and a 📝 marks
   sessions with a note. See [where they are saved](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags).
-- **List view** with search over titles, prompts, notes and tags (a match inside a prompt or note is shown under the title), optional
+- **List view** with search over titles, the start of each prompt, notes and tags (a match inside a prompt or note is shown under the title), optional
   [full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search) over the whole transcripts, project and status filters, and sorting by
   any column (click a header; click again to reverse). List-only filters narrow it down further
   by model, git branch, source (with several config directories), tag, date range (sessions active on
@@ -163,7 +165,7 @@ the logs it covers.
 - **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
   `c` / `l` calendar / list, `/` search, `j` / `k` next / previous session, `Enter` open its
   transcript, `Esc` close. In a transcript, `n` / `p` step through events, `]` / `[` through
-  prompts, and `s` / `e` toggle Stats / Expand tools. Press `?` (or click **?** in the top bar)
+  prompts, `s` / `e` toggle Stats / Expand tools, and `b` goes back to the parent session. Press `?` (or click **?** in the top bar)
   for the full list.
 - **Views in the URL** — the address keeps the view, span, date, selected session and project
   page, so reloading keeps your place, Back and Forward step through range and view changes, and

@@ -6,11 +6,12 @@
 
 - **Week and day calendar**:
     - Each session is drawn as bars covering its active periods.
-    - A session is split wherever it sat idle longer than the chosen threshold (15 minutes by
-      default).
+    - A session is split wherever it sat idle longer than the **Split after** threshold (15
+      minutes by default).
     - Overlapping sessions sit side by side.
     - Click a date in the week view to open that day on its own.
-    - Zoom with the − / + buttons or ++ctrl++ + mouse wheel.
+    - Zoom with the − / + buttons or ++ctrl++ / ++cmd++ + mouse wheel; **Reset** goes back to the
+      default.
 - **Month and year views**: a month calendar and a GitHub-style yearly heatmap, with one cell
   per day.
     - Cells are shaded by active time or cost; switch with "Shade by".
@@ -25,6 +26,7 @@
 - **Event marks** on each bar show when prompts, commits, compactions and API errors happened.
     - The tooltip counts them for that block.
     - Click a mark to open the transcript at that point.
+    - Click the marks key at the right of the legend to hide or show them.
 - **Activity density**: a heat strip behind each day shows prompts and responses per 10 minutes.
 - **Live updates**: new log lines are picked up within a second.
 - **Views in the URL**: the address keeps the calendar or list view, the span, the date, the
@@ -114,16 +116,19 @@
     - Markdown rendering and collapsible tool calls.
     - Optional thinking and metadata.
     - Drill-down into subagent transcripts.
-    - A stats panel per transcript.
+    - A stats panel per transcript, with tokens and cost by model and calls and errors by tool.
+      Its active time counts gaps of up to 5 minutes, whatever the calendar's **Split after**
+      setting.
     - ‹ › buttons to step through prompts, commits, compactions and errors, and through
       search matches when opened from a full-text hit.
 - **List view**:
-    - Search over titles, prompts, notes and tags, or the whole transcripts with
+    - Search over titles, the start of each prompt, notes and tags, or the whole transcripts with
       [full-text search](#full-text-search).
-    - Filter by project and status.
+    - Filter by project and status; each status chip shows its count. **With prompts only** (on
+      by default) hides sessions in which no prompt was sent. These filters apply to every view.
     - Narrow the list further by model, git branch, source (with several config directories),
       tag, date range and cost range. The date range keeps sessions that were active on any day in it.
-      These filters apply to the list only; **Clear** resets them.
+      These filters apply to the list only; the **Clear N filters** button resets them.
     - Sort by any column.
 - **Project page**: click a project name to open it. Project names can be clicked in the list,
   the Summary table, the detail pane, and the project menu (**Page**). The page covers all time
@@ -151,11 +156,14 @@
 
 ## Full-text search
 
-The search box matches titles, prompts, notes and tags. Tick **Full text** next to it to also
-search the transcripts themselves:
+The search box matches titles, the start of each prompt, notes and tags. Tick **Full text** next
+to it to also search the transcripts themselves:
 
-- What is searched: prompts, assistant replies, tool inputs (commands, file paths, edits), tool
-  output, errors, and subagent transcripts. Thinking is not searched.
+![Full-text search in the list view](images/search.png)
+
+- What is searched: prompts and slash commands, assistant replies, tool inputs (commands, file
+  paths, edits), tool output, errors, background task results, and subagent transcripts.
+  Thinking is not searched.
 - Queries need at least 3 characters. Case and line breaks are ignored, and words in Japanese
   and other languages without spaces match too.
 - A matching session shows a snippet of its first hit, with where it was (e.g. "Tool output"),
@@ -164,8 +172,8 @@ search the transcripts themselves:
   and the detail pane.
 - **Open ↗** opens the transcript at the hit. **Matches** in the transcript steps through every
   match in it.
-- The toggle is remembered. The other filters still apply, and the status next to the toggle
-  counts hits over all sessions.
+- The toggle is remembered. The other filters still apply, and the status at the right of the
+  search box counts hits over all sessions.
 
 The text is kept in a SQLite index on disk. It is built in the background the first time, which
 takes a while for large logs; until it is done the status says "indexing" and results fill in as
@@ -180,7 +188,7 @@ cache and safe to delete; it is rebuilt on the next start.
 
 `--search-index PATH` puts it elsewhere. It takes a little under half the space of the logs it
 covers. If the file cannot be written, the index is kept in memory and rebuilt on each start; if
-your Python's SQLite lacks FTS5, the status reads "Full text unavailable" and the
+your Python's SQLite lacks FTS5 with the trigram tokenizer (SQLite 3.34 or later), the status reads "Full text unavailable" and the
 rest of the search still works.
 
 ## Keyboard shortcuts

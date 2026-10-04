@@ -6,16 +6,17 @@ Everything stays on your machine.
   host name.
 - It reads your Claude Code logs read-only.
 - It writes two files. The full-text search index is a cache of the text in your logs, kept in
-  your user cache directory (see [Full-text search](features.md#full-text-search)); it is safe to
-  delete and is rebuilt on the next start. The notes file keeps the notes and tags you add to
+  your user cache directory (see [Full-text search](features.md#full-text-search)) with SQLite's
+  `-wal` and `-shm` files next to it; it is safe to delete and is rebuilt on the next start. The notes file keeps the notes and tags you add to
   sessions (see [Notes and tags](getting-started.md#notes-and-tags)). It is written only when you
   change a note or tag. If the file cannot be read, it is never overwritten; notes are turned
-  off until it is fixed.
+  off until it is fixed. `--search-index` and `--notes` move these files elsewhere.
 - Pages on other websites cannot change your notes: the server accepts changes only as JSON
   from its own page.
 - It makes no network requests. The page loads no external scripts, fonts or analytics.
 - Some commit hashes do not appear in the logs. Those are looked up with `git log` in the
-  session's working directory.
+  session's working directory. The detail pane also runs `git status --porcelain` there to show
+  whether the working tree is clean.
 - The Markdown report links `#N` references to the `origin` remote of each session's repository.
   It reads the remote with `git remote get-url origin`; it never contacts the remote.
 

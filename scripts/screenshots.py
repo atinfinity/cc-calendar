@@ -55,6 +55,10 @@ def main() -> None:
                 "--port",
                 str(port),
                 "--no-browser",
+                "--notes",
+                str(root / "notes.json"),
+                "--search-index",
+                str(Path(tmp) / "search.db"),
             ],
         )
         try:
@@ -111,6 +115,15 @@ def shoot(url: str) -> None:
         page.click('#view-toggle button[data-view="list"]')
         page.wait_for_selector(".list table")
         page.screenshot(path=OUT / "list.png")
+
+        page.keyboard.press("Escape")  # close the detail pane
+        page.check("#full-text")
+        page.fill("#search", "1 failed")
+        page.wait_for_selector("#full-text-status:has-text('in transcripts')")
+        page.wait_for_selector("#list .snippet")
+        page.screenshot(path=OUT / "search.png")
+        page.fill("#search", "")
+        page.uncheck("#full-text")
 
         page.keyboard.press("Escape")
         page.click('#view-toggle button[data-view="calendar"]')

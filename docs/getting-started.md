@@ -43,6 +43,7 @@ The server binds to `127.0.0.1` on a free port and opens your browser. It reads 
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
 | `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](#notes-and-tags)) |
 | `--search-index PATH` | File that keeps the full-text search index (default: see [Full-text search](features.md#full-text-search)) |
+| `--version` | Print the version and exit |
 
 ## Several config directories
 
@@ -64,9 +65,11 @@ A session found in more than one directory is shown once, from the copy with the
 ## Finding your way around
 
 - **Calendar / List** at the top switches between the calendar and a sortable table of sessions.
-- **Day / Week / Month / Year** picks the span. Use ◀ ▶ to move and **Today** to come back.
-- Use the search box, the project filter and the status chips to narrow every view. Totals and
-  reports follow these filters. Tick **Full text** to search the whole transcripts, not just
+- **Day / Week / Month / Year** picks the span. Use ◀ ▶ to move and **This week** (**Today**, **This month** or **This year**, following the
+  span) to come back.
+- Use the search box, the project filter and the status chips to narrow every view. **With
+  prompts only** (on by default) hides sessions in which no prompt was sent. Totals and reports
+  follow these filters. Tick **Full text** to search the whole transcripts, not just
   titles and prompts; see [Full-text search](features.md#full-text-search).
 - Click a session to open its detail pane. From the detail pane, open the transcript.
 - **Summary**, **Tools** and **Copy report** work on the displayed range.

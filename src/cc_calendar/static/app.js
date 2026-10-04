@@ -265,19 +265,21 @@ function renderFullTextStatus(searching = false) {
     } else if (ft?.hits) {
       text = `${ft.hits.size} in transcripts`;
       if (ft.pending) {
-        text += ` · indexing (${ft.pending} files left)`;
-        title = "Transcripts are still being indexed, so more sessions may match";
+        text += " · indexing";
+        title = `Transcripts are still being indexed (${ft.pending} files left), so more sessions may match`;
       }
     }
   }
   el.textContent = text;
   el.title = title;
+  // Keep the query clear of the status.
+  $("search").style.paddingRight = text ? `${el.offsetWidth + 14}px` : "";
 }
 
 function setFullText(on) {
   state.fullText = on;
   prefs.set("fullText", on);
-  $("search").placeholder = on ? "Search titles, prompts and transcripts…" : "Search titles and prompts…";
+  $("search").placeholder = on ? "Search sessions and transcripts…" : "Search sessions…";
   renderMain();
   runFullText();
 }
