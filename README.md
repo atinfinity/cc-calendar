@@ -37,8 +37,12 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   split wherever it sat idle longer than the chosen threshold (15 minutes by default). Overlapping
   sessions sit side by side. Click a date in the week view to open that day on its own. Zoom with
   the − / + buttons or Ctrl + mouse wheel.
+- **Month and year views** — a month calendar and a GitHub-style yearly heatmap, one cell per day
+  shaded by active time or cost (switch with "Shade by"). Month cells list the day's busiest
+  projects; the year view adds per-month totals. Click a day to open it in the day view, or a
+  month total to open that month.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
-  table breaks the week (or day) down by project. Active time is the drawn bars; a session's cost
+  table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
@@ -65,9 +69,11 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
   any column (click a header; click again to reverse).
 - **Live updates** — new log lines are picked up within a second.
 
-| Session detail | Transcript with stats | List view |
-| --- | --- | --- |
-| ![Detail pane](docs/images/detail.png) | ![Transcript viewer](docs/images/transcript.png) | ![List view](docs/images/list.png) |
+| Session detail | Transcript with stats |
+| --- | --- |
+| ![Detail pane](docs/images/detail.png) | ![Transcript viewer](docs/images/transcript.png) |
+| **List view** | **Month view** |
+| ![List view](docs/images/list.png) | ![Month view](docs/images/month.png) |
 
 Screenshots show fictional demo data.
 

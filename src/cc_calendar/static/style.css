@@ -310,3 +310,39 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
   .detail-pane { position: fixed; inset: 0; width: auto; z-index: 40; }
   #search { width: 100%; }
 }
+
+/* Month calendar and yearly heatmap */
+.seg[hidden] { display: none; }
+.heat.l0 { background: var(--bg-soft); }
+.heat.l1 { background: color-mix(in srgb, var(--accent) 22%, var(--bg)); }
+.heat.l2 { background: color-mix(in srgb, var(--accent) 45%, var(--bg)); }
+.heat.l3 { background: color-mix(in srgb, var(--accent) 70%, var(--bg)); }
+.heat.l4 { background: var(--accent); }
+.heat-scale { color: var(--muted); }
+.heat-scale i.heat { display: inline-block; width: 11px; height: 11px; border-radius: 2px; }
+.month {
+  display: grid; grid-template-columns: repeat(7, minmax(90px, 1fr)); gap: 1px;
+  background: var(--border); min-height: 100%;
+  grid-template-rows: auto; grid-auto-rows: minmax(92px, 1fr);
+}
+.month-head { background: var(--bg); padding: 6px 4px; text-align: center; font-weight: 500; color: var(--muted); }
+.month-day { padding: 4px 6px; min-height: 92px; cursor: pointer; font-size: 12px; overflow: hidden; }
+.month-day:hover { outline: 2px solid var(--border-strong); outline-offset: -2px; }
+.month-day.outside { opacity: 0.45; }
+.month-day.today .month-date { color: var(--accent); font-weight: 700; }
+.month-day.heat.l3, .month-day.heat.l4 { color: #fff; }
+.month-day.heat.l3 .muted, .month-day.heat.l4 .muted,
+.month-day.today.heat.l3 .month-date, .month-day.today.heat.l4 .month-date { color: #fff; }
+.month-date { font-weight: 600; }
+.month-total { min-height: 1.3em; font-size: 11px; }
+.month-project { display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.month-project .dot { flex: none; }
+.year { padding: 16px 14px; }
+.year-grid { display: grid; grid-auto-rows: 14px; gap: 3px; font-size: 10px; color: var(--muted); }
+.year-month { white-space: nowrap; overflow: visible; }
+.year-weekday { line-height: 14px; }
+.year-day { border-radius: 2px; cursor: pointer; }
+.year-day:hover { outline: 2px solid var(--text); outline-offset: -1px; }
+.year-day.today { outline: 2px solid var(--now); outline-offset: -1px; }
+.year-months { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.year-month-total { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 12px; min-width: 110px; }
