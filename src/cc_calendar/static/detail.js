@@ -3,6 +3,7 @@ import {
   STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, compactDetail, fmtEffortMix, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
   shortModel, statusColor,
 } from "./util.js";
+import { copyText } from "./report.js";
 
 const CHECKS = [
   ["turn_ended", "Turn ended", "Claude finished its last reply and was not interrupted with Esc"],
@@ -11,6 +12,32 @@ const CHECKS = [
   ["committed", "Working tree clean",
     "The repository has no uncommitted changes. This is its current state, not the state when the session ended"],
 ];
+
+// Quote for POSIX shells unless the text is plainly safe.
+export function shellQuote(text) {
+  return /^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replaceAll("'", "'\\''")}'`;
+}
+
+// Claude Code finds a session by the directory it was started in, so cd there first.
+export function resumeCommand(d) {
+  const resume = `claude --resume ${shellQuote(d.id)}`;
+  return d.cwd ? `cd ${shellQuote(d.cwd)} && ${resume}` : resume;
+}
+
+function resumeButton(d) {
+  const live = d.status === "running" || d.status === "waiting";
+  const cmd = resumeCommand(d);
+  const btn = h("button", {
+    title: `Copy: ${cmd}` + (live ? "\nThis session is still open; resuming it elsewhere runs it twice." : ""),
+    onclick: async () => {
+      const ok = await copyText(cmd);
+      btn.textContent = ok ? "Copied ✓" : "Copy failed";
+      clearTimeout(btn.timer);
+      btn.timer = setTimeout(() => { btn.textContent = "Copy resume command"; }, 1500);
+    },
+  }, "Copy resume command");
+  return btn;
+}
 
 function card(title, ...body) {
   return h("section", { class: "card" }, h("h3", {}, title), h("div", { class: "card-body" }, ...body));
@@ -37,6 +64,7 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect }) {
       h("span", { class: "idtag", title: d.id }, d.id.slice(0, 8)),
       statusBadge,
       h("div", { class: "spacer" }),
+      resumeButton(d),
       h("button", { class: "primary", onclick: () => onOpenLog(null) }, "Open log"),
       h("button", { onclick: onClose, "aria-label": "Close" }, "✕")),
     h("h2", {}, d.title),

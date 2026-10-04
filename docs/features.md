@@ -70,6 +70,10 @@
     - files changed and pull requests
     - subagents and background tasks
     - links between a session and the one it was continued in
+- **Resume**: "Copy resume command" copies
+  `cd <project dir> && claude --resume <session id>`. Paste it into a terminal to pick the session
+  up again. Claude Code looks sessions up by the directory they were started in, so the command
+  changes to that directory first.
 - **Effort and compactions**:
     - The share of requests at each effort level.
     - Each compaction's trigger and context size before → after, e.g.
