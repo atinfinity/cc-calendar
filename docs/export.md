@@ -60,7 +60,7 @@ JSON wraps the records in an object that identifies the format:
 {
   "format": "cc-calendar.sessions",
   "schema_version": 1,
-  "generator": "cc-calendar 0.2.0",
+  "generator": "cc-calendar 0.3.0",
   "exported_at": "2026-10-04T10:00:00+09:00",
   "sessions": [
     {
@@ -107,4 +107,4 @@ CSV has no version field. Read columns by their header names, not by position.
 
 | Schema version | cc-calendar | Changes |
 | --- | --- | --- |
-| 1 | Next release after 0.2.0 | First version |
+| 1 | 0.3.0 | First version |
