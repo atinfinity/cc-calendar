@@ -182,20 +182,33 @@ class SearchIndex:
             return self._init(sqlite3.connect(":memory:", check_same_thread=False))
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            return self._init(self._connect(path))
+            return self._open_file(path)
         except sqlite3.DatabaseError as e:  # corrupt or not a database: start over
             log.warning("rebuilding the search index at %s: %s", path, e)
             for p in (path, path.with_name(path.name + "-wal"), path.with_name(path.name + "-shm")):
                 p.unlink(missing_ok=True)
-            return self._init(self._connect(path))
+            return self._open_file(path)
+
+    def _open_file(self, path: Path) -> sqlite3.Connection:
+        conn = self._connect(path)
+        try:
+            return self._init(conn)
+        except BaseException:
+            # Close before the caller deletes the file: Windows cannot unlink an open file.
+            conn.close()
+            raise
 
     @staticmethod
     def _connect(path: Path) -> sqlite3.Connection:
         # Autocommit mode: transactions are begun and ended explicitly.
         conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
-        conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
-        conn.execute("PRAGMA journal_mode = WAL")
-        conn.execute("PRAGMA synchronous = NORMAL")
+        try:
+            conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA synchronous = NORMAL")
+        except BaseException:
+            conn.close()
+            raise
         return conn
 
     @staticmethod

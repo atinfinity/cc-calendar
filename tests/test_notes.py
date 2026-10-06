@@ -122,4 +122,8 @@ def test_default_path(monkeypatch, tmp_path):
     assert notes.default_path() == tmp_path / "cc-calendar" / "notes.json"
     monkeypatch.setattr(notes.sys, "platform", "darwin")
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Windows Path.home() ignores HOME
     assert notes.default_path() == tmp_path / "Library/Application Support/cc-calendar/notes.json"
+    monkeypatch.setattr(notes.sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
+    assert notes.default_path() == tmp_path / "Roaming" / "cc-calendar" / "notes.json"

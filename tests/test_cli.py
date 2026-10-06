@@ -7,6 +7,7 @@ def test_default_dir_is_named_local(tmp_path, monkeypatch):
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))  # Windows expanduser ignores HOME
     assert [(d.name, d.path) for d in claude_dirs(["~/.claude"])] == [
         ("local", (home / ".claude").resolve())
     ]
