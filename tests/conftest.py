@@ -222,7 +222,10 @@ def claude_dir(tmp_path: Path) -> Path:
             {"agentType": "Explore", "description": "Look things up", "toolUseId": "t-agent"}
         )
     )
-    (subdir / "agent-gone.jsonl").symlink_to(subdir / "does-not-exist.jsonl")
+    try:
+        (subdir / "agent-gone.jsonl").symlink_to(subdir / "does-not-exist.jsonl")
+    except OSError:
+        pass  # Windows needs Developer Mode or admin rights for symlinks
 
     # A session that was interrupted mid-turn and then continued in s-next.
     prev = LogBuilder("s-prev")

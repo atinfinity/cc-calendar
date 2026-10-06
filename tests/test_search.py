@@ -178,6 +178,8 @@ def test_search_unavailable(claude_dir, monkeypatch):
 
 
 def test_unreadable_index_path_falls_back_to_memory(claude_dir, tmp_path):
+    if os.name == "nt":
+        pytest.skip("chmod cannot make a directory unwritable on Windows")
     if os.geteuid() == 0:
         pytest.skip("root can write anywhere")
     locked = tmp_path / "locked"

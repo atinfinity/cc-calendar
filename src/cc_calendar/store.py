@@ -233,6 +233,9 @@ def _same_process(pid: int, proc_start: object) -> bool:
 
 
 def _proc_start(pid: int) -> str | None:
+    if os.name == "nt":
+        # No `ps`; Git's MSYS ps only sees MSYS processes. Fall back to the PID alone.
+        return None
     now = time.monotonic()
     hit = _proc_starts.get(pid)
     if hit is not None and now - hit[0] < PROC_START_TTL:
@@ -253,6 +256,8 @@ def _proc_start(pid: int) -> str | None:
 
 
 def _pid_alive(pid: int) -> bool:
+    if os.name == "nt":
+        return _pid_alive_nt(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -262,3 +267,43 @@ def _pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+_ERROR_ACCESS_DENIED = 5
+_STILL_ACTIVE = 259
+
+
+def _pid_alive_nt(pid: int) -> bool:
+    """On Windows `os.kill(pid, 0)` sends Ctrl+C to the console group, so ask OpenProcess."""
+    import ctypes
+
+    kernel32 = _kernel32()
+    handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return ctypes.get_last_error() == _ERROR_ACCESS_DENIED
+    try:
+        code = ctypes.c_ulong()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return True
+        # An exited process keeps its PID while a handle to it is open elsewhere.
+        return code.value == _STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+_kernel32_dll = None
+
+
+def _kernel32():
+    global _kernel32_dll
+    if _kernel32_dll is None:
+        import ctypes
+
+        dll = ctypes.WinDLL("kernel32", use_last_error=True)
+        dll.OpenProcess.restype = ctypes.c_void_p
+        dll.OpenProcess.argtypes = (ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong)
+        dll.GetExitCodeProcess.argtypes = (ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong))
+        dll.CloseHandle.argtypes = (ctypes.c_void_p,)
+        _kernel32_dll = dll
+    return _kernel32_dll
