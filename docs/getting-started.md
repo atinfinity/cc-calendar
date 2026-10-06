@@ -52,6 +52,11 @@ automatically if needed. pipx and pip work too.
 The server binds to `127.0.0.1` on a free port and opens your browser. It reads the logs under
 `~/.claude/projects/`, so any session you have run with Claude Code shows up straight away.
 
+Linux, macOS and Windows are supported. On Windows the logs are read from
+`%USERPROFILE%\.claude\projects\`; one limitation: **Copy resume command** joins two commands
+with `&&`, which cmd and PowerShell 7 accept but Windows PowerShell 5.1 does not — there,
+replace the `&&` with `;`.
+
 ## Options
 
 | Option | Description |

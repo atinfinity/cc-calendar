@@ -70,6 +70,10 @@ def claude_dirs(specs: list[str]) -> list[ClaudeDir]:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Legacy Windows console encodings (e.g. cp932) cannot print "—" or every path.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(
         prog="cc-calendar", description="Weekly calendar view of your Claude Code sessions."
     )

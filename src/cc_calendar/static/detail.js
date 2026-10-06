@@ -22,7 +22,10 @@ export function shellQuote(text) {
 // Claude Code finds a session by the directory it was started in, so cd there first.
 export function resumeCommand(d) {
   const resume = `claude --resume ${shellQuote(d.id)}`;
-  return d.cwd ? `cd ${shellQuote(d.cwd)} && ${resume}` : resume;
+  if (!d.cwd) return resume;
+  // A Windows path gets cmd/PowerShell 7 quoting ('&&' must become ';' in PowerShell 5).
+  if (/^[A-Za-z]:[\\/]/.test(d.cwd)) return `cd "${d.cwd}" && ${resume}`;
+  return `cd ${shellQuote(d.cwd)} && ${resume}`;
 }
 
 function resumeButton(d) {
