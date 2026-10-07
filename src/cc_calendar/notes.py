@@ -77,15 +77,19 @@ class Notes:
         self.entries: dict[str, dict] = {}
         self.error: str | None = None
         self.lock = threading.Lock()
-        self._mtime: int | None = None
+        self._mtime: tuple[int, int, int] | None = None
         with self.lock:
             self._load()
 
-    def _stat(self) -> int | None:
+    def _stat(self) -> tuple[int, int, int] | None:
+        """What identifies a version of the file. The mtime alone is not enough: on Windows two
+        writes in quick succession can get the same one. Each save renames a new file into
+        place, so the inode changes even then."""
         try:
-            return self.path.stat().st_mtime_ns if self.path else None
+            st = self.path.stat() if self.path else None
         except OSError:
             return None
+        return (st.st_mtime_ns, st.st_size, st.st_ino) if st else None
 
     def _load(self) -> None:
         mtime = self._stat()
