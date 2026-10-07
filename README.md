@@ -45,6 +45,12 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 | `--search-index PATH` | File that keeps the full-text search index (default: see [Full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search)) |
 | `--version` | Print the version and exit |
 
+### Windows
+
+Windows is supported and covered by CI; sessions are read from `%USERPROFILE%\.claude\projects\`.
+One limitation: **Copy resume command** joins two commands with `&&`, which cmd and PowerShell 7
+accept but Windows PowerShell 5.1 does not — there, replace the `&&` with `;`.
+
 ### Several config directories
 
 Pass `--claude-dir` more than once to see sessions from several places together, such as
