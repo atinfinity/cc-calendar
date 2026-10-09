@@ -14,7 +14,7 @@ from pathlib import Path
 import uvicorn
 
 from . import __version__, notes, search
-from .server import create_app
+from .server import Broadcaster, create_app
 from .store import ClaudeDir
 
 HOST = "127.0.0.1"
@@ -69,6 +69,18 @@ def claude_dirs(specs: list[str]) -> list[ClaudeDir]:
     return out
 
 
+class Server(uvicorn.Server):
+    """Ends the browser's event stream on Ctrl+C, so that shutdown need not wait for it."""
+
+    def __init__(self, config: uvicorn.Config, broadcaster: Broadcaster) -> None:
+        super().__init__(config)
+        self.broadcaster = broadcaster
+
+    def handle_exit(self, sig, frame) -> None:
+        self.broadcaster.close()
+        super().handle_exit(sig, frame)
+
+
 def main(argv: list[str] | None = None) -> None:
     # Legacy Windows console encodings (e.g. cp932) cannot print "—" or every path.
     for stream in (sys.stdout, sys.stderr):
@@ -114,4 +126,7 @@ def main(argv: list[str] | None = None) -> None:
         print(f"cc-calendar: warning: notes cannot be saved: {error}", file=sys.stderr)
     if not args.no_browser:
         threading.Thread(target=open_when_ready, args=(url, port), daemon=True).start()
-    uvicorn.run(app, host=HOST, port=port, log_level="warning")
+    config = uvicorn.Config(
+        app, host=HOST, port=port, log_level="warning", timeout_graceful_shutdown=3
+    )
+    Server(config, app.state.broadcaster).run()
