@@ -1,4 +1,4 @@
-"""Notes and tags the user attaches to sessions, kept in a JSON file of their own.
+"""Notes, tags and ratings the user attaches to sessions, kept in a JSON file of their own.
 
 The logs stay read-only; besides the full-text search index (a cache), this file is the only
 thing cc-calendar writes. It is keyed by session id, so one file serves every config directory,
@@ -19,6 +19,8 @@ NOTE_LIMIT = 2000
 TAG_LIMIT = 40
 TAGS_PER_SESSION = 20
 FILE_VERSION = 1
+# How a session went, as rated by the user; unset when not rated.
+RATINGS = ("done", "partial", "failed")
 
 
 def default_path() -> Path:
@@ -64,6 +66,14 @@ def clean_tags(tags: list[str], known: dict[str, str]) -> list[str]:
     if len(out) > TAGS_PER_SESSION:
         raise ValueError(f"a session can have at most {TAGS_PER_SESSION} tags")
     return out
+
+
+def clean_rating(rating: str | None) -> str | None:
+    if not rating:
+        return None
+    if rating not in RATINGS:
+        raise ValueError(f"the rating must be one of {', '.join(RATINGS)}")
+    return rating
 
 
 class Notes:
@@ -112,6 +122,8 @@ class Notes:
             entry["note"] = note if isinstance(note, str) else ""
             tags = tags if isinstance(tags, list) else []
             entry["tags"] = [t for t in tags if isinstance(t, str)]
+            # Older files have no rating. An unknown one (e.g. from a newer version) is kept in
+            # the file, since saving rewrites every entry, but not shown.
             self.entries[sid] = entry
 
     def refresh(self) -> None:
@@ -122,7 +134,11 @@ class Notes:
 
     def get(self, sid: str) -> dict:
         entry = self.entries.get(sid) or {}
-        return {"note": entry.get("note", ""), "tags": list(entry.get("tags", []))}
+        return {
+            "note": entry.get("note", ""),
+            "tags": list(entry.get("tags", [])),
+            "rating": entry.get("rating") if entry.get("rating") in RATINGS else None,
+        }
 
     def all_tags(self) -> list[dict]:
         """Every tag with the number of sessions that have it, most used first."""
@@ -135,7 +151,9 @@ class Notes:
             for t, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].casefold()))
         ]
 
-    def set(self, sid: str, note: str, tags: list[str]) -> dict:
+    def set(self, sid: str, note: str, tags: list[str], rating: str | None = None) -> dict:
+        """Replace the session's note and tags. `rating=None` keeps its rating, even one this
+        version does not know; "" clears it."""
         with self.lock:
             if self._stat() != self._mtime:
                 self._load()
@@ -150,10 +168,18 @@ class Notes:
             }
             note = clean_note(note)
             tags = clean_tags(tags, known)
-            if note or tags:
+            if rating is None:
+                rating = self.entries.get(sid, {}).get("rating")
+            else:
+                rating = clean_rating(rating)
+            if note or tags or rating:
                 entry = self.entries.setdefault(sid, {})
                 updated = datetime.now().astimezone().isoformat(timespec="seconds")
                 entry.update(note=note, tags=tags, updated=updated)
+                if rating:
+                    entry["rating"] = rating
+                else:
+                    entry.pop("rating", None)
             else:
                 self.entries.pop(sid, None)
             self._save()

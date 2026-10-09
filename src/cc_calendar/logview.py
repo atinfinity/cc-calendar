@@ -15,6 +15,7 @@ from .parser import (
     compact_extra,
     compact_info,
     content_text,
+    copied_head_length,
     parse_ts,
     prompt_text,
     tool_result_text,
@@ -40,9 +41,11 @@ def _input_summary(name: str, inp: dict) -> str:
     return ""
 
 
-def iter_records(path: Path, session_id: str | None) -> Iterator[dict]:
-    """Records of one transcript, skipping copied predecessors and duplicate uuids."""
-    seen: set[str] = set()
+def session_records(path: Path, session_id: str | None) -> tuple[list[dict], int]:
+    """Records of one transcript, and how many it starts with that were copied from the
+    session it continues: those are left out, as are duplicate uuids."""
+    records: list[dict] = []
+    copied = 0
     with open(path, "rb") as f:
         for line in f:
             try:
@@ -52,13 +55,25 @@ def iter_records(path: Path, session_id: str | None) -> Iterator[dict]:
             if not isinstance(rec, dict):
                 continue
             if session_id and rec.get("sessionId") not in (None, session_id):
+                copied += 1
                 continue
-            uuid = rec.get("uuid")
-            if uuid:
-                if uuid in seen:
-                    continue
-                seen.add(uuid)
-            yield rec
+            records.append(rec)
+    head = copied_head_length(records) if session_id else 0
+    out: list[dict] = []
+    seen: set[str] = set()
+    for rec in records[head:]:
+        uuid = rec.get("uuid")
+        if uuid:
+            if uuid in seen:
+                continue
+            seen.add(uuid)
+        out.append(rec)
+    return out, copied + head
+
+
+def iter_records(path: Path, session_id: str | None) -> Iterator[dict]:
+    """Records of one transcript, skipping copied predecessors and duplicate uuids."""
+    yield from session_records(path, session_id)[0]
 
 
 def build_entries(path: Path, session_id: str | None) -> list[dict]:
@@ -67,10 +82,15 @@ def build_entries(path: Path, session_id: str | None) -> list[dict]:
     if key in _cache:
         _cache.move_to_end(key)
         return _cache[key]
+    records, copied = session_records(path, session_id)
     entries: list[dict] = []
+    if copied:
+        # They are in the earlier session's own transcript, and not counted in this one.
+        text = f"Continues an earlier session: the {copied:,} records copied from it are not shown"
+        entries.append({"kind": "system", "ts": None, "text": text})
     tool_names: dict[str, str] = {}
     commit_calls: set[str] = set()
-    for rec in iter_records(path, session_id):
+    for rec in records:
         entries.extend(_entries_for(rec, tool_names, commit_calls))
     for i, e in enumerate(entries):
         e["i"] = i

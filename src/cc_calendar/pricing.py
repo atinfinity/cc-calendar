@@ -58,16 +58,26 @@ def price_for(model: str | None) -> Price | None:
     return best[1] if best else None
 
 
-def estimate_cost(model: str | None, usage: dict) -> float:
+# Usage fields in the order cost_parts() returns them: input, output, cache write, cache read.
+TOKEN_TYPES = (
+    "input_tokens",
+    "output_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
+)
+
+
+def cost_parts(model: str | None, usage: dict) -> tuple[float, float, float, float]:
+    """Estimated USD per token type, in TOKEN_TYPES order; zeros for an unknown model."""
     price = price_for(model)
     if price is None:
-        return 0.0
-    return (
-        usage.get("input_tokens", 0) * price.input
-        + usage.get("output_tokens", 0) * price.output
-        + usage.get("cache_creation_input_tokens", 0) * price.cache_write
-        + usage.get("cache_read_input_tokens", 0) * price.cache_read_rate
-    ) / 1_000_000
+        return (0.0, 0.0, 0.0, 0.0)
+    rates = (price.input, price.output, price.cache_write, price.cache_read_rate)
+    return tuple(usage.get(k, 0) * r / 1_000_000 for k, r in zip(TOKEN_TYPES, rates, strict=True))
+
+
+def estimate_cost(model: str | None, usage: dict) -> float:
+    return sum(cost_parts(model, usage))
 
 
 def cache_savings(model: str | None, usage: dict) -> float:

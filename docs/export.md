@@ -2,7 +2,7 @@
 
 The **Export** buttons in the list view download the sessions shown there as CSV or JSON. The file
 contains the sessions that pass the current filters (search, projects, statuses, "With prompts
-only", and the list filters for model, branch, source, tag, dates and cost), in the current sort
+only", and the list filters for model, branch, source, rating, tag, output, dates and cost), in the current sort
 order.
 
 The file is named `cc-calendar-sessions-YYYY-MM-DD.csv` or `.json`, using the date of the export.
@@ -25,6 +25,7 @@ CSV and JSON carry the same fields, in this order.
 | `source` | string | Name of the Claude config directory the session was read from, as in the Source column (`local` with the default `~/.claude`). See [Several config directories](getting-started.md#several-config-directories) |
 | `branch` | string or null | Git branch recorded in the log |
 | `status` | string | `running`, `waiting`, `done` or `interrupted` |
+| `rating` | string or null | How you rated the session: `done`, `partial` or `failed`; `null` when not rated. See [Notes and tags](getting-started.md#notes-and-tags) |
 | `start` | string | First activity, ISO 8601 with your UTC offset, e.g. `2026-09-29T20:15:00+09:00` |
 | `end` | string | Last activity, same format |
 | `active_minutes` | number | Active time: the length of the drawn bars, one decimal place |
@@ -40,7 +41,7 @@ CSV and JSON carry the same fields, in this order.
 | `commits` | integer | Commits made in the session |
 | `pull_requests` | integer | Pull requests the session opened or linked to |
 | `files_changed` | integer | Files the session edited or wrote |
-| `lines_added` | integer or null | Lines added, from Claude Code's cost record; `null` when the session wrote none |
+| `lines_added` | integer or null | Lines added, from Claude Code's cost record (a continued session's own share); `null` when the session wrote none or its share is unknown |
 | `lines_removed` | integer or null | Lines removed, as for `lines_added` |
 | `cost_per_commit` | number or null | `cost_usd` divided by `commits`, four decimal places; `null` without commits |
 | `tags` | array of strings | Tags you gave the session, in the order shown. In CSV, joined with `;` (tags cannot contain commas). Empty when there are none. See [Notes and tags](getting-started.md#notes-and-tags) |
@@ -80,6 +81,7 @@ JSON wraps the records in an object that identifies the format:
       "source": "local",
       "branch": "main",
       "status": "done",
+      "rating": "partial",
       "start": "2026-09-29T20:15:00+09:00",
       "end": "2026-09-29T23:19:00+09:00",
       "active_minutes": 113,
@@ -126,3 +128,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
 | 1 | 0.4.0 | Added `source`, `tags` and `note` |
+| 1 | Unreleased | Added `rating` |

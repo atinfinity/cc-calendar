@@ -101,7 +101,7 @@ A session found in more than one directory is shown once, from the copy with the
 
 ## Notes and tags
 
-Notes and tags you add to sessions are saved in one JSON file, keyed by session ID:
+Notes, tags and ratings you add to sessions are saved in one JSON file, keyed by session ID:
 
 | Platform | Default location |
 | --- | --- |

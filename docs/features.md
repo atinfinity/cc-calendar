@@ -14,7 +14,8 @@
       default.
 - **Month and year views**: a month calendar and a GitHub-style yearly heatmap, with one cell
   per day.
-    - Cells are shaded by active time or cost; switch with "Shade by".
+    - Cells are shaded by active time, cost or commits; switch with "Shade by". Shaded by commits,
+      month cells also show the day's commit count.
     - Month cells list the day's busiest projects.
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
@@ -59,6 +60,31 @@
     - calls made inside subagents
     - MCP servers
     - subagent runs by type, with their tokens and cost
+- **Cost breakdown**: the Costs pane splits the displayed range's cost by model and token type:
+    - one stacked bar per model: input, output, cache write and cache read
+    - hover a bar segment for its cost and tokens
+    - subagent requests count under the model they ran on
+    - the week and month views add a row per day, so a spike can be traced to one token type
+
+    It follows the current filters. A session with Claude Code's own cost record keeps that
+    total, split by the estimate's proportions.
+- **Most expensive requests**: the **Top requests** pane ranks the prompts sent in the displayed
+  range by cost.
+    - A prompt's cost covers the requests from it until the next prompt, plus the subagents
+      started in that span.
+    - Each row shows the cost, the prompt, its project and session, when it was sent, tokens, and
+      how many requests and subagents it took.
+    - The top 10 are shown; **Show all** lists up to 50.
+    - Click a row to open the transcript at that prompt.
+    - When a session has Claude Code's own cost record, its prompts' estimates are scaled to add
+      up to it, so they match the session's cost.
+- **Hours of the week**: the Hours pane is a weekday × hour-of-day heatmap of the displayed
+  range, to show when you work with Claude Code.
+    - Cells are shaded by active time, cost or commits, with the same "Shade by" control as the
+      month and year views.
+    - Hover a cell for its totals; each row ends with that weekday's total.
+    - Hours are in the browser's time zone, and weeks start on Monday like the week view.
+    - It follows the current filters.
 - **Cache efficiency**: each session shows its cache hit rate and roughly how much caching saved.
   Rates below 90% are highlighted.
 
@@ -66,6 +92,32 @@
 
     Cost comes from Claude Code's own cost record when the session wrote one. Otherwise it is
     estimated from token usage and a built-in price table, and shown with a `~` prefix.
+
+    A continued session's cost record is cumulative: it starts from the previous session's
+    totals. So its cost, and its line counts, are its own share: its record minus the previous
+    session's last record, following chains of continuations. When that share cannot be told
+    (the previous session's log or cost record is gone, or the record is below the previous
+    session's), its cost is estimated from its own token usage and its line counts are not
+    shown. The cost tooltip says which applies.
+
+    A continued session's log starts with a copy of the end of the previous session's. That copy
+    is not counted in the continued session: not its requests, tokens, commits, files, marks or
+    active time. Newer Claude Code versions write the copy under the new session's ID, and the
+    copy is recognised by its records' prompt IDs. This works even when the previous session's log
+    is gone, so its share of the cost is then estimated. It does not work when the copied part
+    ends in the middle of a turn.
+
+    In that case, nothing in the log may name the session it continues. So a cost record more
+    than 3 times the session's own token estimate, and at least \$1 above it, is also taken to be
+    cumulative and treated the same way. Ordinary records stay well below that.
+
+    A session resumed with `claude --resume` keeps its log, but its cost record covers only the
+    last run: the totals start again from zero when Claude Code starts. So its cost is that
+    record plus an estimate of the token usage, subagents included, from before the last run
+    started. It is shown with a `~` prefix because part of it is estimated, and the Summary splits
+    it the same way: the days of earlier runs get their estimate and the last run gets the record.
+    Its line counts cover only the last run, so they are not shown. A record far above the last
+    run's own token usage already counts the earlier runs and is used as it is.
 
     Treat all costs as rough figures, not billing data. The price table uses Anthropic API list
     prices as of when it was last updated. It does not know about subscription plans, discounts or
@@ -92,8 +144,10 @@
     - files changed and pull requests
     - subagents and background tasks
     - links between a session and the one it was continued in
-- **Notes and tags**: the **Notes** card in the detail pane keeps a note and tags for the
-  session. Click **+ Add note or tags** to start.
+- **Notes and tags**: the **Notes** card in the detail pane keeps a rating, a note and
+  tags for the session. Click **+ Add note or tags** to start.
+    - **Rating** rates how the session went: **✓ Done**, **◐ Partial** or **✕ Failed**. One click
+      sets it, even while the card is collapsed; click the active one again to clear it.
     - The note is plain text, up to 2,000 characters. It saves when you leave the box, with
       ++cmd+enter++ / ++ctrl+enter++, or with ++esc++.
     - Type a tag and press ++enter++ or a comma to add it; tags already in use are suggested.
@@ -101,7 +155,10 @@
     - Tags that differ only in case count as one, written the way they were first used.
     - The list view has a **Tags** column and a **Tag** filter, including "(untagged)". A 📝
       next to a title marks a note; hover it to read the start.
-    - The calendar tooltip shows the tags, and the search box matches notes and tags.
+    - The list view has a **Rating** column and, once a session is rated, a **Rating**
+      filter, including "(unrated)". The Summary adds a line with the active time and cost of the
+      sessions rated done, partial and failed, and of the unrated rest.
+    - The calendar tooltip shows the rating and tags, and the search box matches notes and tags.
     - They are saved in a file of their own; see
       [Notes and tags](getting-started.md#notes-and-tags) for where.
 - **Resume**: "Copy resume command" copies
@@ -120,6 +177,9 @@
       are not loaded (see [Privacy](privacy.md)).
     - Optional thinking and metadata.
     - Drill-down into subagent transcripts.
+    - A continued session's transcript starts after the records copied from the session it
+      continues, with a note saying how many were left out. Those records are in that session's
+      own transcript.
     - A stats panel per transcript, with tokens and cost by model and calls and errors by tool.
       Its active time counts gaps of up to 5 minutes, whatever the calendar's **Split after**
       setting.
@@ -155,7 +215,7 @@
 - **Export**: download the sessions shown in the list view as CSV or JSON. The file follows
   the current filters and sort order. It covers:
     - start and end (ISO 8601 with your UTC offset) and active time
-    - project, source config directory, branch and status
+    - project, source config directory, branch, status and rating
     - prompts, tokens, cost and cache hit rate
     - model, effort, Claude Code version
     - commits, pull requests, edited files, lines added and removed, and cost per commit

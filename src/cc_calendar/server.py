@@ -18,6 +18,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
 from . import __version__, gitinfo
+from .costs import cost_breakdown
+from .expensive import expensive_requests
 from .logview import build_entries, find_entries, log_events
 from .notes import NOTE_LIMIT, TAGS_PER_SESSION, Notes, NotesUnavailable
 from .parser import SessionAcc
@@ -91,6 +93,7 @@ def summary(
         "tokens": s.tokens(),
         "cost": round(cost, 4),
         "cost_estimated": estimated,
+        "cost_basis": s.cost_basis(),
         "cache_hit": cache_hit,
         "cache_saved": round(cache_saved, 4),
         "model": models[0] if models else None,
@@ -107,7 +110,7 @@ def summary(
         "continued_in": s.continued_in,
         "continued_from": continued_from,
         "search": search,
-        **notes.get(s.session_id),  # note, tags
+        **notes.get(s.session_id),  # note, tags, rating
     }
 
 
@@ -143,11 +146,11 @@ def detail(
                 (sa.to_dict() for sa in s.subagents.values()), key=lambda d: d["start"] or 0
             ),
             "background": list(s.background.values()),
+            # A continuation's own share: its record carries over its predecessor's totals.
             "cost_state": {
-                k: s.cost_state.get(k)
-                for k in ("totalDuration", "totalLinesAdded", "totalLinesRemoved", "modelUsage")
+                k: own.get(k) for k in ("totalDuration", "totalLinesAdded", "totalLinesRemoved")
             }
-            if s.cost_state
+            if (own := s.own_cost_state())
             else None,
         }
     )
@@ -160,9 +163,20 @@ class ToolsQuery(BaseModel):
     sessions: list[str] = Field(max_length=100_000)
 
 
+class CostsQuery(BaseModel):
+    bounds: list[tuple[int, int]] = Field(min_length=1, max_length=400)  # [start, end) per day
+    sessions: list[str] = Field(max_length=100_000)
+
+
+class RequestsQuery(ToolsQuery):
+    limit: int = Field(50, ge=1, le=500)
+
+
 class NotesUpdate(BaseModel):
     note: str = Field("", max_length=NOTE_LIMIT * 2)  # checked exactly after trimming
     tags: list[str] = Field(default_factory=list, max_length=TAGS_PER_SESSION * 5)
+    # One of notes.RATINGS, "" to clear it, or left out to keep it.
+    rating: str | None = Field(None, max_length=20)
 
 
 def same_origin_json(request: Request) -> None:
@@ -232,6 +246,10 @@ def create_app(
                     sid = await asyncio.to_thread(store.update_file, path)
                     if sid:
                         changed.add(sid)
+                        # Its continuation's cost is counted from its last cost record.
+                        s = store.sessions.get(sid)
+                        if s is not None and s.continued_in:
+                            changed.add(s.continued_in)
             if changed or live_changed:
                 broadcaster.publish({"sessions": sorted(changed), "live": live_changed})
 
@@ -331,7 +349,7 @@ def create_app(
     async def update_notes(sid: str, body: NotesUpdate) -> dict:
         get_session(sid)
         try:
-            out = await asyncio.to_thread(notes.set, sid, body.note, body.tags)
+            out = await asyncio.to_thread(notes.set, sid, body.note, body.tags, body.rating)
         except NotesUnavailable as e:
             raise HTTPException(409, str(e)) from e
         except ValueError as e:
@@ -391,6 +409,19 @@ def create_app(
         with store.lock:
             picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
             return tool_usage(picked, q.start, q.end)
+
+    @app.post("/api/costs")
+    def costs(q: CostsQuery) -> dict:
+        with store.lock:
+            picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
+            return cost_breakdown(picked, q.bounds)
+
+    @app.post("/api/requests")
+    def requests(q: RequestsQuery) -> dict:
+        """The costliest prompts sent in the range, among the given sessions."""
+        with store.lock:
+            picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
+            return expensive_requests(picked, q.start, q.end, q.limit)
 
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:

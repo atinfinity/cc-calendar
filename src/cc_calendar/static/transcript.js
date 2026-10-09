@@ -1,6 +1,6 @@
 // Modal transcript viewer with lazy loading and subagent drill-down.
 import {
-  MARK_KINDS, cacheTitle, compactDetail, fmtCost, fmtEffortMix, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
+  MARK_KINDS, cacheTitle, compactDetail, costTitle, fmtCost, fmtEffortMix, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h, prefs, renderMarkdown,
   shortModel,
 } from "./util.js";
 import { helpOpen, typing } from "./shortcuts.js";
@@ -284,7 +284,7 @@ function renderStats(panel, st) {
       cacheTitle(st.cache_hit, st.cache_saved)),
     tile(main && subs.length ? "Cost (this log)" : "Cost", fmtCost(st.cost, true), "", "Estimated from token usage"),
     main && subs.length ? tile("Subagents", subs.length, `${fmtTokens(subTokens)} tok · ${fmtCost(subCost, true)}`) : null,
-    main ? tile("Session total", fmtCost(d.cost, d.cost_estimated), "", d.cost_estimated ? "Estimated, including subagents" : "From Claude Code's cost record") : null,
+    main ? tile("Session total", fmtCost(d.cost, d.cost_estimated), "", costTitle(d)) : null,
     main && d.cost_state && (d.cost_state.totalLinesAdded || d.cost_state.totalLinesRemoved)
       ? tile("Lines", `+${d.cost_state.totalLinesAdded} / −${d.cost_state.totalLinesRemoved}`) : null,
   ];

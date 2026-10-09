@@ -49,6 +49,8 @@ def test_sessions(client):
     assert by_id["s-next"]["continued_from"] == "s-prev"
     assert by_id["s-prev"]["continued_in"] == "s-next"
     assert by_id["s-next"]["cost"] == 1.25 and by_id["s-next"]["cost_estimated"] is False
+    assert by_id["s-next"]["cost_basis"] == "continued"
+    assert by_id["s-basic"]["cost_basis"] == "estimate"
     assert "readme" in basic["search"].lower()
     assert basic["version"] == "2.1.0"  # Claude Code version from the log
     assert data["version"] == __version__
@@ -74,6 +76,14 @@ def test_session_detail(client):
     sub = client.get("/api/sessions/s-sub").json()
     assert [a["id"] for a in sub["subagents"]] == ["a1"]
     assert sub["subagents"][0]["has_log"] is True
+    # A continuation shows its own share of the cumulative cost record.
+    nxt = client.get("/api/sessions/s-next").json()
+    assert nxt["cost"] == 1.25 and nxt["continued_from"] == "s-prev"
+    assert nxt["cost_state"] == {
+        "totalDuration": 1000,
+        "totalLinesAdded": 3,
+        "totalLinesRemoved": 1,
+    }
     assert client.get("/api/sessions/nope").status_code == 404
 
 
@@ -115,6 +125,55 @@ def test_tools(client):
     data = res.json()
     assert [t["name"] for t in data["tools"]] == ["Agent"]
     assert [(a["type"], a["runs"]) for a in data["subagents"]] == [("Explore", 1)]
+
+
+def test_costs(client):
+    sessions = client.get("/api/sessions").json()["sessions"]
+    start = min(s["start"] for s in sessions)
+    end = max(s["end"] for s in sessions) + 1
+    res = client.post("/api/costs", json={"bounds": [[start, end]], "sessions": ["s-sub", "x"]})
+    data = res.json()
+    assert [m["model"] for m in data["models"]] == ["claude-sonnet-5-5", "claude-haiku-4-5"]
+    assert data["sessions"] == 1 and len(data["days"]) == 1
+    assert client.post("/api/costs", json={"bounds": [], "sessions": []}).status_code == 422
+
+
+def test_requests(client):
+    sessions = client.get("/api/sessions").json()["sessions"]
+    start = min(s["start"] for s in sessions)
+    end = max(s["end"] for s in sessions) + 1
+    ids = ["s-basic", "s-sub", "s-next", "missing"]
+    data = client.post(
+        "/api/requests", json={"start": start, "end": end, "sessions": ids, "limit": 2}
+    ).json()
+    # One prompt each; the copy of s-prev that s-next starts with is not counted again.
+    assert data["prompts"] == 3 and len(data["top"]) == 2
+    top = data["top"][0]
+    # s-next's recorded $1.25 all falls to "Carry on", the only prompt with requests.
+    assert (top["session"], top["text"], top["cost"], top["estimated"]) == (
+        "s-next",
+        "Carry on",
+        1.25,
+        False,
+    )
+    assert data["top"][1]["session"] == "s-basic"
+    sub = client.post("/api/requests", json={"start": start, "end": end, "sessions": ["s-sub"]})
+    assert [(r["requests"], r["subagents"]) for r in sub.json()["top"]] == [(2, 1)]
+    bad = client.post("/api/requests", json={"start": 0, "end": 1, "sessions": [], "limit": 0})
+    assert bad.status_code == 422
+
+
+def test_rating(client):
+    url = "/api/sessions/s-basic/notes"
+    assert client.put(url, json={"rating": "partial"}).json()["rating"] == "partial"
+    by_id = {s["id"]: s for s in client.get("/api/sessions").json()["sessions"]}
+    assert by_id["s-basic"]["rating"] == "partial" and by_id["s-sub"]["rating"] is None
+    assert client.get("/api/sessions/s-basic").json()["rating"] == "partial"
+    # Only the same origin may change it.
+    foreign = client.put(url, json={"rating": "failed"}, headers={"Origin": "https://evil.example"})
+    assert foreign.status_code == 403
+    assert client.get("/api/sessions/s-basic").json()["rating"] == "partial"
+    assert client.put(url, json={"rating": ""}).json()["rating"] is None
 
 
 @pytest.fixture

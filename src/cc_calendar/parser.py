@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from .pricing import cache_hit_rate, cache_savings, context_window, estimate_cost
+from .pricing import (
+    TOKEN_TYPES,
+    cache_hit_rate,
+    cache_savings,
+    context_window,
+    cost_parts,
+    estimate_cost,
+)
 
 INTERRUPT_PREFIX = "[Request interrupted"
 GIT_COMMIT_RE = re.compile(r"\bgit\b(?:\s+-[cC]\s+\S+)*[^|;&\n]*?\bcommit\b")
@@ -25,6 +33,14 @@ def compact_info(rec: dict) -> dict:
         "pre": pre if isinstance(pre, int) else None,
         "post": post if isinstance(post, int) else None,
     }
+
+
+def is_number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def as_count(v: Any) -> int | None:
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
 
 
 def compact_extra(c: dict) -> dict:
@@ -49,6 +65,16 @@ COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
 PASTED_TAG = "<pasted_content"
 PASTED_TAG_RE = re.compile(r"</?pasted_content\b[^>]*>")
 DENSITY_BUCKET_MS = 10 * 60 * 1000
+# Totals in a cost record that a continuation carries over from its predecessor.
+CUMULATIVE_COST_KEYS = ("totalCostUSD", "totalLinesAdded", "totalLinesRemoved", "totalAPIDuration")
+# A cost record this far above the session's own token estimate is taken to be cumulative: a
+# continuation that names no predecessor. Real records stay below twice the estimate, while a
+# continuation's full record is many times its own share.
+CUMULATIVE_RATIO = 3
+CUMULATIVE_MARGIN_USD = 1.0
+# Totals in a cost record that cover only the Claude Code process that wrote it. A resumed
+# session's last record starts again from zero, so these say nothing about its earlier runs.
+RUN_COST_KEYS = (*CUMULATIVE_COST_KEYS, "totalDuration")
 
 
 def parse_ts(value: Any) -> int | None:
@@ -153,6 +179,62 @@ def extract_commit_subject(command: str) -> str | None:
     return None
 
 
+class CopiedHead:
+    """Spots the copy of an earlier session that a continued session's log starts with.
+
+    Older Claude Code versions keep the earlier session's ID on the copied records, which tells
+    them apart. Newer ones rewrite it to the new session's, and give every copied user record
+    the prompt ID of the new session's first turn. A user record never shares the prompt ID of a
+    turn that has already ended, so a user record under the log's first prompt ID that follows a
+    `turn_duration` record shows that everything up to that turn end was copied. A copy whose
+    last turn did not end cleanly is not recognised.
+
+    Feed it a log's records in order, leaving out those under another session's ID.
+    """
+
+    def __init__(self) -> None:
+        self.prompt_id: str | None = None
+        self.open = True  # still among the records under the log's first prompt ID
+        self.seen = 0  # records fed
+        self.turn_end: int | None = None  # records fed up to the last turn end among them
+        self.copied = 0  # leading records known to be copied
+        self.uuids: set[str] = set()  # repeated records tell nothing new
+
+    def feed(self, rec: dict) -> bool:
+        """Note the next record; True when it shows that more of the log was copied."""
+        self.seen += 1
+        if not self.open:
+            return False
+        uuid = rec.get("uuid")
+        if uuid:
+            if uuid in self.uuids:
+                return False
+            self.uuids.add(uuid)
+        rtype = rec.get("type")
+        if rtype == "user" and uuid:
+            pid = rec.get("promptId")
+            if self.prompt_id is None and isinstance(pid, str):
+                self.prompt_id = pid
+            elif pid != self.prompt_id or pid is None:
+                self.open, self.uuids = False, set()
+            elif self.turn_end is not None:
+                self.copied, self.turn_end = self.turn_end, None
+                return True
+        elif rtype == "system" and rec.get("subtype") == "turn_duration" and self.prompt_id:
+            self.turn_end = self.seen
+        return False
+
+
+def copied_head_length(records: list[dict]) -> int:
+    """How many of `records` (one log's, in order) were copied from the session it continues."""
+    head = CopiedHead()
+    for rec in records:
+        head.feed(rec)
+        if not head.open:
+            break
+    return head.copied
+
+
 @dataclass
 class Usage:
     model: str | None
@@ -235,6 +317,17 @@ class SessionAcc:
     last_prompt: str | None = None
     cost_state: dict | None = None
     continued_in: str | None = None
+    copied_from: str | None = None  # session whose records this log starts with a copy of
+    # Leading records copied under this session's own ID (see CopiedHead); not counted.
+    copied_head: int = 0
+    head: CopiedHead = field(default_factory=CopiedHead, repr=False)
+    head_tail: list[dict] = field(default_factory=list, repr=False)  # fed since head.turn_end
+    # Set by the store: the session this one continues (also when its log is gone) and that
+    # session's last cost record, whose totals this session's record starts from.
+    predecessor: str | None = None
+    prior_cost_state: dict | None = None
+    # API message IDs of the predecessor: a continuation's log may start with copies of them.
+    prior_usage_ids: frozenset[str] = frozenset()
     permission_mode: str | None = None
     last_stop_reason: str | None = None
     last_assistant_ts: int | None = None
@@ -263,7 +356,56 @@ class SessionAcc:
         sid = rec.get("sessionId")
         # A continued session may begin with a verbatim copy of its predecessor.
         if sid is not None and sid != self.session_id:
+            self.copied_from = sid
             return
+        head = self.head
+        if head.open:
+            if head.feed(rec):
+                self._drop_copied_head()
+            if head.turn_end == head.seen:
+                self.head_tail = []
+            elif head.open and head.turn_end is not None:
+                self.head_tail.append(rec)
+            else:
+                self.head_tail = []
+        self._feed(rec)
+
+    # Kept when a copied head is dropped: they describe the session rather than count its work.
+    HEAD_KEEP = (
+        "cwd",
+        "git_branch",
+        "version",
+        "seen_uuids",
+        "ai_title",
+        "agent_name",
+        "last_prompt",
+        "cost_state",
+        "continued_in",
+        "copied_from",
+        "predecessor",
+        "prior_cost_state",
+        "prior_usage_ids",
+        "permission_mode",
+        "head",
+    )
+
+    def _drop_copied_head(self) -> None:
+        """Forget what the records before the head's tail added: they were copied from the
+        session this one continues. Then feed the tail again."""
+        tail = self.head_tail
+        fresh = SessionAcc(self.session_id, self.path, self.project_dir, self.source)
+        for name in fresh.__dataclass_fields__:
+            if name not in self.HEAD_KEEP and name != "subagents":
+                setattr(self, name, getattr(fresh, name))
+        # Subagents with a log of their own in this session's directory stay.
+        self.subagents = {k: sa for k, sa in self.subagents.items() if sa.path is not None}
+        self.copied_head = self.head.copied
+        for rec in tail:
+            self.seen_uuids.discard(rec.get("uuid"))
+        for rec in tail:
+            self._feed(rec)
+
+    def _feed(self, rec: dict) -> None:
         uuid = rec.get("uuid")
         if uuid:
             if uuid in self.seen_uuids:
@@ -306,7 +448,9 @@ class SessionAcc:
         elif rtype == "cost-state":
             self.cost_state = rec
         elif rtype == "continued-in":
-            self.continued_in = rec.get("continuedInSessionId")
+            # A copy of the predecessor's record rewritten to this session's ID names itself.
+            if rec.get("continuedInSessionId") != self.session_id:
+                self.continued_in = rec.get("continuedInSessionId")
         elif rtype == "permission-mode":
             self.permission_mode = rec.get("permissionMode")
         elif rtype == "pr-link" and rec.get("prUrl"):
@@ -553,13 +697,86 @@ class SessionAcc:
     def cost_density(self) -> dict[int, float]:
         """Estimated cost per DENSITY_BUCKET_MS bucket, subagents included.
 
-        Lets the UI split a session's cost across days; only the proportions are used.
+        Lets the UI split a session's cost across days; only the proportions are used. For a
+        resumed session the run its cost record covers gets the record's cost and the earlier
+        runs their estimate, so earlier days do not take a share of the record.
         """
         out: Counter = Counter()
-        for u in self.all_usages():
-            if u.ts is not None:
+        if self.cost_basis() == "resumed":
+            start = self.cost_state["startTime"]
+            for u in self.earlier_usages():
                 out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
+            run: Counter = Counter()
+            for u in self.all_usages():
+                if u.ts is not None and u.ts >= start:
+                    run[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
+            recorded = float(self.cost_state["totalCostUSD"])
+            total = sum(run.values())
+            if total > 0:
+                for b, c in run.items():
+                    out[b] += recorded * c / total
+            else:
+                out[start // DENSITY_BUCKET_MS] += recorded
+        else:
+            for u in self.all_usages():
+                if u.ts is not None:
+                    out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
         return {b: round(c, 6) for b, c in out.items() if c}
+
+    def cost_breakdown(self) -> dict[int, dict[str, list[float]]]:
+        """Tokens and estimated cost per DENSITY_BUCKET_MS bucket and model, subagents included.
+
+        Each entry is [input, output, cache write, cache read] tokens followed by their costs,
+        so subagent requests count under the model they ran on.
+        """
+        out: dict[int, dict[str, list[float]]] = {}
+        for u in self.all_usages():
+            if u.ts is None:
+                continue
+            row = out.setdefault(u.ts // DENSITY_BUCKET_MS, {}).setdefault(
+                u.model or "unknown", [0] * 8
+            )
+            for i, k in enumerate(TOKEN_TYPES):
+                row[i] += u.usage.get(k, 0)
+            for i, c in enumerate(cost_parts(u.model, u.usage)):
+                row[4 + i] += c
+        return out
+
+    def prompt_costs(self) -> list[dict]:
+        """Cost and tokens of each timestamped prompt, oldest first.
+
+        A prompt owns the requests from it until the next prompt, plus the subagents started in
+        that span. With Claude Code's own cost record, the estimates are scaled to add up to it
+        (requests before the first prompt keep their share), like the per-day split in the UI.
+        """
+        prompts = sorted((p for p in self.prompts if p["ts"] is not None), key=lambda p: p["ts"])
+        starts = [p["ts"] for p in prompts]
+        out = [dict(p, cost=0.0, tokens=0, requests=0, subagents=0) for p in prompts]
+
+        def owner(ts: int | None) -> dict | None:
+            i = bisect_right(starts, ts) - 1 if ts is not None else -1
+            return out[i] if i >= 0 else None
+
+        estimated = 0.0
+        for u in self.usages.values():
+            cost = estimate_cost(u.model, u.usage)
+            estimated += cost
+            if (row := owner(u.ts)) is not None:
+                row["cost"] += cost
+                row["tokens"] += u.total
+                row["requests"] += 1
+        for sa in self.subagents.values():
+            cost = sa.cost()
+            estimated += cost
+            if (row := owner(sa.first_ts)) is not None:
+                row["cost"] += cost
+                row["tokens"] += sa.tokens()
+                row["subagents"] += 1
+        total, _ = self.cost()
+        scale = total / estimated if estimated else 1.0
+        for row in out:
+            row["cost"] *= scale
+        return out
 
     def all_usages(self) -> list[Usage]:
         """API usage of the session and its subagents."""
@@ -579,24 +796,127 @@ class SessionAcc:
             s.tokens() for s in self.subagents.values()
         )
 
+    def own_cost_state(self) -> dict | None:
+        """The cost record with its cumulative totals cut down to this session's own share.
+
+        A continuation's record starts from its predecessor's final totals, so those are
+        subtracted. Totals that cannot be told that way (the predecessor's record is gone, the
+        cost is below its, or the record is cumulative with no known predecessor) are None, as
+        are a resumed session's run totals, which cover only its last run.
+        """
+        cs = self.cost_state
+        if cs is None:
+            return None
+        basis = self.cost_basis()
+        if basis == "resumed":
+            return {**cs, **dict.fromkeys(RUN_COST_KEYS)}
+        if self.predecessor is None:
+            if basis in ("cumulative", "no_previous"):
+                return {**cs, **dict.fromkeys(CUMULATIVE_COST_KEYS)}
+            return cs
+        prior = self.prior_cost_state or {}
+        out = dict(cs)
+        for k in CUMULATIVE_COST_KEYS:
+            v, p = cs.get(k), prior.get(k)
+            out[k] = v - p if is_number(v) and is_number(p) and v >= p else None
+        if out["totalCostUSD"] is None:
+            out.update(dict.fromkeys(CUMULATIVE_COST_KEYS))
+        return out
+
+    def earlier_usages(self) -> list[Usage]:
+        """API usage, subagents included, from before the run the cost record covers.
+
+        The record's startTime is when the Claude Code process that wrote it started; a session
+        resumed with `claude --resume` keeps its log, so its earlier runs come before that.
+        Copies of the predecessor's messages at the start of a continuation are left out.
+        """
+        cs = self.cost_state or {}
+        start = cs.get("startTime")
+        if not is_number(start):
+            return []
+        out = [
+            u
+            for mid, u in self.usages.items()
+            if u.ts is not None and u.ts < start and mid not in self.prior_usage_ids
+        ]
+        for sa in self.subagents.values():
+            out.extend(u for u in sa.usages.values() if u.ts is not None and u.ts < start)
+        return out
+
+    def resumed(self) -> bool:
+        """True when the cost record covers only the last of several runs of this session.
+
+        A resumed run starts its totals from zero, so the record sits close to the token
+        estimate of its own run. A record far above that estimate already counts the earlier
+        runs (or a predecessor's), and is left to the other rules.
+        """
+        cs = self.cost_state
+        if not cs or not is_number(cs.get("totalCostUSD")) or not self.earlier_usages():
+            return False
+        start = cs["startTime"]
+        run = sum(
+            estimate_cost(u.model, u.usage)
+            for u in self.all_usages()
+            if u.ts is not None and u.ts >= start
+        )
+        return cs["totalCostUSD"] <= max(run * CUMULATIVE_RATIO, run + CUMULATIVE_MARGIN_USD)
+
+    def cost_basis(self) -> str:
+        """Where cost() comes from.
+
+        "record": Claude Code's cost record; "continued": this continuation's share of its
+        cumulative record. Estimated from tokens: "estimate" (no record), "no_previous" (the
+        predecessor's log or record is gone) or "negative" (the record is below the
+        predecessor's) or "cumulative" (the record is far above the session's own token usage,
+        as when it continues a session nothing names and whose copy went unrecognised). Partly
+        estimated: "resumed" (the record covers only the last run of a resumed session; earlier
+        runs are estimated).
+        """
+        cs = self.cost_state
+        if not cs or not is_number(cs.get("totalCostUSD")):
+            return "estimate"
+        if self.resumed():
+            # Its own process started from zero, so no predecessor totals are in the record.
+            return "resumed"
+        if self.predecessor is None:
+            # Newer continuations rewrite the copied records' session IDs, so nothing in the
+            # log names the predecessor once its own log is gone. The copy may still show.
+            if self.copied_head:
+                return "no_previous"
+            est = self.estimate()
+            if cs["totalCostUSD"] > max(est * CUMULATIVE_RATIO, est + CUMULATIVE_MARGIN_USD):
+                return "cumulative"
+            return "record"
+        prior = self.prior_cost_state
+        if not prior or not is_number(prior.get("totalCostUSD")):
+            return "no_previous"
+        return "negative" if cs["totalCostUSD"] < prior["totalCostUSD"] else "continued"
+
+    def own_lines(self) -> tuple[int | None, int | None]:
+        """(lines added, lines removed) in this session, from its own share of the cost
+        record; None when unknown."""
+        cs = self.own_cost_state() or {}
+        return as_count(cs.get("totalLinesAdded")), as_count(cs.get("totalLinesRemoved"))
+
     def cost(self) -> tuple[float, bool]:
         """(cost USD, estimated?)"""
-        if self.cost_state and isinstance(self.cost_state.get("totalCostUSD"), (int, float)):
-            return float(self.cost_state["totalCostUSD"]), False
+        basis = self.cost_basis()
+        if basis in ("record", "continued"):
+            return float(self.own_cost_state()["totalCostUSD"]), False
+        if basis == "resumed":
+            earlier = sum(estimate_cost(u.model, u.usage) for u in self.earlier_usages())
+            return float(self.cost_state["totalCostUSD"]) + earlier, True
+        return self.estimate(), True
+
+    def estimate(self) -> float:
+        """Cost USD estimated from token usage, subagents included."""
         est = sum(estimate_cost(u.model, u.usage) for u in self.usages.values())
-        est += sum(s.cost() for s in self.subagents.values())
-        return est, True
+        return est + sum(s.cost() for s in self.subagents.values())
 
     def lines_changed(self) -> dict[str, int | None]:
-        """Lines added / removed, from Claude Code's cost record; None when it wrote none."""
-        cs = self.cost_state or {}
-        return {
-            k: v if isinstance(v, int) and not isinstance(v, bool) else None
-            for k, v in (
-                ("lines_added", cs.get("totalLinesAdded")),
-                ("lines_removed", cs.get("totalLinesRemoved")),
-            )
-        }
+        """Lines added / removed in this session; None when unknown."""
+        added, removed = self.own_lines()
+        return {"lines_added": added, "lines_removed": removed}
 
     def models(self) -> list[str]:
         c = Counter(u.model for u in self.usages.values() if u.model)

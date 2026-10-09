@@ -23,6 +23,7 @@ from .parser import (
     classify_user,
     command_text,
     content_text,
+    copied_head_length,
     parse_ts,
     prompt_text,
     tool_result_text,
@@ -30,7 +31,9 @@ from .parser import (
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+# 2: leaves out the copied head of a continued session's log
+# 3: indexes prompts that start with pasted text or come from the desktop app
+SCHEMA_VERSION = 3
 MIN_QUERY = 3  # trigrams: shorter queries cannot match
 # Long texts (file contents, build logs) keep their start and end: an error is usually at the end.
 TEXT_HEAD = 8_000
@@ -309,7 +312,8 @@ class SearchIndex:
                 file_id, _, offset = row
                 if st.st_size > offset:
                     records, end = read_records(path, offset)
-                    rows = self._rows(file_id, records, None if agent_id else session_id)
+                    sid = None if agent_id else session_id
+                    rows = self._rows(file_id, records, sid, offset == 0)
                     if rows:
                         last = conn.execute("SELECT max(id) FROM parts").fetchone()[0] or 0
                         conn.executemany(
@@ -328,13 +332,21 @@ class SearchIndex:
                 raise
 
     @staticmethod
-    def _rows(file_id: int, records: list[dict], session_id: str | None) -> list[tuple]:
-        """`session_id`: for a main transcript, skip records copied from a predecessor."""
+    def _rows(
+        file_id: int, records: list[dict], session_id: str | None, from_start: bool = False
+    ) -> list[tuple]:
+        """`session_id`: for a main transcript, skip records copied from a predecessor.
+
+        `from_start`: `records` start the log. A copy written under the log's own session ID
+        is only recognised then; Claude Code writes it in one go with the first new prompt.
+        """
+        if session_id:
+            records = [r for r in records if r.get("sessionId") in (None, session_id)]
+            if from_start:
+                records = records[copied_head_length(records) :]
         out = []
         seen: set[str] = set()
         for rec in records:
-            if session_id and rec.get("sessionId") not in (None, session_id):
-                continue
             uuid = rec.get("uuid")
             if uuid:
                 if uuid in seen:
