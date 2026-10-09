@@ -1,5 +1,5 @@
 import pytest
-from conftest import BASE, LogBuilder, basic_session, cost_totals
+from conftest import BASE, CWD, LogBuilder, basic_session, continuation, cost_totals, ts
 
 from cc_calendar.logview import build_entries, log_events
 from cc_calendar.parser import (
@@ -383,3 +383,112 @@ def test_compaction_sizes(tmp_path):
     entries = build_entries(b.write(tmp_path / "s.jsonl"), b.sid)
     compact = next(e for e in entries if e.get("event") == "compact")
     assert (compact["pre"], compact["post"], compact["trigger"]) == (167_000, 31_000, "auto")
+
+
+def continued_basic(upto: int | None = None) -> tuple[LogBuilder, LogBuilder]:
+    """basic_session continued in s-new, which adds one turn after the copy.
+
+    Also returns the new turn's records alone, as a log of their own.
+    """
+    prev = basic_session("s-old")
+    nxt = continuation(prev, "s-new", upto)
+    copied = len(nxt.records)
+    nxt.meta("file-history-snapshot", messageId="fh1", snapshot={"timestamp": ts(30)})
+    nxt.prompt(30, "Now the changelog")
+    nxt.tool_use(31, "t-edit", "Edit", {"file_path": f"{CWD}/CHANGES.md"}, msg_id="n1")
+    nxt.tool_result(32, "t-edit", "ok")
+    nxt.assistant(33, [{"type": "text", "text": "Done."}], msg_id="n2", stop_reason="end_turn")
+    nxt.turn_end(33)
+    alone = LogBuilder("s-new")
+    alone.records = nxt.records[copied:]
+    return nxt, alone
+
+
+def counted(s: SessionAcc) -> tuple:
+    return (
+        [p["text"] for p in s.prompts],
+        s.tokens(),
+        s.estimate(),
+        s.commits,
+        dict(s.files),
+        s.marks(),
+        s.segments(15 * MIN),
+        s.density(),
+        [c[1] for c in s.tool_calls],
+    )
+
+
+def test_copy_under_own_session_id_is_not_counted():
+    nxt, alone = continued_basic()
+    s = feed(nxt)
+    assert s.copied_head == 8  # the records with a uuid; the ai-title is not copied
+    assert counted(s) == counted(feed(alone))
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+    assert s.commits == [] and s.state(None)[0] == "done"
+    assert s.cwd == CWD and s.copied_from is None
+
+
+def test_copy_is_told_while_the_log_grows():
+    nxt, alone = continued_basic()
+    s = SessionAcc(session_id="s-new", path="x.jsonl", project_dir="p")
+    for r in nxt.records[:10]:  # the copy, the snapshot and the new prompt
+        s.feed(r)
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+    for r in nxt.records[10:] + nxt.records:  # the rest, then everything again
+        s.feed(r)
+    assert counted(s) == counted(feed(alone))
+
+
+def test_copy_ending_with_a_notification():
+    # The continuation's own first record may be a notification rather than a prompt.
+    nxt, _ = continued_basic()
+    first = next(i for i, r in enumerate(nxt.records) if r.get("timestamp") == ts(30))
+    note = "<task-notification>\n<task-id>bg1</task-id>\n<status>completed</status>"
+    rec = {**nxt.records[first], "uuid": "note", "message": {"role": "user", "content": note}}
+    nxt.records.insert(first, rec)
+    s = feed(nxt)
+    assert s.copied_head == 8
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+
+
+def test_ordinary_sessions_have_no_copied_head():
+    b = basic_session()
+    b.prompt(10, "And a licence")
+    b.tool_use(11, "t-sleep", "Bash", {"command": "sleep 9"}, msg_id="m9")
+    b.interrupt(12)
+    b.turn_end(12)
+    b.prompt(13, "Go on")
+    b.turn_end(14)
+    s = feed(b)
+    assert s.copied_head == 0
+    assert [p["text"] for p in s.prompts] == ["Add a README", "And a licence", "Go on"]
+    assert len(s.commits) == 1
+
+
+def test_copy_without_turn_end_or_prompt_ids_is_counted():
+    # Without them nothing tells the copy from the session's own first turn.
+    nxt = continuation(basic_session("s-old"), "s-new", upto=7)  # stops before the turn end
+    nxt.prompt(30, "Now the changelog")
+    s = feed(nxt)
+    assert s.copied_head == 0 and len(s.prompts) == 2
+    nxt, _ = continued_basic()
+    for r in nxt.records:
+        r.pop("promptId", None)
+    s = feed(nxt)
+    assert s.copied_head == 0 and len(s.prompts) == 2
+
+
+def test_log_hides_the_copied_head(tmp_path):
+    nxt, alone = continued_basic()
+    entries = build_entries(nxt.write(tmp_path / "s-new.jsonl"), nxt.sid)
+    assert entries[0] == {
+        "kind": "system",
+        "ts": None,
+        "text": "Continues an earlier session: the 8 records copied from it are not shown",
+        "i": 0,
+    }
+    assert all("README" not in str(e) for e in entries)
+    events = log_events(entries)
+    assert sorted(k for _, _, k in events) == sorted(m[1] for m in feed(nxt).marks())
+    shown = build_entries(alone.write(tmp_path / "alone.jsonl"), alone.sid)
+    assert [e["kind"] for e in entries[1:]] == [e["kind"] for e in shown]

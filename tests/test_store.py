@@ -3,9 +3,10 @@ import os
 import shutil
 
 import pytest
-from conftest import BASE, PROJECT, LogBuilder, cost_totals
+from conftest import BASE, PROJECT, LogBuilder, basic_session, continuation, cost_totals
 
 from cc_calendar import store as store_mod
+from cc_calendar.parser import SessionAcc
 from cc_calendar.pricing import estimate_cost
 from cc_calendar.store import ClaudeDir, Store
 
@@ -297,3 +298,55 @@ def test_live_sessions_without_ps(claude_dir, monkeypatch):
 def test_proc_start_of_this_process():
     start = store_mod._proc_start(os.getpid())
     assert start is None or len(start.split()) == 5  # e.g. "Sun Oct  4 05:53:32 2026"
+
+
+def continued_with_copy(proj) -> tuple[LogBuilder, LogBuilder]:
+    """n0 continued in n1 the newer way: n1's copy of n0 is under n1's own session ID."""
+    prev = basic_session("n0")
+    prev.meta("cost-state", **cost_totals(1.0, 10, 2))
+    prev.meta("continued-in", continuedInSessionId="n1")
+    prev.write(proj / "n0.jsonl")
+    nxt = continuation(prev, "n1")
+    nxt.prompt(30, "Now the changelog")
+    nxt.assistant(31, [{"type": "text", "text": "ok"}], msg_id="n1-m", stop_reason="end_turn")
+    nxt.turn_end(31)
+    nxt.meta("cost-state", **cost_totals(1.5, 14, 3))
+    nxt.write(proj / "n1.jsonl")
+    alone = LogBuilder("n1")
+    alone.records = nxt.records[len(nxt.records) - 4 :]
+    return nxt, alone
+
+
+def test_continued_with_copy_counts_own_work(claude_dir):
+    proj = claude_dir / "projects" / PROJECT
+    _, alone = continued_with_copy(proj)
+    store = Store(claude_dir)
+    store.scan()
+    s = store.sessions["n1"]
+    assert own(store, "n1") == (0.5, "continued", (4, 1))
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+    assert s.commits == [] and s.copied_head == 8
+    assert s.estimate() == pytest.approx(estimate(alone))
+    assert s.marks() == [(s.prompts[0]["ts"], "prompt")]
+    assert len(store.sessions["n0"].commits) == 1
+
+
+def test_continued_with_copy_from_deleted_log(claude_dir):
+    # The copy still shows the session continues another, whose totals its record includes.
+    proj = claude_dir / "projects" / PROJECT
+    _, alone = continued_with_copy(proj)
+    (proj / "n0.jsonl").unlink()
+    store = Store(claude_dir)
+    store.scan()
+    s = store.sessions["n1"]
+    assert s.predecessor is None
+    assert s.cost_basis() == "no_previous" and s.own_lines() == (None, None)
+    assert s.cost() == (pytest.approx(estimate(alone)), True)
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+
+
+def estimate(b: LogBuilder) -> float:
+    s = SessionAcc(b.sid, "x", "p")
+    for r in b.records:
+        s.feed(r)
+    return s.estimate()
