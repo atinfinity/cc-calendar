@@ -149,6 +149,62 @@ def extract_commit_subject(command: str) -> str | None:
     return None
 
 
+class CopiedHead:
+    """Spots the copy of an earlier session that a continued session's log starts with.
+
+    Older Claude Code versions keep the earlier session's ID on the copied records, which tells
+    them apart. Newer ones rewrite it to the new session's, and give every copied user record
+    the prompt ID of the new session's first turn. A user record never shares the prompt ID of a
+    turn that has already ended, so a user record under the log's first prompt ID that follows a
+    `turn_duration` record shows that everything up to that turn end was copied. A copy whose
+    last turn did not end cleanly is not recognised.
+
+    Feed it a log's records in order, leaving out those under another session's ID.
+    """
+
+    def __init__(self) -> None:
+        self.prompt_id: str | None = None
+        self.open = True  # still among the records under the log's first prompt ID
+        self.seen = 0  # records fed
+        self.turn_end: int | None = None  # records fed up to the last turn end among them
+        self.copied = 0  # leading records known to be copied
+        self.uuids: set[str] = set()  # repeated records tell nothing new
+
+    def feed(self, rec: dict) -> bool:
+        """Note the next record; True when it shows that more of the log was copied."""
+        self.seen += 1
+        if not self.open:
+            return False
+        uuid = rec.get("uuid")
+        if uuid:
+            if uuid in self.uuids:
+                return False
+            self.uuids.add(uuid)
+        rtype = rec.get("type")
+        if rtype == "user" and uuid:
+            pid = rec.get("promptId")
+            if self.prompt_id is None and isinstance(pid, str):
+                self.prompt_id = pid
+            elif pid != self.prompt_id or pid is None:
+                self.open, self.uuids = False, set()
+            elif self.turn_end is not None:
+                self.copied, self.turn_end = self.turn_end, None
+                return True
+        elif rtype == "system" and rec.get("subtype") == "turn_duration" and self.prompt_id:
+            self.turn_end = self.seen
+        return False
+
+
+def copied_head_length(records: list[dict]) -> int:
+    """How many of `records` (one log's, in order) were copied from the session it continues."""
+    head = CopiedHead()
+    for rec in records:
+        head.feed(rec)
+        if not head.open:
+            break
+    return head.copied
+
+
 @dataclass
 class Usage:
     model: str | None
@@ -232,6 +288,10 @@ class SessionAcc:
     cost_state: dict | None = None
     continued_in: str | None = None
     copied_from: str | None = None  # session whose records this log starts with a copy of
+    # Leading records copied under this session's own ID (see CopiedHead); not counted.
+    copied_head: int = 0
+    head: CopiedHead = field(default_factory=CopiedHead, repr=False)
+    head_tail: list[dict] = field(default_factory=list, repr=False)  # fed since head.turn_end
     # Set by the store: the session this one continues (also when its log is gone) and that
     # session's last cost record, whose totals this session's record starts from.
     predecessor: str | None = None
@@ -266,6 +326,53 @@ class SessionAcc:
         if sid is not None and sid != self.session_id:
             self.copied_from = sid
             return
+        head = self.head
+        if head.open:
+            if head.feed(rec):
+                self._drop_copied_head()
+            if head.turn_end == head.seen:
+                self.head_tail = []
+            elif head.open and head.turn_end is not None:
+                self.head_tail.append(rec)
+            else:
+                self.head_tail = []
+        self._feed(rec)
+
+    # Kept when a copied head is dropped: they describe the session rather than count its work.
+    HEAD_KEEP = (
+        "cwd",
+        "git_branch",
+        "version",
+        "seen_uuids",
+        "ai_title",
+        "agent_name",
+        "last_prompt",
+        "cost_state",
+        "continued_in",
+        "copied_from",
+        "predecessor",
+        "prior_cost_state",
+        "permission_mode",
+        "head",
+    )
+
+    def _drop_copied_head(self) -> None:
+        """Forget what the records before the head's tail added: they were copied from the
+        session this one continues. Then feed the tail again."""
+        tail = self.head_tail
+        fresh = SessionAcc(self.session_id, self.path, self.project_dir, self.source)
+        for name in fresh.__dataclass_fields__:
+            if name not in self.HEAD_KEEP and name != "subagents":
+                setattr(self, name, getattr(fresh, name))
+        # Subagents with a log of their own in this session's directory stay.
+        self.subagents = {k: sa for k, sa in self.subagents.items() if sa.path is not None}
+        self.copied_head = self.head.copied
+        for rec in tail:
+            self.seen_uuids.discard(rec.get("uuid"))
+        for rec in tail:
+            self._feed(rec)
+
+    def _feed(self, rec: dict) -> None:
         uuid = rec.get("uuid")
         if uuid:
             if uuid in self.seen_uuids:
@@ -590,9 +697,11 @@ class SessionAcc:
         cost is below its, or the record is cumulative with no known predecessor) are None.
         """
         cs = self.cost_state
-        if cs is not None and self.cost_basis() == "cumulative":
-            return {**cs, **dict.fromkeys(CUMULATIVE_COST_KEYS)}
-        if cs is None or self.predecessor is None:
+        if cs is None:
+            return None
+        if self.predecessor is None:
+            if self.cost_basis() in ("cumulative", "no_previous"):
+                return {**cs, **dict.fromkeys(CUMULATIVE_COST_KEYS)}
             return cs
         prior = self.prior_cost_state or {}
         out = dict(cs)
@@ -610,14 +719,16 @@ class SessionAcc:
         cumulative record. Estimated from tokens: "estimate" (no record), "no_previous" (the
         predecessor's log or record is gone) or "negative" (the record is below the
         predecessor's) or "cumulative" (the record is far above the session's own token usage,
-        as when it continues a session nothing names).
+        as when it continues a session nothing names and whose copy went unrecognised).
         """
         cs = self.cost_state
         if not cs or not is_number(cs.get("totalCostUSD")):
             return "estimate"
         if self.predecessor is None:
             # Newer continuations rewrite the copied records' session IDs, so nothing in the
-            # log names the predecessor once its own log is gone.
+            # log names the predecessor once its own log is gone. The copy may still show.
+            if self.copied_head:
+                return "no_previous"
             est = self.estimate()
             if cs["totalCostUSD"] > max(est * CUMULATIVE_RATIO, est + CUMULATIVE_MARGIN_USD):
                 return "cumulative"

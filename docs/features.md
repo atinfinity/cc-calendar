@@ -74,8 +74,15 @@
     session's), its cost is estimated from its own token usage and its line counts are not
     shown. The cost tooltip says which applies.
 
-    Newer continuations do not always name the session they continue. So a cost record more than
-    3 times the session's own token estimate, and at least \$1 above it, is also taken to be
+    A continued session's log starts with a copy of the end of the previous session's. That copy
+    is not counted in the continued session: not its requests, tokens, commits, files, marks or
+    active time. Newer Claude Code versions write the copy under the new session's ID, and the
+    copy is recognised by its records' prompt IDs. This works even when the previous session's log
+    is gone, so its share of the cost is then estimated. It does not work when the copied part
+    ends in the middle of a turn.
+
+    In that case, nothing in the log may name the session it continues. So a cost record more
+    than 3 times the session's own token estimate, and at least \$1 above it, is also taken to be
     cumulative and treated the same way. Ordinary records stay well below that.
 
     Treat all costs as rough figures, not billing data. The price table uses Anthropic API list
@@ -131,6 +138,9 @@
       are not loaded (see [Privacy](privacy.md)).
     - Optional thinking and metadata.
     - Drill-down into subagent transcripts.
+    - A continued session's transcript starts after the records copied from the session it
+      continues, with a note saying how many were left out. Those records are in that session's
+      own transcript.
     - A stats panel per transcript, with tokens and cost by model and calls and errors by tool.
       Its active time counts gaps of up to 5 minutes, whatever the calendar's **Split after**
       setting.

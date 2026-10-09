@@ -24,6 +24,9 @@ class LogBuilder:
         self.sid = session_id
         self.records: list[dict] = []
         self._n = 0
+        # Claude Code stamps user records with the ID of the prompt they belong to.
+        self.prompt_id: str | None = None
+        self.next_prompt_id: str | None = None
 
     def _uuid(self) -> str:
         self._n += 1
@@ -39,17 +42,25 @@ class LogBuilder:
             "gitBranch": "main",
             "version": "2.1.0",
         }
+        if rtype == "user" and self.prompt_id:
+            rec["promptId"] = self.prompt_id
         rec.update(extra)
         self.records.append(rec)
         return rec
 
+    def _new_prompt(self) -> None:
+        self.prompt_id = self.next_prompt_id or f"{self.sid}-p{self._n + 1}"
+        self.next_prompt_id = None
+
     def prompt(self, minute: float, text: str) -> dict:
+        self._new_prompt()
         return self._base(
             "user", minute, origin={"kind": "human"}, message={"role": "user", "content": text}
         )
 
     def command(self, minute: float, name: str, args: str = "") -> dict:
         text = f"<command-name>{name}</command-name>\n<command-args>{args}</command-args>"
+        self._new_prompt()
         return self._base(
             "user", minute, origin={"kind": "human"}, message={"role": "user", "content": text}
         )
@@ -138,6 +149,24 @@ class LogBuilder:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("".join(json.dumps(r) + "\n" for r in self.records))
         return path
+
+
+def continuation(prev: LogBuilder, sid: str, upto: int | None = None) -> LogBuilder:
+    """A session continuing `prev` the way newer Claude Code writes it.
+
+    Its log starts with a copy of `prev`'s first `upto` records under its own session ID,
+    every user record's promptId rewritten to that of its own first prompt.
+    """
+    b = LogBuilder(sid)
+    b.next_prompt_id = f"{sid}-first"
+    for r in prev.records[:upto]:
+        if not r.get("uuid"):
+            continue
+        rec = {**json.loads(json.dumps(r)), "sessionId": sid}
+        if rec["type"] == "user":
+            rec["promptId"] = b.next_prompt_id
+        b.records.append(rec)
+    return b
 
 
 def cost_totals(cost: float, added: int, removed: int, duration: int = 1000) -> dict:
