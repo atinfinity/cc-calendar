@@ -21,12 +21,15 @@ uv tool install cc-calendar
 cc-calendar
 ```
 
-Or try it without installing: `uvx cc-calendar`. Update with `uv tool upgrade cc-calendar`.
+Or try it without installing: `uvx cc-calendar`.
 
 With Python 3.12+ already installed, `pipx install cc-calendar` works too.
 
 Installed v0.3.0 or earlier from GitHub? Switch to the PyPI package once with
 `uv tool install --force cc-calendar`; `uv tool upgrade` works from then on.
+
+Update with `uv tool upgrade cc-calendar`, then restart `cc-calendar`. See
+[Update](https://atinfinity.github.io/cc-calendar/getting-started/#update) for uvx, pipx and other installs.
 
 To run it from a checkout:
 
