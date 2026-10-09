@@ -132,12 +132,30 @@ class LogBuilder:
             toolUseResult=tur if tur is not None else {"stdout": output},
         )
 
-    def turn_end(self, minute: float, pending_background: int = 0) -> dict:
+    def turn_end(
+        self, minute: float, pending_background: int = 0, duration: float | None = None
+    ) -> dict:
+        """End a turn; `duration` (minutes) is written as durationMs, as Claude Code does."""
         return self._base(
             "system",
             minute,
             subtype="turn_duration",
             pendingBackgroundAgentCount=pending_background,
+            **({"durationMs": round(duration * 60_000)} if duration is not None else {}),
+        )
+
+    def notification(self, minute: float, task_id: str, status: str = "completed") -> dict:
+        """A background task's result, which starts a turn when Claude was idle."""
+        text = (
+            f"<task-notification><task-id>{task_id}</task-id>"
+            f"<status>{status}</status></task-notification>"
+        )
+        self._new_prompt()
+        return self._base(
+            "user",
+            minute,
+            origin={"kind": "task-notification"},
+            message={"role": "user", "content": text},
         )
 
     def meta(self, rtype: str, **fields) -> dict:
