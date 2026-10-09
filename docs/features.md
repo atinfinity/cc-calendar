@@ -59,6 +59,14 @@
     - calls made inside subagents
     - MCP servers
     - subagent runs by type, with their tokens and cost
+- **Cost breakdown**: the Costs pane splits the displayed range's cost by model and token type:
+    - one stacked bar per model: input, output, cache write and cache read
+    - hover a bar segment for its cost and tokens
+    - subagent requests count under the model they ran on
+    - the week and month views add a row per day, so a spike can be traced to one token type
+
+    It follows the current filters. A session with Claude Code's own cost record keeps that
+    total, split by the estimate's proportions.
 - **Cache efficiency**: each session shows its cache hit rate and roughly how much caching saved.
   Rates below 90% are highlighted.
 

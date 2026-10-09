@@ -18,6 +18,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
 from . import __version__, gitinfo
+from .costs import cost_breakdown
 from .logview import build_entries, find_entries, log_events
 from .notes import NOTE_LIMIT, TAGS_PER_SESSION, Notes, NotesUnavailable
 from .parser import SessionAcc
@@ -158,6 +159,11 @@ def detail(
 class ToolsQuery(BaseModel):
     start: int
     end: int
+    sessions: list[str] = Field(max_length=100_000)
+
+
+class CostsQuery(BaseModel):
+    bounds: list[tuple[int, int]] = Field(min_length=1, max_length=400)  # [start, end) per day
     sessions: list[str] = Field(max_length=100_000)
 
 
@@ -396,6 +402,12 @@ def create_app(
         with store.lock:
             picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
             return tool_usage(picked, q.start, q.end)
+
+    @app.post("/api/costs")
+    def costs(q: CostsQuery) -> dict:
+        with store.lock:
+            picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
+            return cost_breakdown(picked, q.bounds)
 
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:
