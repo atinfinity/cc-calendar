@@ -79,10 +79,13 @@ export function renderOverview(container, visible, { legend, rangeLabel, rangeCo
   const todayKey = new Date().toDateString();
   const tipText = (d, t) => {
     const date = d.toLocaleDateString([], { weekday: "short", year: "numeric", month: "short", day: "numeric" });
-    const commits = t.commits ? ` · ${t.commits} commit${t.commits > 1 ? "s" : ""}` : "";
-    return t.ms || t.cost
-      ? `${date}\n${fmtDuration(t.ms)} active · ${fmtCost(t.cost, t.estimated)}${commits} · ${t.sessions} session${t.sessions > 1 ? "s" : ""}`
-      : `${date}\nNo activity`;
+    // A commit can fall on a day with no active time, e.g. one made just after midnight.
+    const parts = [
+      t.ms || t.cost ? `${fmtDuration(t.ms)} active · ${fmtCost(t.cost, t.estimated)}` : null,
+      t.commits ? commitCount(t.commits) : null,
+      t.sessions ? `${t.sessions} session${t.sessions > 1 ? "s" : ""}` : null,
+    ].filter(Boolean);
+    return `${date}\n${parts.length ? parts.join(" · ") : "No activity"}`;
   };
 
   if (year) {
@@ -92,6 +95,8 @@ export function renderOverview(container, visible, { legend, rangeLabel, rangeCo
   }
   container.scrollTop = 0;
 }
+
+const commitCount = (n) => `${n} commit${n > 1 ? "s" : ""}`;
 
 function renderMonth(days, summary, inRange, level, value, tipText, todayKey) {
   // Top projects per day, by active time.
@@ -113,6 +118,7 @@ function renderMonth(days, summary, inRange, level, value, tipText, todayKey) {
         ? d.toLocaleDateString([], { month: "short", day: "numeric" })
         : String(d.getDate())),
       h("div", { class: "month-total" }, dayTotalLabel(t)),
+      state.heat === "commits" && t.commits ? h("div", { class: "month-total" }, commitCount(t.commits)) : null,
       h("div", { class: "month-projects" },
         ...projects.slice(0, 3).map((r) => h("div", { class: "month-project", title: `${r.name} · ${fmtDuration(r.days[i])}` },
           h("span", { class: "dot", style: { background: state.projectColors.get(r.project) } }), r.name)),

@@ -14,7 +14,8 @@
       default.
 - **Month and year views**: a month calendar and a GitHub-style yearly heatmap, with one cell
   per day.
-    - Cells are shaded by active time, cost or commits; switch with "Shade by".
+    - Cells are shaded by active time, cost or commits; switch with "Shade by". Shaded by commits,
+      month cells also show the day's commit count.
     - Month cells list the day's busiest projects.
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
