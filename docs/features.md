@@ -14,7 +14,7 @@
       default.
 - **Month and year views**: a month calendar and a GitHub-style yearly heatmap, with one cell
   per day.
-    - Cells are shaded by active time or cost; switch with "Shade by".
+    - Cells are shaded by active time, cost or commits; switch with "Shade by".
     - Month cells list the day's busiest projects.
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
@@ -56,6 +56,13 @@
     - calls made inside subagents
     - MCP servers
     - subagent runs by type, with their tokens and cost
+- **Hours of the week**: the Hours pane is a weekday × hour-of-day heatmap of the displayed
+  range, to show when you work with Claude Code.
+    - Cells are shaded by active time, cost or commits, with the same "Shade by" control as the
+      month and year views.
+    - Hover a cell for its totals; each row ends with that weekday's total.
+    - Hours are in the browser's time zone, and weeks start on Monday like the week view.
+    - It follows the current filters.
 - **Cache efficiency**: each session shows its cache hit rate and roughly how much caching saved.
   Rates below 90% are highlighted.
 

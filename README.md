@@ -111,7 +111,7 @@ the logs it covers.
   sessions sit side by side. Click a date in the week view to open that day on its own. Zoom with
   the − / + buttons or Ctrl/⌘ + mouse wheel.
 - **Month and year views** — a month calendar and a GitHub-style yearly heatmap, one cell per day
-  shaded by active time or cost (switch with "Shade by"). Month cells list the day's busiest
+  shaded by active time, cost or commits (switch with "Shade by"). Month cells list the day's busiest
   projects; the year view adds per-month totals. Click a day to open it in the day view, or a
   month total to open that month.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
@@ -124,6 +124,9 @@ the logs it covers.
 - **Tool usage** — the Tools pane aggregates tool calls in the displayed range: most used tools,
   error counts and rates (10% or more is highlighted), calls made inside subagents, MCP servers,
   and subagent runs by type with their tool calls, tokens and cost. It follows the current filters.
+- **Hours of the week** — the Hours pane shades a weekday × hour-of-day grid of the displayed range
+  by active time, cost or commits, so late-night sessions and the busiest weekday stand out. Hover
+  a cell for its totals. Hours are in the browser's time zone; it follows the current filters.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).

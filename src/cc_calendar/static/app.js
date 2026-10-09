@@ -9,6 +9,7 @@ import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
 import { bindShortcuts } from "./shortcuts.js";
 import { renderToolsPane } from "./toolspane.js";
+import { renderHoursPane } from "./hours.js";
 import { closeLog, openLog } from "./transcript.js";
 import { majorChange, readHash, stateHash } from "./urlstate.js";
 import {
@@ -26,7 +27,7 @@ export const state = {
   byId: new Map(),
   view: prefs.get("view", "calendar"),
   span: prefs.get("span", "week"), // "day" | "week" | "month" | "year"
-  heat: prefs.get("heat", "time"), // month and year shading: "time" | "cost"
+  heat: prefs.get("heat", "time"), // month, year and Hours shading: "time" | "cost" | "commits"
   anchor: startOfDay(new Date()), // any day inside the displayed range
   hourPx: prefs.get("hourPx", DEFAULT_HOUR_PX),
   colorBy: prefs.get("colorBy", "project"),
@@ -41,6 +42,7 @@ export const state = {
   listFilter: { ...EMPTY_FILTER, ...prefs.get("listFilter", {}) }, // list view only
   showSummary: prefs.get("summary", false),
   showTools: prefs.get("tools", false),
+  showHours: prefs.get("hours", false),
   appVersion: null, // cc-calendar version reported by the server
   dataVersion: 0, // bumped on every reload so cached aggregates refresh
   showMarks: prefs.get("marks", true),
@@ -407,6 +409,7 @@ function renderMain() {
     renderList(visible);
   }
   renderTools(visible);
+  renderHours(visible);
 }
 
 function renderTools(visible) {
@@ -418,6 +421,12 @@ function renderTools(visible) {
   const end = addDays(days[days.length - 1], 1).getTime();
   const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
   renderToolsPane(pane, { start, end, ids, key: `${start}|${end}|${state.dataVersion}|${ids.join(",")}` });
+}
+
+function renderHours(visible) {
+  const pane = $("hours-pane");
+  pane.hidden = !(state.showHours && state.view === "calendar");
+  if (!pane.hidden) renderHoursPane(pane, visible, { days: rangeDays(), rerender: renderMain });
 }
 
 function renderToolbar() {
@@ -432,6 +441,7 @@ function renderToolbar() {
   $("go-today").textContent = { day: "Today", week: "This week", month: "This month", year: "This year" }[state.span];
   $("summary-toggle").classList.toggle("active", state.showSummary);
   $("tools-toggle").classList.toggle("active", state.showTools);
+  $("hours-toggle").classList.toggle("active", state.showHours);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
 
@@ -691,6 +701,11 @@ function bind() {
   $("tools-toggle").onclick = () => {
     state.showTools = !state.showTools;
     prefs.set("tools", state.showTools);
+    renderAll();
+  };
+  $("hours-toggle").onclick = () => {
+    state.showHours = !state.showHours;
+    prefs.set("hours", state.showHours);
     renderAll();
   };
   $("copy-report").onclick = async () => {

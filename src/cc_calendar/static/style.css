@@ -430,3 +430,13 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .tools-pane td.warn { color: var(--interrupted); font-weight: 600; }
 .usage-bar { display: inline-block; height: 8px; border-radius: 2px; background: var(--accent); vertical-align: middle; }
 .tools-pane .link-btn { margin-top: 6px; }
+
+/* Hours pane: weekday x hour-of-day heatmap */
+.legend.hours-legend { padding: 0 0 8px; }
+.summary table.hours-grid { min-width: 0; border-collapse: separate; border-spacing: 3px; }
+.summary .hours-grid th, .summary .hours-grid td { padding: 0 2px; border: none; }
+.summary .hours-grid th { font-size: 10px; font-weight: 500; text-align: left; background: none; }
+.summary .hours-grid th.hours-hour { width: 22px; }
+.summary .hours-grid td.hours-cell { width: 22px; height: 18px; padding: 0; border-radius: 2px; }
+.hours-cell:hover { outline: 2px solid var(--text); outline-offset: -1px; }
+.summary .hours-grid td.num { padding-left: 8px; font-size: 11px; color: var(--muted); }
