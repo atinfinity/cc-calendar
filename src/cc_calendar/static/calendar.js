@@ -38,7 +38,8 @@ export function renderCalendar(container, visible, { onSelect, onOpenEvent, onTo
     : "");
   summaryPane.hidden = !state.showSummary;
   if (state.showSummary) {
-    renderSummary(summaryPane, summary, days.map((d) => `${d.toLocaleDateString([], { weekday: "short" })} ${d.getDate()}`));
+    renderSummary(summaryPane, summary, days.map((d) => `${d.toLocaleDateString([], { weekday: "short" })} ${d.getDate()}`),
+      { sessions: visible, first: days[0] });
   }
   legend.replaceChildren(...legendItems(inWeek).map((e) =>
     h("span", { title: e.title || "" }, h("span", { class: "dot", style: { background: e.color } }), `${e.label} ${e.n}`)),
