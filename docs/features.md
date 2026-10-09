@@ -15,6 +15,9 @@
       the time; hover the header for how long two or more ran at once.
     - Zoom with the − / + buttons or ++ctrl++ / ++cmd++ + mouse wheel; **Reset** goes back to the
       default.
+
+![Day view with the Parallel column](images/day.png)
+
 - **Month and year views**: a month calendar and a GitHub-style yearly heatmap, with one cell
   per day.
     - Cells are shaded by active time, cost or commits; switch with "Shade by". Shaded by commits,
@@ -31,6 +34,9 @@
       \$X vs plan \$Y".
     - Both are kept in this browser's local storage. The figures follow the current filters.
     - These are rough estimates from the logs at API list prices, not billing data.
+
+![Month view with a monthly budget](images/budget.png)
+
 - **Colors** by project, status, model, effort (the level most requests ran at), source (with
   several config directories), tag or cost
   (< \$1 / \$1–5 / \$5–20 / \$20–50 / ≥ \$50).
@@ -87,6 +93,9 @@
     - Subagents run inside their parent's turn and are not counted again. A continued session's
       copy of the session it continues is not counted.
     - A range counts the parts of the spans inside it; Reply counts the waits that ended in it.
+
+![Summary table with working and waiting time](images/summary.png)
+
 - **Markdown report**: "Copy report" copies the displayed range as Markdown. The report covers:
     - active time and cost per project
     - each session's title and tags (notes are left out)
@@ -110,6 +119,9 @@
     - calls made inside subagents
     - MCP servers
     - subagent runs by type, with their tokens and cost
+
+![Tools pane](images/tools.png)
+
 - **Cost breakdown**: the Costs pane splits the displayed range's cost by model and token type:
     - one stacked bar per model: input, output, cache write and cache read
     - hover a bar segment for its cost and tokens
@@ -129,6 +141,9 @@
     level would write different amounts. A session with Claude Code's own cost record is
     re-priced at the same ratio of recorded to estimated cost, so both figures compare on the
     same footing.
+
+![Costs pane with idle re-cache and what-if](images/costs.png)
+
 - **Most expensive requests**: the **Top requests** pane ranks the prompts sent in the displayed
   range by cost.
     - A prompt's cost covers the requests from it until the next prompt, plus the subagents
@@ -139,6 +154,9 @@
     - Click a row to open the transcript at that prompt.
     - When a session has Claude Code's own cost record, its prompts' estimates are scaled to add
       up to it, so they match the session's cost.
+
+![Top requests pane](images/requests.png)
+
 - **Cost per pull request**: the **Pull requests** pane lists the PRs that sessions in the
   displayed range worked on, with their repository, how many sessions worked on each, active
   time, cost and commits. The project page has the same table for all of the project's sessions.
@@ -157,6 +175,9 @@
     - Click a row to show the session that opened the PR. The detail pane's Pull requests list
       shows each PR's cost and links to the project page's table. **Export** downloads the table
       as CSV or JSON (see [Export format](export.md#pull-requests)).
+
+![Pull requests pane](images/prs.png)
+
 - **Hours of the week**: the Hours pane is a weekday × hour-of-day heatmap of the displayed
   range, to show when you work with Claude Code.
     - Cells are shaded by active time, cost or commits, with the same "Shade by" control as the
@@ -164,6 +185,9 @@
     - Hover a cell for its totals; each row ends with that weekday's total.
     - Hours are in the browser's time zone, and weeks start on Monday like the week view.
     - It follows the current filters.
+
+![Hours pane](images/hours.png)
+
 - **Cache efficiency**: each session shows its cache hit rate and roughly how much caching saved.
   Rates below 90% are highlighted.
 - **Idle re-cache**: the prompt cache expires when no request uses it for a while, so the first
@@ -287,6 +311,8 @@
       context grow this far, and each of those requests costs a few times more. The chart
       draws the 200k line, and the list highlights the session's **Peak ctx**.
     - `/clear` starts a new session, so it ends the chart.
+
+![Friction and context size in the detail pane](images/detail-context.png)
 
 ![Transcript viewer with stats](images/transcript.png)
 
