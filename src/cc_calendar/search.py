@@ -25,12 +25,15 @@ from .parser import (
     content_text,
     copied_head_length,
     parse_ts,
+    prompt_text,
     tool_result_text,
 )
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 2  # 2: leaves out the copied head of a continued session's log
+# 2: leaves out the copied head of a continued session's log
+# 3: indexes prompts that start with pasted text or come from the desktop app
+SCHEMA_VERSION = 3
 MIN_QUERY = 3  # trigrams: shorter queries cannot match
 # Long texts (file contents, build logs) keep their start and end: an error is usually at the end.
 TEXT_HEAD = 8_000
@@ -85,7 +88,7 @@ def record_docs(rec: dict) -> list[tuple[str, str | None, str]]:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
                     out.append(("tool_result", None, tool_result_text(b.get("content"))))
         elif kind == "prompt":
-            out.append(("prompt", None, content_text(content)))
+            out.append(("prompt", None, prompt_text(content)))
         elif kind == "command":
             out.append(("prompt", None, command_text(content_text(content))))
         elif kind == "notification":

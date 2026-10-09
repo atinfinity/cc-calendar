@@ -17,6 +17,7 @@ from .parser import (
     content_text,
     copied_head_length,
     parse_ts,
+    prompt_text,
     tool_result_text,
 )
 from .search import normalize
@@ -166,6 +167,7 @@ def _entries_for(rec: dict, tool_names: dict[str, str], commit_calls: set[str]) 
             return out
         text = content_text(content)
         if kind == "prompt":
+            text = prompt_text(content)
             return [{"kind": "user", "ts": ts, "text": _clip(text), "event": "prompt"}]
         if kind == "command":
             text = command_text(text)

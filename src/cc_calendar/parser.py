@@ -61,6 +61,9 @@ TASK_STATUS_RE = re.compile(r"<status>(.*?)</status>", re.S)
 TASK_SUMMARY_RE = re.compile(r"<summary>(.*?)</summary>", re.S)
 COMMAND_NAME_RE = re.compile(r"<command-name>(.*?)</command-name>", re.S)
 COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
+# Text pasted into the prompt box is wrapped as <pasted_content id="..">..</pasted_content id="..">.
+PASTED_TAG = "<pasted_content"
+PASTED_TAG_RE = re.compile(r"</?pasted_content\b[^>]*>")
 DENSITY_BUCKET_MS = 10 * 60 * 1000
 # Totals in a cost record that a continuation carries over from its predecessor.
 CUMULATIVE_COST_KEYS = ("totalCostUSD", "totalLinesAdded", "totalLinesRemoved", "totalAPIDuration")
@@ -109,10 +112,26 @@ def tool_result_text(content: Any) -> str:
     return ""
 
 
+def prompt_text(content: Any) -> str:
+    """Text of a human prompt, with the pasted-content wrapper tags removed."""
+    return PASTED_TAG_RE.sub("", content_text(content)).strip()
+
+
+def _from_human(rec: dict, kind: str | None) -> bool:
+    if kind is not None:
+        return kind == "human"
+    # The Claude desktop app writes typed prompts without `origin`. Records the
+    # app generates itself (scheduled runs and the like) carry promptSource=system.
+    return rec.get("entrypoint") == "claude-desktop" and rec.get("promptSource") != "system"
+
+
 def classify_user(rec: dict) -> str:
     """Classify a `type=user` record.
 
     Returns one of: prompt, command, tool_result, interrupt, notification, compact, meta.
+    A prompt is text the user wrote: `origin.kind == "human"` (or a desktop-app record,
+    which has no `origin`) whose text is not one of Claude Code's own `<tag>` wrappers.
+    Pasted text is the exception: it starts with `<pasted_content>` but is still a prompt.
     """
     content = rec.get("message", {}).get("content")
     if rec.get("toolUseResult") is not None or (
@@ -129,11 +148,11 @@ def classify_user(rec: dict) -> str:
     kind = origin.get("kind") if isinstance(origin, dict) else None
     if kind == "task-notification" or text.startswith("<task-notification>"):
         return "notification"
-    if rec.get("isMeta") or kind != "human":
+    if rec.get("isMeta") or not _from_human(rec, kind):
         return "meta"
     if text.startswith("<command-message>") or text.startswith("<command-name>"):
         return "command"
-    if text.startswith("<"):
+    if text.startswith("<") and not text.startswith(PASTED_TAG):
         return "meta"
     return "prompt"
 
@@ -449,9 +468,10 @@ class SessionAcc:
         if rec.get("permissionMode"):
             self.permission_mode = rec["permissionMode"]
         if kind in ("prompt", "command"):
-            text = content_text(content).strip()
             if kind == "command":
-                text = command_text(text)
+                text = command_text(content_text(content))
+            else:
+                text = prompt_text(content)
             self.prompts.append({"uuid": rec.get("uuid"), "ts": ts, "text": text, "kind": kind})
             self.last_prompt_ts = ts
             if ts is not None:
