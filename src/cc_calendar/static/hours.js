@@ -23,9 +23,11 @@ function hourCells(sessions, start, end) {
     for (const [a, b] of s.segments) {
       const to = Math.min(b, end);
       for (let t = Math.max(a, start); t < to;) {
-        const hour = new Date(t);
-        hour.setMinutes(0, 0, 0);
-        const next = Math.min(hour.getTime() + HOUR_MS, to);
+        // Step back by the minutes past the local hour rather than setMinutes(0): in the hour
+        // repeated when clocks go back, setMinutes picks the first 1:00 and t never advances.
+        const d = new Date(t);
+        const past = d.getMinutes() * 60_000 + d.getSeconds() * 1000 + d.getMilliseconds();
+        const next = Math.min(t - past + HOUR_MS, to);
         const c = cellAt(t);
         active.set(c, (active.get(c) || 0) + next - t);
         t = next;
