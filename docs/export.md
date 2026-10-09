@@ -51,6 +51,9 @@ CSV and JSON carry the same fields, in this order.
 | `tool_calls` | integer | Tool calls in the main session; subagents' calls are not counted |
 | `tool_errors` | integer | Of `tool_calls`, those that returned an error, including commands that exited non-zero and tool uses you rejected |
 | `friction` | integer | `interrupts` + `api_errors` + `queued_prompts` + `tool_errors`, as in the Friction column |
+| `context_avg` | integer or null | Average context per main-thread request, in tokens: input, cache writes and cache reads. Subagents are not included. `null` without requests |
+| `context_peak` | integer or null | Largest context of a single request, as for `context_avg` |
+| `context_bloated` | boolean | `true` when at least 20 requests each resent more than 200k tokens. See [Context size](features.md#sessions-in-detail) |
 | `tags` | array of strings | Tags you gave the session, in the order shown. In CSV, joined with `;` (tags cannot contain commas). Empty when there are none. See [Notes and tags](getting-started.md#notes-and-tags) |
 | `note` | string | Your note on the session; empty when there is none. Line breaks are kept |
 
@@ -114,6 +117,9 @@ JSON wraps the records in an object that identifies the format:
       "tool_calls": 84,
       "tool_errors": 5,
       "friction": 8,
+      "context_avg": 104512,
+      "context_peak": 166830,
+      "context_bloated": false,
       "tags": ["redesign", "PR review"],
       "note": "Waiting for design sign-off"
     }
@@ -142,4 +148,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
 | 1 | 0.4.0 | Added `source`, `tags` and `note` |
-| 1 | Unreleased | Added `rating`, `idle_recache_usd`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction` |
+| 1 | Unreleased | Added `rating`, `idle_recache_usd`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction`, and `context_avg`, `context_peak` and `context_bloated` |

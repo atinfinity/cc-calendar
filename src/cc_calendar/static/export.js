@@ -50,6 +50,9 @@ export function sessionRecords(rows) {
     tool_calls: s.friction.tool_calls,
     tool_errors: s.friction.tool_errors,
     friction: s.friction.total,
+    context_avg: s.context_avg ?? null,
+    context_peak: s.context_peak ?? null,
+    context_bloated: Boolean(s.context_bloated),
     tags: [...(s.tags || [])],
     note: s.note || "",
   }));
@@ -75,6 +78,7 @@ export const EXPORT_FIELDS = [
   "active_minutes", "span_minutes", "prompts", "tokens", "cost_usd", "cost_estimated",
   "cache_hit_rate", "idle_recache_usd", "model", "effort", "claude_code_version", "commits", "pull_requests", "files_changed", "lines_added", "lines_removed",
   "cost_per_commit", "interrupts", "api_errors", "queued_prompts", "tool_calls", "tool_errors", "friction",
+  "context_avg", "context_peak", "context_bloated",
   "tags", "note",
 ];
 

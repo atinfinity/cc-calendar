@@ -294,6 +294,20 @@ a { color: var(--accent); }
 .list td.warn { color: var(--interrupted); }
 .ctx { display: inline-block; width: 50px; height: 6px; border-radius: 3px; background: var(--border); vertical-align: middle; overflow: hidden; }
 .ctx > i { display: block; height: 100%; background: var(--accent); }
+.ctx-chart { display: block; width: 100%; height: 70px; background: var(--bg-soft); border-radius: 4px; cursor: crosshair; }
+.ctx-area { fill: var(--accent); fill-opacity: 0.18; }
+.ctx-line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.ctx-compact { stroke: #f5a524; stroke-width: 2; }
+.ctx-bloat { stroke: var(--interrupted); stroke-width: 1; stroke-dasharray: 4 3; }
+.ctx-limit { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 2; }
+.ctx-cursor { stroke: var(--text); stroke-width: 1; stroke-opacity: 0.5; }
+.ctx-readout { margin-top: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ctx-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; margin-top: 2px; }
+.ctx-legend .key::before { content: ""; display: inline-block; width: 14px; height: 0; margin-right: 4px; vertical-align: middle; border-top: 2px solid var(--accent); }
+.ctx-legend .key.compact::before { width: 0; height: 10px; border-top: 0; border-left: 2px solid #f5a524; }
+.ctx-legend .key.bloat::before { border-top: 1px dashed var(--interrupted); }
+.ctx-legend .key.limit::before { border-top: 1px dashed var(--muted); }
+.ctx-warn { color: var(--interrupted); font-size: 12px; margin-bottom: 4px; }
 .card { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; }
 .card > h3 { margin: 0; padding: 7px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--bg-soft); border-radius: 8px 8px 0 0; }
 .card > .card-body { padding: 8px 10px; }

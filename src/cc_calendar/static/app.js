@@ -9,6 +9,7 @@ import { overviewRange, renderOverview } from "./overview.js";
 import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
 import { costPer } from "./summary.js";
+import { bloatTitle } from "./contextchart.js";
 import { bindShortcuts } from "./shortcuts.js";
 import { renderRequestsPane } from "./requestspane.js";
 import { renderToolsPane } from "./toolspane.js";
@@ -561,6 +562,8 @@ const LIST_COLUMNS = [
   ["cache", "Cache", (s) => s.cache_hit, "asc", true],
   ["percommit", "$/commit", (s) => costPer(s.cost, (s.commit_list || []).length), "desc", true],
   ["friction", "Friction", (s) => s.friction.total, "desc", true],
+  ["ctxavg", "Avg ctx", (s) => s.context_avg, "desc", true],
+  ["ctxpeak", "Peak ctx", (s) => s.context_peak, "desc", true],
 ];
 
 function listColumns() {
@@ -617,7 +620,7 @@ function renderList(visible) {
     return h("th", {
       class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
       title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : key === "percommit" ? "Sort by cost per commit"
-        : key === "friction" ? "Sort by friction: interrupts, API errors, queued prompts and failed tool calls added up" : `Sort by ${label.toLowerCase()}`,
+        : key === "friction" ? "Sort by friction: interrupts, API errors, queued prompts and failed tool calls added up" : key === "ctxavg" ? "Sort by average context per request" : key === "ctxpeak" ? "Sort by peak context" : `Sort by ${label.toLowerCase()}`,
       onclick: () => setSort(key),
     }, label, sorted ? (state.sort.dir === "asc" ? " ▲" : " ▼") : "");
   });
@@ -651,6 +654,9 @@ function renderList(visible) {
             fmtPct(s.cache_hit)),
           h("td", { class: "num", title: outputTitle(s) }, fmtCost(costPer(s.cost, (s.commit_list || []).length), s.cost_estimated)),
           h("td", { class: "num", title: frictionParts(s.friction).map(([, text]) => text).join(" · ") }, s.friction.total),
+          h("td", { class: "num" }, s.context_avg == null ? "–" : fmtTokens(s.context_avg)),
+          h("td", { class: "num" + (s.context_bloated ? " warn" : ""), title: s.context_bloated ? bloatTitle(s) : null },
+            s.context_peak == null ? "–" : fmtTokens(s.context_peak)),
         ))),
     ),
   );

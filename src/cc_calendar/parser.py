@@ -81,6 +81,14 @@ RUN_COST_KEYS = (*CUMULATIVE_COST_KEYS, "totalDuration")
 CACHE_TTL_5M_MS = 5 * 60 * 1000
 CACHE_TTL_1H_MS = 60 * 60 * 1000
 
+# A session ran on a bloated context when at least BLOAT_REQUESTS of its requests each resent
+# more than BLOAT_TOKENS. Sessions on a 200k-token window compact on their own before that, so
+# only a larger window lets the context grow past it, and every request then costs a few times
+# as much as one on a compacted context.
+BLOAT_TOKENS = 200_000
+BLOAT_REQUESTS = 20
+CONTEXT_POINTS = 400  # most points in the detail pane's context chart
+
 
 def parse_ts(value: Any) -> int | None:
     """ISO-8601 timestamp -> epoch milliseconds."""
@@ -1015,6 +1023,59 @@ class SessionAcc:
         if u is None:
             return None
         return round(100 * u.context / context_window(u.model), 1)
+
+    def context_requests(self) -> list[Usage]:
+        """Main-thread requests that sent context, oldest first.
+
+        Copies of the predecessor's messages at the start of a continuation are left out.
+        """
+        out = [
+            u
+            for mid, u in self.usages.items()
+            if u.ts is not None and u.context > 0 and mid not in self.prior_usage_ids
+        ]
+        return sorted(out, key=lambda u: u.ts)
+
+    def context_stats(self) -> dict:
+        """Average and peak context per request, and whether the session ran bloated."""
+        sizes = [u.context for u in self.context_requests()]
+        over = sum(1 for n in sizes if n > BLOAT_TOKENS)
+        return {
+            "context_avg": round(sum(sizes) / len(sizes)) if sizes else None,
+            "context_peak": max(sizes) if sizes else None,
+            "context_over": over,
+            "context_bloated": over >= BLOAT_REQUESTS,
+        }
+
+    def context_chart(self) -> dict:
+        """Context size per main-thread request for the detail pane's chart.
+
+        Points are [request index, ts, tokens]. A long session is cut down to CONTEXT_POINTS
+        points, keeping the smallest and largest request of each stretch, so peaks and the drop
+        after a compaction stay visible. `compactions` holds the index of the first request
+        after each compaction, in the order of `self.compactions`.
+        """
+        reqs = self.context_requests()
+        n = len(reqs)
+        points = [[i, u.ts, u.context] for i, u in enumerate(reqs)]
+        if n > CONTEXT_POINTS:
+            buckets = CONTEXT_POINTS // 2
+            picked = []
+            for b in range(buckets):
+                chunk = points[b * n // buckets : (b + 1) * n // buckets]
+                lo = min(chunk, key=lambda p: p[2])
+                hi = max(chunk, key=lambda p: p[2])
+                picked += sorted({lo[0]: lo, hi[0]: hi}.values())
+            points = picked
+        times = [u.ts for u in reqs]
+        last = self.last_main_usage
+        return {
+            "points": points,
+            "requests": n,
+            "limit": context_window(last.model) if last else None,
+            "bloat_tokens": BLOAT_TOKENS,
+            "compactions": [min(bisect_right(times, c["ts"]), n) for c in self.compactions],
+        }
 
     def state(self, live: dict | None) -> tuple[str, dict]:
         """Status label plus the individual checks shown in the detail pane."""

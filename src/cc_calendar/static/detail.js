@@ -5,6 +5,7 @@ import {
 } from "./util.js";
 import { notesCard } from "./notes.js";
 import { copyText } from "./report.js";
+import { contextCard } from "./contextchart.js";
 
 const CHECKS = [
   ["turn_ended", "Turn ended", "Claude finished its last reply and was not interrupted with Esc"],
@@ -140,6 +141,7 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
   const f = d.friction;
   parts.push(card("Friction", h("div", { class: "stats" }, frictionParts(f).map(([key, text, hint]) =>
     h("span", { class: "stat" + (f[key] && (key === "interrupts" || key === "api_errors") ? " warn" : ""), title: hint }, text)))));
+  parts.push(contextCard(d));
 
   // Outcomes
   const outcome = [];
