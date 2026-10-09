@@ -5,6 +5,7 @@ import {
 } from "./util.js";
 import { notesCard } from "./notes.js";
 import { copyText } from "./report.js";
+import { contextCard } from "./contextchart.js";
 
 const CHECKS = [
   ["turn_ended", "Turn ended", "Claude finished its last reply and was not interrupted with Esc"],
@@ -118,6 +119,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
     const title = v == null ? `${hint} (unknown)` : hint;
     return h("span", { class: `check-pill ${cls}`, title }, `${mark} ${label}`);
   }))));
+
+  parts.push(contextCard(d));
 
   // Outcomes
   const outcome = [];

@@ -44,6 +44,9 @@ CSV and JSON carry the same fields, in this order.
 | `lines_added` | integer or null | Lines added, from Claude Code's cost record (a continued session's own share); `null` when the session wrote none or its share is unknown |
 | `lines_removed` | integer or null | Lines removed, as for `lines_added` |
 | `cost_per_commit` | number or null | `cost_usd` divided by `commits`, four decimal places; `null` without commits |
+| `context_avg` | integer or null | Average context per main-thread request, in tokens: input, cache writes and cache reads. Subagents are not included. `null` without requests |
+| `context_peak` | integer or null | Largest context of a single request, as for `context_avg` |
+| `context_bloated` | boolean | `true` when at least 20 requests each resent more than 200k tokens. See [Context size](features.md#sessions-in-detail) |
 | `tags` | array of strings | Tags you gave the session, in the order shown. In CSV, joined with `;` (tags cannot contain commas). Empty when there are none. See [Notes and tags](getting-started.md#notes-and-tags) |
 | `note` | string | Your note on the session; empty when there is none. Line breaks are kept |
 
@@ -100,6 +103,9 @@ JSON wraps the records in an object that identifies the format:
       "lines_added": 182,
       "lines_removed": 40,
       "cost_per_commit": 1.7177,
+      "context_avg": 104512,
+      "context_peak": 166830,
+      "context_bloated": false,
       "tags": ["redesign", "PR review"],
       "note": "Waiting for design sign-off"
     }
@@ -128,4 +134,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
 | 1 | 0.4.0 | Added `source`, `tags` and `note` |
-| 1 | Unreleased | Added `rating` |
+| 1 | Unreleased | Added `rating`, `context_avg`, `context_peak` and `context_bloated` |

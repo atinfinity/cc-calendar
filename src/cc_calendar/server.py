@@ -96,6 +96,7 @@ def summary(
         "cost_basis": s.cost_basis(),
         "cache_hit": cache_hit,
         "cache_saved": round(cache_saved, 4),
+        **s.context_stats(),  # context_avg, context_peak, context_over, context_bloated
         "model": models[0] if models else None,
         "effort": s.effort(),
         "version": s.version,  # Claude Code version
@@ -137,6 +138,7 @@ def detail(
             "compactions": s.compactions,
             "permission_mode": s.permission_mode,
             "context_pct": s.context_pct(),
+            "context": s.context_chart(),
             "checks": checks,
             "prompts": prompts,
             "commits": commits,

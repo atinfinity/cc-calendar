@@ -154,6 +154,10 @@ the logs it covers.
 - **Effort and compactions** — the detail pane and transcript stats show the share of requests
   per effort level, and each compaction shows its trigger and context size before → after
   (e.g. `auto · 168k → 32k tokens`) in the mark tooltip, the transcript and the detail pane.
+- **Context size** — the detail pane charts the context each request resent, with compactions
+  marked. The list has **Avg ctx** and **Peak ctx** columns; Peak ctx is highlighted for
+  bloated sessions, where at least 20 requests each resent more than 200k tokens and so cost a
+  few times more than on a compacted context.
 - **Status** — Running and Waiting for live sessions, Done or Interrupted for finished ones, with
   the underlying checks (turn ended, no background work left, clean exit, working tree clean).
 - **Notifications** — turn on "Notify" in the top bar to get a desktop notification when a live
@@ -189,7 +193,7 @@ the logs it covers.
 - **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
   and sort order: start, end, active time, project, source directory, branch, status, prompts,
   tokens, cost, cache hit rate, model, effort, Claude Code version, commits, pull requests, files changed, lines added and removed, cost per
-  commit, tags and note. Times are
+  commit, average and peak context, tags and note. Times are
   ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
   `c` / `l` calendar / list, `/` search, `j` / `k` next / previous session, `Enter` open its

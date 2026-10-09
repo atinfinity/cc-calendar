@@ -9,6 +9,7 @@ import { overviewRange, renderOverview } from "./overview.js";
 import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
 import { costPer } from "./summary.js";
+import { bloatTitle } from "./contextchart.js";
 import { bindShortcuts } from "./shortcuts.js";
 import { renderRequestsPane } from "./requestspane.js";
 import { renderToolsPane } from "./toolspane.js";
@@ -559,6 +560,8 @@ const LIST_COLUMNS = [
   ["cost", "Cost", (s) => s.cost, "desc", true],
   ["cache", "Cache", (s) => s.cache_hit, "asc", true],
   ["percommit", "$/commit", (s) => costPer(s.cost, (s.commit_list || []).length), "desc", true],
+  ["ctxavg", "Avg ctx", (s) => s.context_avg, "desc", true],
+  ["ctxpeak", "Peak ctx", (s) => s.context_peak, "desc", true],
 ];
 
 function listColumns() {
@@ -614,7 +617,7 @@ function renderList(visible) {
     const sorted = state.sort.key === key;
     return h("th", {
       class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
-      title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : key === "percommit" ? "Sort by cost per commit" : `Sort by ${label.toLowerCase()}`,
+      title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : key === "percommit" ? "Sort by cost per commit" : key === "ctxavg" ? "Sort by average context per request" : key === "ctxpeak" ? "Sort by peak context" : `Sort by ${label.toLowerCase()}`,
       onclick: () => setSort(key),
     }, label, sorted ? (state.sort.dir === "asc" ? " ▲" : " ▼") : "");
   });
@@ -647,6 +650,9 @@ function renderList(visible) {
           h("td", { class: "num" + (s.cache_hit != null && s.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(s.cache_hit, s.cache_saved) },
             fmtPct(s.cache_hit)),
           h("td", { class: "num", title: outputTitle(s) }, fmtCost(costPer(s.cost, (s.commit_list || []).length), s.cost_estimated)),
+          h("td", { class: "num" }, s.context_avg == null ? "–" : fmtTokens(s.context_avg)),
+          h("td", { class: "num" + (s.context_bloated ? " warn" : ""), title: s.context_bloated ? bloatTitle(s) : null },
+            s.context_peak == null ? "–" : fmtTokens(s.context_peak)),
         ))),
     ),
   );

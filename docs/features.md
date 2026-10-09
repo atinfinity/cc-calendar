@@ -169,6 +169,15 @@
     - The share of requests at each effort level.
     - Each compaction's trigger and context size before → after, e.g.
       `auto · 168k → 32k tokens`.
+- **Context size**: the detail pane charts the context each request resent (input, cache
+  writes and cache reads) over the session, so you can see where it grew and where it dropped.
+    - Amber lines mark compactions. Hover the chart for a request's time and size.
+    - The model's context limit is drawn at the top when the peak comes near it.
+    - A session is **bloated** when at least 20 requests each resent more than 200k tokens.
+      Sessions on a 200k-token window compact before that, so only a larger window lets the
+      context grow this far, and each of those requests costs a few times more. The chart
+      draws the 200k line, and the list highlights the session's **Peak ctx**.
+    - `/clear` starts a new session, so it ends the chart.
 
 ![Transcript viewer with stats](images/transcript.png)
 
@@ -198,6 +207,8 @@
     - Sort by any column. **$/commit** is the session's cost divided by its commits; sessions
       without commits show `–` and sort last. Its tooltip counts commits, pull requests, edited
       files and lines.
+    - **Avg ctx** and **Peak ctx** are the average and largest context per request. Peak ctx
+      is highlighted for bloated sessions (see **Context size** above).
 - **Project page**: click a project name to open it. Project names can be clicked in the list,
   the Summary table, the detail pane, and the project menu (**Page**). The page covers all time
   and ignores the filters. It shows:
@@ -219,6 +230,7 @@
     - prompts, tokens, cost and cache hit rate
     - model, effort, Claude Code version
     - commits, pull requests, edited files, lines added and removed, and cost per commit
+    - average and peak context per request, and whether the context was bloated
     - tags and note
 
     See [Export format](export.md) for the fields and the JSON envelope.

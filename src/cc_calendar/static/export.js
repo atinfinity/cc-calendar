@@ -43,6 +43,9 @@ export function sessionRecords(rows) {
     lines_added: s.lines_added ?? null,
     lines_removed: s.lines_removed ?? null,
     cost_per_commit: round(costPer(s.cost, (s.commit_list || []).length), 4),
+    context_avg: s.context_avg ?? null,
+    context_peak: s.context_peak ?? null,
+    context_bloated: Boolean(s.context_bloated),
     tags: [...(s.tags || [])],
     note: s.note || "",
   }));
@@ -67,7 +70,7 @@ export const EXPORT_FIELDS = [
   "id", "title", "project", "project_path", "source", "branch", "status", "rating", "start", "end",
   "active_minutes", "span_minutes", "prompts", "tokens", "cost_usd", "cost_estimated",
   "cache_hit_rate", "model", "effort", "claude_code_version", "commits", "pull_requests", "files_changed", "lines_added", "lines_removed",
-  "cost_per_commit", "tags", "note",
+  "cost_per_commit", "context_avg", "context_peak", "context_bloated", "tags", "note",
 ];
 
 // Bump when a field is renamed, removed or changes meaning; adding fields does not need it.

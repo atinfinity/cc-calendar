@@ -3,6 +3,9 @@ from conftest import BASE, CWD, LogBuilder, basic_session, continuation, cost_to
 
 from cc_calendar.logview import build_entries, log_events
 from cc_calendar.parser import (
+    BLOAT_REQUESTS,
+    BLOAT_TOKENS,
+    CONTEXT_POINTS,
     DENSITY_BUCKET_MS,
     SessionAcc,
     classify_user,
@@ -356,6 +359,69 @@ def test_context_pct():
     b = LogBuilder("s")
     b.assistant(0, [], msg_id="m1", usage={"input_tokens": 0, "cache_read_input_tokens": 100_000})
     assert feed(b).context_pct() == 10.0  # 1M-token window
+
+
+def context_session(sizes: list[int], compact_after: int | None = None) -> LogBuilder:
+    """One request per minute resending `sizes[i]` tokens of context, an optional compaction."""
+    b = LogBuilder("s")
+    b.prompt(0, "go")
+    for i, n in enumerate(sizes):
+        usage = {
+            "input_tokens": 10,
+            "cache_creation_input_tokens": 90,
+            "cache_read_input_tokens": n - 100,
+        }
+        b.assistant(i + 1, [], msg_id=f"m{i}", usage=usage)
+        if i == compact_after:
+            meta = {"trigger": "auto", "preTokens": n, "postTokens": 30_000}
+            b._base("system", i + 1.5, subtype="compact_boundary", compactMetadata=meta)
+    return b
+
+
+def test_context_series():
+    b = context_session([50_000, 120_000, 160_000, 30_000, 60_000], compact_after=2)
+    # A response written as two records is still one request.
+    usage = {
+        "input_tokens": 10,
+        "cache_creation_input_tokens": 90,
+        "cache_read_input_tokens": 59_900,
+    }
+    b.assistant(5, [], msg_id="m4", usage=usage, output_tokens=99)
+    s = feed(b)
+    assert s.context_stats() == {
+        "context_avg": 84_000,
+        "context_peak": 160_000,
+        "context_over": 0,
+        "context_bloated": False,
+    }
+    chart = s.context_chart()
+    assert chart["requests"] == 5
+    assert [p[2] for p in chart["points"]] == [50_000, 120_000, 160_000, 30_000, 60_000]
+    assert chart["points"][0][:2] == [0, T0 + MIN]
+    assert chart["compactions"] == [3]  # the first request after it
+    assert chart["limit"] == 1_000_000 and chart["bloat_tokens"] == BLOAT_TOKENS
+    empty = SessionAcc(session_id="e", path="x", project_dir="p")
+    assert empty.context_stats()["context_peak"] is None
+    assert empty.context_chart()["points"] == []
+
+
+def test_context_bloated():
+    big = BLOAT_TOKENS + 1
+    near = feed(context_session([100_000] + [big] * (BLOAT_REQUESTS - 1)))
+    assert near.context_stats()["context_over"] == BLOAT_REQUESTS - 1
+    assert near.context_stats()["context_bloated"] is False
+    assert feed(context_session([big] * BLOAT_REQUESTS)).context_stats()["context_bloated"]
+
+
+def test_context_chart_downsampled():
+    sizes = [1000 + 100 * i for i in range(1000)]
+    sizes[500] = 900_000  # a lone spike survives
+    chart = feed(context_session(sizes)).context_chart()
+    points = chart["points"]
+    assert chart["requests"] == 1000 and len(points) <= CONTEXT_POINTS
+    assert points[0][0] == 0 and points[-1][0] == 999
+    assert max(p[2] for p in points) == 900_000
+    assert [p[0] for p in points] == sorted({p[0] for p in points})
 
 
 def test_project_is_launch_directory():

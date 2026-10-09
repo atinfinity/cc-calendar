@@ -58,6 +58,9 @@ def test_sessions(client):
     # Output for cost per commit / PR / line.
     assert basic["files_changed"] == 1
     assert basic["pr_list"] == []
+    # Context per request: 100 input + 1000 cache read in each of the three requests.
+    assert (basic["context_avg"], basic["context_peak"]) == (1100, 1100)
+    assert basic["context_bloated"] is False
     assert basic["lines_added"] is None and basic["lines_removed"] is None
     nxt = by_id["s-next"]
     assert nxt["pr_list"] == [{"number": 7, "url": "https://github.com/o/demo/pull/7"}]
@@ -73,6 +76,8 @@ def test_session_detail(client):
     # Commits are attributed to the prompt that preceded them.
     assert d["prompts"][0]["commits"] == [d["commits"][0]["sha"] or "Add README"]
     assert d["checks"]["committed"] is None  # /work/demo is not a git repository here
+    assert d["context"]["requests"] == 3
+    assert [p[2] for p in d["context"]["points"]] == [1100, 1100, 1100]
     sub = client.get("/api/sessions/s-sub").json()
     assert [a["id"] for a in sub["subagents"]] == ["a1"]
     assert sub["subagents"][0]["has_log"] is True
