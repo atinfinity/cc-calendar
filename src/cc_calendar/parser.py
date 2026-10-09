@@ -61,6 +61,9 @@ CUMULATIVE_COST_KEYS = ("totalCostUSD", "totalLinesAdded", "totalLinesRemoved", 
 # continuation's full record is many times its own share.
 CUMULATIVE_RATIO = 3
 CUMULATIVE_MARGIN_USD = 1.0
+# Totals in a cost record that cover only the Claude Code process that wrote it. A resumed
+# session's last record starts again from zero, so these say nothing about its earlier runs.
+RUN_COST_KEYS = (*CUMULATIVE_COST_KEYS, "totalDuration")
 
 
 def parse_ts(value: Any) -> int | None:
@@ -236,6 +239,8 @@ class SessionAcc:
     # session's last cost record, whose totals this session's record starts from.
     predecessor: str | None = None
     prior_cost_state: dict | None = None
+    # API message IDs of the predecessor: a continuation's log may start with copies of them.
+    prior_usage_ids: frozenset[str] = frozenset()
     permission_mode: str | None = None
     last_stop_reason: str | None = None
     last_assistant_ts: int | None = None
@@ -556,12 +561,30 @@ class SessionAcc:
     def cost_density(self) -> dict[int, float]:
         """Estimated cost per DENSITY_BUCKET_MS bucket, subagents included.
 
-        Lets the UI split a session's cost across days; only the proportions are used.
+        Lets the UI split a session's cost across days; only the proportions are used. For a
+        resumed session the run its cost record covers gets the record's cost and the earlier
+        runs their estimate, so earlier days do not take a share of the record.
         """
         out: Counter = Counter()
-        for u in self.all_usages():
-            if u.ts is not None:
+        if self.cost_basis() == "resumed":
+            start = self.cost_state["startTime"]
+            for u in self.earlier_usages():
                 out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
+            run: Counter = Counter()
+            for u in self.all_usages():
+                if u.ts is not None and u.ts >= start:
+                    run[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
+            recorded = float(self.cost_state["totalCostUSD"])
+            total = sum(run.values())
+            if total > 0:
+                for b, c in run.items():
+                    out[b] += recorded * c / total
+            else:
+                out[start // DENSITY_BUCKET_MS] += recorded
+        else:
+            for u in self.all_usages():
+                if u.ts is not None:
+                    out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
         return {b: round(c, 6) for b, c in out.items() if c}
 
     def all_usages(self) -> list[Usage]:
@@ -587,11 +610,15 @@ class SessionAcc:
 
         A continuation's record starts from its predecessor's final totals, so those are
         subtracted. Totals that cannot be told that way (the predecessor's record is gone, the
-        cost is below its, or the record is cumulative with no known predecessor) are None.
+        cost is below its, or the record is cumulative with no known predecessor) are None, as
+        are a resumed session's run totals, which cover only its last run.
         """
         cs = self.cost_state
-        if cs is not None and self.cost_basis() == "cumulative":
+        basis = self.cost_basis() if cs is not None else None
+        if basis == "cumulative":
             return {**cs, **dict.fromkeys(CUMULATIVE_COST_KEYS)}
+        if basis == "resumed":
+            return {**cs, **dict.fromkeys(RUN_COST_KEYS)}
         if cs is None or self.predecessor is None:
             return cs
         prior = self.prior_cost_state or {}
@@ -603,6 +630,44 @@ class SessionAcc:
             out.update(dict.fromkeys(CUMULATIVE_COST_KEYS))
         return out
 
+    def earlier_usages(self) -> list[Usage]:
+        """API usage, subagents included, from before the run the cost record covers.
+
+        The record's startTime is when the Claude Code process that wrote it started; a session
+        resumed with `claude --resume` keeps its log, so its earlier runs come before that.
+        Copies of the predecessor's messages at the start of a continuation are left out.
+        """
+        cs = self.cost_state or {}
+        start = cs.get("startTime")
+        if not is_number(start):
+            return []
+        out = [
+            u
+            for mid, u in self.usages.items()
+            if u.ts is not None and u.ts < start and mid not in self.prior_usage_ids
+        ]
+        for sa in self.subagents.values():
+            out.extend(u for u in sa.usages.values() if u.ts is not None and u.ts < start)
+        return out
+
+    def resumed(self) -> bool:
+        """True when the cost record covers only the last of several runs of this session.
+
+        A resumed run starts its totals from zero, so the record sits close to the token
+        estimate of its own run. A record far above that estimate already counts the earlier
+        runs (or a predecessor's), and is left to the other rules.
+        """
+        cs = self.cost_state
+        if not cs or not is_number(cs.get("totalCostUSD")) or not self.earlier_usages():
+            return False
+        start = cs["startTime"]
+        run = sum(
+            estimate_cost(u.model, u.usage)
+            for u in self.all_usages()
+            if u.ts is not None and u.ts >= start
+        )
+        return cs["totalCostUSD"] <= max(run * CUMULATIVE_RATIO, run + CUMULATIVE_MARGIN_USD)
+
     def cost_basis(self) -> str:
         """Where cost() comes from.
 
@@ -610,11 +675,15 @@ class SessionAcc:
         cumulative record. Estimated from tokens: "estimate" (no record), "no_previous" (the
         predecessor's log or record is gone) or "negative" (the record is below the
         predecessor's) or "cumulative" (the record is far above the session's own token usage,
-        as when it continues a session nothing names).
+        as when it continues a session nothing names). Partly estimated: "resumed" (the record
+        covers only the last run of a resumed session; earlier runs are estimated).
         """
         cs = self.cost_state
         if not cs or not is_number(cs.get("totalCostUSD")):
             return "estimate"
+        if self.resumed():
+            # Its own process started from zero, so no predecessor totals are in the record.
+            return "resumed"
         if self.predecessor is None:
             # Newer continuations rewrite the copied records' session IDs, so nothing in the
             # log names the predecessor once its own log is gone.
@@ -635,8 +704,12 @@ class SessionAcc:
 
     def cost(self) -> tuple[float, bool]:
         """(cost USD, estimated?)"""
-        if self.cost_basis() in ("record", "continued"):
+        basis = self.cost_basis()
+        if basis in ("record", "continued"):
             return float(self.own_cost_state()["totalCostUSD"]), False
+        if basis == "resumed":
+            earlier = sum(estimate_cost(u.model, u.usage) for u in self.earlier_usages())
+            return float(self.cost_state["totalCostUSD"]) + earlier, True
         return self.estimate(), True
 
     def estimate(self) -> float:

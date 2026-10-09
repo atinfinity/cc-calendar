@@ -78,6 +78,14 @@
     3 times the session's own token estimate, and at least \$1 above it, is also taken to be
     cumulative and treated the same way. Ordinary records stay well below that.
 
+    A session resumed with `claude --resume` keeps its log, but its cost record covers only the
+    last run: the totals start again from zero when Claude Code starts. So its cost is that
+    record plus an estimate of the token usage, subagents included, from before the last run
+    started. It is shown with a `~` prefix because part of it is estimated, and the Summary splits
+    it the same way: the days of earlier runs get their estimate and the last run gets the record.
+    Its line counts cover only the last run, so they are not shown. A record far above the last
+    run's own token usage already counts the earlier runs and is used as it is.
+
     Treat all costs as rough figures, not billing data. The price table uses Anthropic API list
     prices as of when it was last updated. It does not know about subscription plans, discounts or
     price changes.

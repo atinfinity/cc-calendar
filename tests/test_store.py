@@ -3,9 +3,10 @@ import os
 import shutil
 
 import pytest
-from conftest import PROJECT, LogBuilder, cost_totals
+from conftest import BASE, PROJECT, LogBuilder, cost_totals
 
 from cc_calendar import store as store_mod
+from cc_calendar.pricing import estimate_cost
 from cc_calendar.store import ClaudeDir, Store
 
 
@@ -114,6 +115,33 @@ def test_continued_cost_below_predecessor(claude_dir):
     s = store.sessions["c1"]
     assert s.cost_basis() == "negative" and s.cost()[1] is True
     assert s.own_lines() == (None, None)
+
+
+@pytest.mark.parametrize("rewritten", [False, True])
+def test_continuation_later_resumed(claude_dir, rewritten):
+    # c1 continues c0, exits, and is resumed later: its last record is that run's alone.
+    proj = claude_dir / "projects" / PROJECT
+    continued_chain(proj, [(1.0, 10, 2), (3.5, 15, 2)])
+    c1 = proj / "c1.jsonl"
+    recs = [json.loads(line) for line in c1.read_text().splitlines()]
+    if rewritten:  # newer continuations copy their predecessor's records under their own ID
+        recs = [{**r, "sessionId": "c1"} for r in recs]
+    resumed = LogBuilder("c1")
+    resumed.prompt(2000, "Resume")
+    resumed.assistant(2001, [], msg_id="c1-r", stop_reason="end_turn")
+    start = int(BASE.timestamp() * 1000) + 1999 * 60_000
+    resumed.meta("cost-state", **cost_totals(0.25, 4, 0), startTime=start)
+    c1.write_text("".join(json.dumps(r) + "\n" for r in [*recs, *resumed.records]))
+    store = Store(claude_dir)
+    store.scan()
+    s = store.sessions["c1"]
+    assert s.predecessor == "c0" and s.cost_basis() == "resumed"
+    # The resumed run's record plus c1's first run, not the copy of c0's request.
+    first_run = s.usages["c1-m"]
+    assert s.earlier_usages() == [first_run]
+    assert s.cost() == (pytest.approx(0.25 + estimate_cost(first_run.model, first_run.usage)), True)
+    assert s.own_lines() == (None, None)
+    assert own(store, "c0") == (1.0, "record", (10, 2))
 
 
 @pytest.mark.parametrize("first", ["c1", "c0"])

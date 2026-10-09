@@ -70,6 +70,7 @@ const COST_BASES = {
   no_previous: "Estimated from token usage, including subagents: this session continues one whose log or cost record is gone, so its own share of Claude Code's cumulative cost record is unknown",
   negative: "Estimated from token usage, including subagents: Claude Code's cost record is below the previous session's, so its own share is unknown",
   cumulative: "Estimated from token usage, including subagents: Claude Code's cost record is far above this session's own usage, so it looks like a continued session's cumulative total whose earlier session is gone",
+  resumed: "Partly estimated: this session was resumed, and Claude Code's cost record covers only its last run. Earlier runs are estimated from token usage, including subagents",
 };
 
 export function costTitle(d) {
