@@ -1,9 +1,10 @@
 // Markdown report of the displayed range, for a standup note or a daily report.
-import { activeMs, summarize } from "./summary.js";
+import { activeMs, fmtDelta, summarize, summarizePrevious } from "./summary.js";
 import { addDays, fmtCost, fmtDuration } from "./util.js";
 
-// `days` are the displayed dates; `label` is the range as shown in the toolbar.
-export function buildReport(visible, days, label) {
+// `days` are the displayed dates; `label` is the range as shown in the toolbar. With `compareSpan`
+// ("day", "week", ...) the totals line is followed by the change from the previous range.
+export function buildReport(visible, days, label, compareSpan = null) {
   const from = days[0].getTime();
   const to = addDays(days[days.length - 1], 1).getTime();
   const sessions = visible
@@ -16,6 +17,16 @@ export function buildReport(visible, days, label) {
     return lines.join("\n") + "\n";
   }
   lines.push(`**${fmtDuration(total.ms)}** active · ${fmtCost(total.cost, total.estimated)} · ${sessions.length} session${sessions.length > 1 ? "s" : ""}`, "");
+  if (compareSpan) {
+    const prev = summarizePrevious(visible, compareSpan, days[0]);
+    const prevSessions = prev.rows.reduce((n, r) => n + r.sessions, 0);
+    lines.push(`vs. previous ${compareSpan}: ${[
+      fmtDelta(total.ms - prev.total.ms, fmtDuration, 30_000),
+      fmtDelta(total.cost - prev.total.cost, (c) => fmtCost(c), 0.005),
+      `${fmtDelta(sessions.length - prevSessions)} sessions`,
+      `${fmtDelta(total.commits - prev.total.commits)} commits`,
+    ].join(" · ")}`, "");
+  }
   for (const r of rows) {
     lines.push(`### ${r.name} (${fmtDuration(r.ms)} · ${fmtCost(r.cost, r.estimated)})`, "");
     for (const s of sessions.filter((x) => x.project === r.project)) {

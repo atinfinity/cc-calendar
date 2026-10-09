@@ -121,6 +121,9 @@ the logs it covers.
   cost per commit; the list has a **$/commit** column and an **Output** filter, so **No output**
   plus a minimum cost finds sessions that cost a lot and produced nothing. The project page adds
   cost per commit and per changed line.
+- **Compare with previous** — the Summary table can show each project's active time, cost,
+  sessions, commits and pull requests next to the previous day, week, month or year, with the
+  change. Projects active in only one of the two ranges are marked new or absent.
 - **Markdown report** — "Copy report" copies the displayed day, week, month or year as Markdown:
   active time and cost per project, each session's title and tags (not notes) and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR

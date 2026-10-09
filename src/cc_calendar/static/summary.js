@@ -1,6 +1,6 @@
 // Active time and cost per day and per project for the displayed range.
 import { projectLink, state } from "./app.js";
-import { RATINGS, fmtCost, fmtDuration, h } from "./util.js";
+import { RATINGS, addDays, fmtCost, fmtDuration, h, prefs } from "./util.js";
 
 const BUCKET_MS = 600_000;
 
@@ -140,15 +140,58 @@ function ratingLine(ratings, total) {
   return h("div", { class: "rating-summary" }, h("span", { class: "muted" }, "By rating:"), ...parts);
 }
 
-export function renderSummary(container, summary, dayLabels) {
+// The range of the same span just before the one starting at `first`: [start, end) as dates.
+// Built from calendar dates rather than a fixed length, so months of any length and DST line up.
+export function previousRange(span, first) {
+  if (span === "year") return [new Date(first.getFullYear() - 1, 0, 1), first];
+  if (span === "month") return [new Date(first.getFullYear(), first.getMonth() - 1, 1), first];
+  return [addDays(first, span === "week" ? -7 : -1), first];
+}
+
+// Totals of the range before the one starting at `first`, from the same (filtered) sessions.
+export function summarizePrevious(sessions, span, first) {
+  const [from, to] = previousRange(span, first).map((d) => d.getTime());
+  return summarize(sessions.filter((s) => s.segments.some(([a, b]) => b >= from && a < to)), [[from, to]]);
+}
+
+// "+1h 5m", "−$2.10", "+3"; "–" when there is no change worth showing.
+export function fmtDelta(d, fmt = String, zero = 0) {
+  if (Math.abs(d) <= zero) return "–";
+  return (d > 0 ? "+" : "−") + fmt(Math.abs(d));
+}
+
+const DELTAS = [
+  ["ms", "Active time", fmtDuration, 30_000],
+  ["cost", "Cost", (c) => fmtCost(c), 0.005],
+  ["sessions", "Sessions", String, 0],
+  ["commits", "Commits", String, 0],
+  ["prs", "PRs", String, 0],
+];
+
+function rangeName(span, [first, end]) {
+  if (span === "year") return String(first.getFullYear());
+  if (span === "month") return first.toLocaleDateString([], { year: "numeric", month: "long" });
+  const opts = { month: "short", day: "numeric" };
+  if (span === "day") return first.toLocaleDateString([], { weekday: "short", ...opts });
+  return `${first.toLocaleDateString([], opts)} – ${addDays(end, -1).toLocaleDateString([], opts)}`;
+}
+
+// `compare` holds the filtered sessions and the first day of the range, for the comparison with
+// the previous range; without it the table has no toggle.
+export function renderSummary(container, summary, dayLabels, compare) {
   const { days, rows, total } = summary;
+  const head = compare ? compareToggle(container, summary, dayLabels, compare) : null;
+  if (compare && state.compareRanges) {
+    renderComparison(container, head, summary, summarizePrevious(compare.sessions, state.span, compare.first), compare.first);
+    return;
+  }
   if (!rows.length) {
-    container.replaceChildren(h("div", { class: "muted" }, "No activity in this range."));
+    container.replaceChildren(...[head, h("div", { class: "muted" }, "No activity in this range.")].filter(Boolean));
     return;
   }
   const perDay = dayLabels.length > 1;
   const dayCells = (values, cls = "") => (perDay ? values.map((ms) => h("td", { class: "num " + cls }, ms ? fmtDuration(ms) : "")) : []);
-  container.replaceChildren(
+  container.replaceChildren(...(head ? [head] : []),
     h("table", {},
       h("thead", {}, h("tr", {},
         h("th", {}, "Project"),
@@ -191,4 +234,69 @@ function outputCells(r) {
     h("td", { class: "num" }, r.prs || ""),
     h("td", { class: "num" }, per == null ? "–" : fmtCost(per, r.estimated)),
   ];
+}
+
+function compareToggle(container, summary, dayLabels, compare) {
+  const span = state.span;
+  const on = state.compareRanges;
+  const prev = previousRange(span, compare.first);
+  return h("div", { class: "summary-head" },
+    h("button", {
+      class: on ? "active" : "",
+      title: on ? "Show the displayed range on its own" : `Compare each project with the previous ${span}`,
+      onclick: () => {
+        state.compareRanges = !on;
+        prefs.set("compareRanges", state.compareRanges);
+        renderSummary(container, summary, dayLabels, compare);
+      },
+    }, `Compare with previous ${span}`),
+    on ? h("span", { class: "muted" }, `vs. ${rangeName(span, prev)}`) : null);
+}
+
+// Totals per project for the displayed range next to the previous one, with the change. Projects
+// active in only one of the two ranges are marked "new" or "absent".
+function renderComparison(container, head, cur, prev, first) {
+  const prevRows = new Map(prev.rows.map((r) => [r.project, r]));
+  const curProjects = new Set(cur.rows.map((r) => r.project));
+  const pairs = [
+    ...cur.rows.map((r) => [r, prevRows.get(r.project)]),
+    ...prev.rows.filter((r) => !curProjects.has(r.project)).map((r) => [null, r]),
+  ];
+  if (!pairs.length) {
+    container.replaceChildren(head, h("div", { class: "muted" }, "No activity in this range or the previous one."));
+    return;
+  }
+  const span = state.span;
+  const prevName = rangeName(span, previousRange(span, first));
+  const totals = (s) => ({ ...s.total, sessions: s.rows.reduce((n, r) => n + r.sessions, 0) });
+  const cells = (c, p) => DELTAS.flatMap(([key, , fmt, zero]) => {
+    const a = c?.[key] || 0;
+    const b = p?.[key] || 0;
+    const show = key === "cost" ? (v, e) => fmtCost(v, e) : fmt;
+    return [
+      h("td", { class: "num" + (key === "ms" ? " strong" : "") }, c ? show(a, c.estimated) : ""),
+      h("td", { class: "num delta", title: `${prevName}: ${p ? show(b, p.estimated) : "no activity"}` },
+        fmtDelta(a - b, fmt, zero)),
+    ];
+  });
+  const mark = (c, p) => (!p ? h("span", { class: "range-mark", title: `No activity in ${prevName}` }, "new")
+    : !c ? h("span", { class: "range-mark", title: "No activity in this range" }, "absent") : null);
+  container.replaceChildren(head,
+    h("table", { class: "compare" },
+      h("thead", {}, h("tr", {},
+        h("th", {}, "Project"),
+        ...DELTAS.flatMap(([, label]) => [h("th", { class: "num" }, label), h("th", { class: "num", title: `Change from ${prevName}` }, "Δ")]))),
+      h("tbody", {}, pairs.map(([c, p]) => {
+        const r = c || p;
+        return h("tr", { class: c ? "" : "absent" },
+          h("td", {},
+            h("span", { class: "dot", style: { background: state.projectColors.get(r.project) } }), projectLink(r.project, r.name),
+            mark(c, p)),
+          ...cells(c, p));
+      })),
+      h("tfoot", {}, h("tr", {}, h("td", {}, "Total"), ...cells(totals(cur), totals(prev))))),
+    h("div", { class: "muted note" },
+      `Δ is the change from ${prevName}; hover it for the previous value. The same filters apply to both ranges, `
+      + "and a range still in progress is compared with the whole previous one."),
+  );
 }

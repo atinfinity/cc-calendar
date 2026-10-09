@@ -67,7 +67,7 @@ export function renderOverview(container, visible, { legend, rangeLabel, rangeCo
     ? ` · ${fmtDuration(totals.total.ms)} · ${fmtCost(totals.total.cost, totals.total.estimated)}`
     : "");
   summaryPane.hidden = !state.showSummary;
-  if (state.showSummary) renderSummary(summaryPane, totals, [rangeLabel.textContent]);
+  if (state.showSummary) renderSummary(summaryPane, totals, [rangeLabel.textContent], { sessions: visible, first });
 
   const value = heatValue;
   let max = 0;
