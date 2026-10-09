@@ -140,7 +140,7 @@ export function renderProject(container, project, { onBack }) {
   state.highlightPr = null;
   renderPrs(prPane, {
     slot: "project", ids, highlight, scope: "in this project", exportName: "pull-requests",
-    key: `${state.dataVersion}|${state.gap}|${ids.join(",")}`,
+    key: `${state.gap}|${ids.join(",")}`,
   });
 
   const section = (title, body) => h("section", { class: "card" }, h("h3", {}, title), h("div", { class: "card-body" }, body));

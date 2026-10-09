@@ -4,18 +4,24 @@ import { fmtCost, fmtTokens, h } from "./util.js";
 const TOP = 15;
 const HIGH_ERROR_RATE = 0.1;
 let lastKey = null;
+let lastVersion = null;
 let lastData = null;
 let showAll = false;
 
 // One decimal below 10% so that a handful of errors among many calls does not read as 0%.
 const fmtPct = (r) => `${(r * 100).toFixed(r < 0.1 ? 1 : 0)}%`;
 
-// `key` changes when the range, the filtered sessions or the data change.
-export async function renderToolsPane(container, { start, end, ids, key }) {
-  if (key !== lastKey) {
+// `key` changes with the range or the filtered sessions, `version` with each reload of the data.
+export async function renderToolsPane(container, { start, end, ids, key, version }) {
+  if (key !== lastKey || version !== lastVersion) {
+    // A reload keeps the table for the same range and sessions until the new one is in, instead
+    // of flashing "Loading" each time a transcript changes.
+    if (key !== lastKey || !lastData) {
+      lastData = null;
+      container.replaceChildren(h("div", { class: "muted" }, "Loading tool usage…"));
+    }
     lastKey = key;
-    lastData = null;
-    container.replaceChildren(h("div", { class: "muted" }, "Loading tool usage…"));
+    lastVersion = version;
     let data;
     try {
       const res = await fetch("/api/tools", {
@@ -26,10 +32,10 @@ export async function renderToolsPane(container, { start, end, ids, key }) {
       if (!res.ok) throw new Error(String(res.status));
       data = await res.json();
     } catch (e) {
-      if (key === lastKey) container.replaceChildren(h("div", { class: "muted" }, `Could not load tool usage (${e.message}).`));
+      if (key === lastKey && version === lastVersion) container.replaceChildren(h("div", { class: "muted" }, `Could not load tool usage (${e.message}).`));
       return;
     }
-    if (key !== lastKey) return; // a newer request superseded this one
+    if (key !== lastKey || version !== lastVersion) return; // a newer request superseded this one
     lastData = data;
   }
   if (lastData) draw(container, lastData);

@@ -5,15 +5,21 @@ import { fmtCost, fmtTokens, h, idleRecacheTitle, shortModel } from "./util.js";
 const TYPES = [["in", "Input"], ["out", "Output"], ["write", "Cache write"], ["read", "Cache read"]];
 const BAR_PX = 240;
 let lastKey = null;
+let lastVersion = null;
 let lastData = null;
 
 // `bounds` holds one [start, end) per row of the per-day table, or the whole range when
-// `labels` is null. `key` changes when the range, the filtered sessions or the data change.
-export async function renderCostsPane(container, { bounds, labels, ids, key }) {
-  if (key !== lastKey) {
+// `labels` is null. `key` changes with the range or the filtered sessions, `version` with each reload of the data.
+export async function renderCostsPane(container, { bounds, labels, ids, key, version }) {
+  if (key !== lastKey || version !== lastVersion) {
+    // A reload keeps the table for the same range and sessions until the new one is in, instead
+    // of flashing "Loading" each time a transcript changes.
+    if (key !== lastKey || !lastData) {
+      lastData = null;
+      container.replaceChildren(h("div", { class: "muted" }, "Loading cost breakdown…"));
+    }
     lastKey = key;
-    lastData = null;
-    container.replaceChildren(h("div", { class: "muted" }, "Loading cost breakdown…"));
+    lastVersion = version;
     let data;
     try {
       const res = await fetch("/api/costs", {
@@ -24,10 +30,10 @@ export async function renderCostsPane(container, { bounds, labels, ids, key }) {
       if (!res.ok) throw new Error(String(res.status));
       data = await res.json();
     } catch (e) {
-      if (key === lastKey) container.replaceChildren(h("div", { class: "muted" }, `Could not load the cost breakdown (${e.message}).`));
+      if (key === lastKey && version === lastVersion) container.replaceChildren(h("div", { class: "muted" }, `Could not load the cost breakdown (${e.message}).`));
       return;
     }
-    if (key !== lastKey) return; // a newer request superseded this one
+    if (key !== lastKey || version !== lastVersion) return; // a newer request superseded this one
     lastData = data;
   }
   if (lastData) draw(container, lastData, labels);
