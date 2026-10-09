@@ -74,7 +74,15 @@ export function renderOverview(container, visible, { legend, rangeLabel, rangeCo
   days.forEach((d, i) => { if (inRange(d)) max = Math.max(max, value(summary.days[i])); });
   const level = (v) => heatLevel(v, max);
 
-  legend.replaceChildren(...shadeBy(rerender), h("span", { class: "muted" }, "Click a day to open it"));
+  // Keep a budget value being typed when live updates re-render the legend.
+  const focused = legend.contains(document.activeElement) ? document.activeElement : null;
+  legend.replaceChildren(...shadeBy(rerender), h("span", { class: "muted" }, "Click a day to open it"),
+    year ? null : renderBudget(monthPace(totals.total.cost, first, end, new Date()), totals.total.estimated, rerender));
+  const again = focused?.dataset.key && legend.querySelector(`[data-key="${focused.dataset.key}"]`);
+  if (again) {
+    again.value = focused.value;
+    again.focus();
+  }
 
   const todayKey = new Date().toDateString();
   const tipText = (d, t) => {
@@ -94,6 +102,72 @@ export function renderOverview(container, visible, { legend, rangeLabel, rangeCo
     container.replaceChildren(renderMonth(days, summary, inRange, level, value, tipText, todayKey));
   }
   container.scrollTop = 0;
+}
+
+// Spend pace of a month: the daily average over the days elapsed, and for the current month the
+// month-end total at that pace. Past months use their actual total; future months have no figures.
+export function monthPace(cost, first, end, now) {
+  const days = Math.round((end - first) / 86400000);
+  if (now < first) return { status: "future", days };
+  if (now >= end) return { status: "past", days, elapsed: days, spent: cost, daily: cost / days, projected: cost };
+  const elapsed = now.getDate();
+  return { status: "current", days, elapsed, spent: cost, daily: cost / elapsed, projected: (cost / elapsed) * days };
+}
+
+// Monthly budget and plan price, in USD, kept in this browser. 0 means not set.
+const budgetPrefs = () => ({ budget: prefs.get("budget", 0), plan: prefs.get("planPrice", 0) });
+let editingBudget = false;
+
+// One line under the legend: spent, daily average, projection and progress against the budget.
+function renderBudget(pace, estimated, rerender) {
+  const { budget, plan } = budgetPrefs();
+  const toggle = h("button", {
+    class: editingBudget ? "active" : "",
+    title: "Set a monthly budget and plan price, kept in this browser",
+    onclick: () => { editingBudget = !editingBudget; rerender(); },
+  }, "Budget");
+  const cost = (v) => fmtCost(v, estimated);
+  const parts = [];
+  if (pace.status === "future") {
+    parts.push(h("span", { class: "muted" }, "No spending yet"));
+  } else {
+    parts.push(h("span", {}, `Spent ${cost(pace.spent)}`),
+      h("span", { class: "muted" }, `${cost(pace.daily)}/day`));
+    if (pace.status === "current") {
+      parts.push(h("span", { title: `${pace.elapsed} of ${pace.days} days elapsed, at the daily average so far` },
+        `Projected ${cost(pace.projected)}`, h("span", { class: "muted" }, ` (day ${pace.elapsed} of ${pace.days})`)));
+    }
+    if (budget > 0) {
+      const over = pace.projected > budget;
+      const pct = (v) => Math.min(100, (100 * v) / budget);
+      parts.push(h("span", {
+        class: "budget-bar" + (over ? " over" : ""),
+        title: `${Math.round((100 * pace.spent) / budget)}% of the ${fmtCost(budget)} budget spent`
+          + (pace.status === "current" ? `, ${Math.round((100 * pace.projected) / budget)}% projected` : ""),
+      }, h("i", { class: "projected", style: { width: `${pct(pace.projected)}%` } }),
+      h("i", { class: "spent", style: { width: `${pct(pace.spent)}%` } })),
+      h("span", { class: over ? "budget-over" : "muted" }, over
+        ? `${pace.status === "current" ? "Projected over" : "Over"} ${fmtCost(budget)} budget by ${cost(pace.projected - budget)}`
+        : `${Math.round((100 * pace.spent) / budget)}% of ${fmtCost(budget)} budget`));
+    }
+    if (plan > 0) {
+      parts.push(h("span", { class: "muted", title: "What this month's usage would cost at API list prices, against your subscription's monthly price" },
+        pace.status === "current"
+          ? `API equivalent ${cost(pace.projected)} projected vs plan ${fmtCost(plan)}`
+          : `API equivalent ${cost(pace.spent)} vs plan ${fmtCost(plan)}`));
+    }
+  }
+  const field = (key, label, value) => h("label", { class: "muted" }, `${label} $`,
+    h("input", {
+      type: "number", min: 0, step: "any", placeholder: "none", value: value || "", "data-key": key, "aria-label": label,
+      onchange: (e) => { prefs.set(key, Math.max(0, Number(e.target.value) || 0)); rerender(); },
+    }));
+  return h("div", { class: "budget" }, toggle,
+    editingBudget ? h("span", { class: "budget-edit" },
+      field("budget", "Monthly budget", budget), field("planPrice", "Plan price", plan)) : null,
+    ...parts,
+    h("span", { class: "muted budget-note", title: "Costs are estimated from the logs at API list prices; check your Anthropic console or plan for billing" },
+      "Rough estimates, not billing data"));
 }
 
 const commitCount = (n) => `${n} commit${n > 1 ? "s" : ""}`;
