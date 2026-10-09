@@ -57,7 +57,9 @@ replace the `&&` with `;`.
 ## Update
 
 Check which version you have with `cc-calendar --version`; the [releases](https://github.com/atinfinity/cc-calendar/releases)
-list what changed in each one.
+list what changed in each one. When a newer version is out, the top bar shows **vX.Y.Z available**
+next to the version, linking here, and the terminal prints a line about it. cc-calendar checks PyPI
+when it starts and once a day; `--no-update-check` turns this off.
 
 === "Installed with uv tool"
 
@@ -107,6 +109,7 @@ carry over.
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
 | `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](#notes-and-tags)) |
 | `--search-index PATH` | File that keeps the full-text search index (default: see [Full-text search](features.md#full-text-search)) |
+| `--no-update-check` | Do not ask PyPI whether a newer version is out. Setting `CC_CALENDAR_NO_UPDATE_CHECK=1` does the same. See [Privacy](privacy.md) |
 | `--version` | Print the version and exit |
 
 ## Several config directories

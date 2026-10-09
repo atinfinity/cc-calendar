@@ -6,7 +6,9 @@ import asyncio
 import json
 import logging
 import sqlite3
-from contextlib import asynccontextmanager
+import sys
+import threading
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -17,7 +19,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
-from . import __version__, gitinfo
+from . import __version__, gitinfo, update
 from .costs import cost_breakdown
 from .expensive import expensive_requests
 from .logview import build_entries, find_entries, log_events
@@ -244,9 +246,10 @@ def create_app(
     watch: bool = True,
     notes_path: Path | None = None,
     index_path: Path | None = None,
+    update_check: bool = False,
 ) -> FastAPI:
     """`notes_path=None` and `index_path=None` keep notes and the search index in memory only
-    (used by tests)."""
+    (used by tests). `update_check` asks PyPI for the latest release at start and once a day."""
     store = Store(dirs, open_index(index_path))
     notes = Notes(notes_path)
     broadcaster = Broadcaster()
@@ -277,12 +280,42 @@ def create_app(
             if changed or live_changed:
                 broadcaster.publish({"sessions": sorted(changed), "live": live_changed})
 
+    latest: dict[str, str] = {}
+
+    async def fetch_latest() -> str | None:
+        # A daemon thread, not asyncio.to_thread: shutdown would wait for a slow request.
+        loop = asyncio.get_running_loop()
+        done: asyncio.Future[str | None] = loop.create_future()
+
+        def work() -> None:
+            version = update.fetch_latest()
+            with suppress(RuntimeError):  # the loop has closed
+                loop.call_soon_threadsafe(lambda: done.done() or done.set_result(version))
+
+        threading.Thread(target=work, daemon=True).start()
+        return await done
+
+    async def check_updates() -> None:
+        while True:
+            version = await fetch_latest()
+            if version and version != latest.get("version"):
+                latest["version"] = version
+                if update.newer(version):
+                    print(
+                        f"cc-calendar: {version} is available (running {__version__}); "
+                        f"see {update.UPDATE_DOCS}",
+                        file=sys.stderr,
+                    )
+            await asyncio.sleep(update.CHECK_EVERY_S)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await asyncio.to_thread(store.scan)
-        task = asyncio.create_task(watcher()) if watch else None
+        tasks = [asyncio.create_task(watcher())] if watch else []
+        if update_check:
+            tasks.append(asyncio.create_task(check_updates()))
         yield
-        if task:
+        for task in tasks:
             task.cancel()
         if store.index is not None:
             store.index.close()
@@ -321,6 +354,7 @@ def create_app(
             "sessions": items,
             "claude_dirs": [{"name": d.name, "path": str(d.path)} for d in store.dirs],
             "version": __version__,
+            "update": update.newer(latest.get("version")),  # a later release on PyPI
             "tags": notes.all_tags(),
             "notes_error": notes.error,
         }

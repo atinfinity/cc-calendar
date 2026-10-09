@@ -46,6 +46,7 @@ The server binds to `127.0.0.1` on a free port and opens your browser.
 | `--claude-dir [NAME=]PATH` | Read logs from another Claude Code config directory (default `~/.claude`). Repeat it to show several directories in one calendar |
 | `--notes PATH` | File that keeps your session notes and tags (default: see [Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)) |
 | `--search-index PATH` | File that keeps the full-text search index (default: see [Full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search)) |
+| `--no-update-check` | Do not ask PyPI whether a newer version is out. Setting `CC_CALENDAR_NO_UPDATE_CHECK=1` does the same |
 | `--version` | Print the version and exit |
 
 ### Windows
@@ -265,7 +266,7 @@ as $0, so it needs updating when new models ship.
 ## Privacy
 
 Everything stays on your machine. The server listens only on localhost, reads your logs read-only,
-and makes no network requests; images linked in transcripts are shown as links, not loaded. It writes two files: the notes file
+and makes no network requests except asking PyPI for the latest cc-calendar version (`--no-update-check` turns that off); images linked in transcripts are shown as links, not loaded. It writes two files: the notes file
 ([Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)), only when you add or change a note, tag or rating, and the
 [full-text search index](https://atinfinity.github.io/cc-calendar/features/#full-text-search), a cache built from your logs. Requests from other
 websites cannot change either. Commit hashes that do not appear in the
