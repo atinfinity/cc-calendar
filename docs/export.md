@@ -80,7 +80,7 @@ JSON wraps the records in an object that identifies the format:
 {
   "format": "cc-calendar.sessions",
   "schema_version": 1,
-  "generator": "cc-calendar 0.6.0",
+  "generator": "cc-calendar 0.6.1",
   "exported_at": "2026-10-04T10:00:00+09:00",
   "sessions": [
     {
@@ -173,7 +173,7 @@ that went to no PR under `unattributed`:
 {
   "format": "cc-calendar.pull_requests",
   "schema_version": 1,
-  "generator": "cc-calendar 0.6.0",
+  "generator": "cc-calendar 0.6.1",
   "exported_at": "2026-10-04T10:00:00+09:00",
   "pull_requests": [
     {
