@@ -135,6 +135,11 @@ def test_costs(client):
     data = res.json()
     assert [m["model"] for m in data["models"]] == ["claude-sonnet-5-5", "claude-haiku-4-5"]
     assert data["sessions"] == 1 and len(data["days"]) == 1
+    assert {(u["model"], u["agent"]) for u in data["usage"]} == {
+        ("claude-sonnet-5-5", False),
+        ("claude-haiku-4-5", True),
+    }
+    assert data["prices"] and all(len(p["rates"]) == 4 for p in data["prices"])
     assert client.post("/api/costs", json={"bounds": [], "sessions": []}).status_code == 422
 
 

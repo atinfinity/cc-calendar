@@ -90,5 +90,68 @@ function draw(container, d, labels) {
       d.recorded
         ? `${d.recorded} of ${d.sessions} sessions have Claude Code's own cost record; their cost is split by the estimate's proportions.`
         : "Sessions with Claude Code's own cost record are split by the estimate's proportions."),
+    whatIfSection(d),
   );
+}
+
+// What-if: the same tokens re-priced as if one model's requests had run on another.
+// Kept across redraws, so the choice survives a range change.
+const SCOPES = [["both", "main thread and subagents"], ["main", "main thread"], ["agent", "subagents"]];
+const whatIf = { from: null, to: null, scope: "both" };
+
+function whatIfSection(d) {
+  const usage = d.usage || [];
+  if (!usage.length || !d.prices?.length) return null;
+  const byCost = new Map();
+  for (const u of usage) byCost.set(u.model, (byCost.get(u.model) || 0) + u.cost);
+  const sources = [...byCost].sort((a, b) => b[1] - a[1]).map(([m]) => m);
+  if (whatIf.from !== "*" && !sources.includes(whatIf.from)) whatIf.from = sources[0];
+  if (!d.prices.some((p) => p.model === whatIf.to)) {
+    // Default to the newest Sonnet, or the first other model in the price table.
+    const other = d.prices.filter((p) => !whatIf.from.startsWith(p.model));
+    whatIf.to = (other.find((p) => p.model.includes("sonnet")) || other[0] || d.prices[0]).model;
+  }
+  const rates = d.prices.find((p) => p.model === whatIf.to).rates;
+  const hit = (u) => (whatIf.from === "*" || u.model === whatIf.from)
+    && (whatIf.scope === "both" || u.agent === (whatIf.scope === "agent"));
+  const affected = usage.filter(hit);
+  const actual = sum(usage.map((u) => u.cost));
+  const was = sum(affected.map((u) => u.cost));
+  const now = sum(affected.map((u) => sum(u.scaled.map((n, i) => (n * rates[i]) / 1e6))));
+  const estimate = actual - was + now;
+  const diff = Math.abs(estimate - actual) < 0.005 ? 0 : estimate - actual;
+  const sign = diff < 0 ? "−" : diff > 0 ? "+" : "";
+  const tokens = sum(affected.map((u) => sum(u.tokens)));
+
+  const section = h("div", { class: "what-if" });
+  const redraw = () => section.replaceWith(whatIfSection(d));
+  const pick = (key, options) => h("select", { onchange: (e) => { whatIf[key] = e.target.value; redraw(); } },
+    options.map(([value, label, title]) => h("option", { value, title, selected: value === whatIf[key] }, label)));
+  const fmtRate = (r) => `$${r[0]} in / $${r[1]} out per M`;
+  section.append(
+    h("div", { class: "what-if-pick" },
+      h("strong", {}, "What if"), " ",
+      pick("from", [["*", "any model"], ...sources.map((m) => [m, shortModel(m), m])]),
+      " ran as ",
+      pick("to", d.prices.map((p) => [p.model, shortModel(p.model), fmtRate(p.rates)])),
+      " in ",
+      pick("scope", SCOPES)),
+    h("div", { class: "what-if-result" },
+      `Actual ${fmtCost(actual, d.estimated)} · What if `,
+      h("strong", {}, fmtCost(estimate, true)),
+      " · Difference ",
+      h("span", { class: diff < 0 ? "what-if-less" : diff > 0 ? "what-if-more" : "" },
+        `${sign}${fmtCost(Math.abs(diff))}`,
+        actual && diff ? ` (${sign}${Math.abs(Math.round((100 * diff) / actual))}%)` : "")),
+    h("div", { class: "muted note" },
+      affected.length
+        ? `Re-prices ${fmtCost(was, d.estimated)} of the actual cost (${fmtTokens(tokens)} tokens) at ${shortModel(whatIf.to)}'s rates (${fmtRate(rates)}). `
+        : "No requests match this choice. ",
+      "A rough estimate from the same token counts: a different model, or another effort level, "
+        + "would write different amounts, so real token counts would differ.",
+      d.recorded
+        ? " Sessions with Claude Code's own cost record are re-priced at the same ratio of recorded to estimated cost, so both figures are on the same footing."
+        : ""),
+  );
+  return section;
 }

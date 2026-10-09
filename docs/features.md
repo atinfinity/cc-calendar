@@ -68,6 +68,16 @@
 
     It follows the current filters. A session with Claude Code's own cost record keeps that
     total, split by the estimate's proportions.
+- **What-if cost**: the **What if** section at the bottom of the Costs pane re-prices the
+  displayed range as if one model's requests (or all of them) had run on another model:
+    - pick the model, the model to price it as, and main thread, subagents or both
+    - shows the actual cost, the re-priced cost and the difference
+    - target models are those in the price table
+
+    It keeps the same token counts, so it is a rough estimate: a different model or effort
+    level would write different amounts. A session with Claude Code's own cost record is
+    re-priced at the same ratio of recorded to estimated cost, so both figures compare on the
+    same footing.
 - **Most expensive requests**: the **Top requests** pane ranks the prompts sent in the displayed
   range by cost.
     - A prompt's cost covers the requests from it until the next prompt, plus the subagents

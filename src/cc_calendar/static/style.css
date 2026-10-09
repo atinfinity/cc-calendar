@@ -450,6 +450,11 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .cost-out { background: var(--accent); }
 .cost-write { background: #e0a100; }
 .cost-read { background: #9aa4b2; }
+.what-if { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.what-if-pick select { margin: 0 2px; }
+.what-if-result { margin-top: 6px; }
+.what-if-less { color: var(--done); font-weight: 600; }
+.what-if-more { color: var(--interrupted); font-weight: 600; }
 
 /* Most expensive requests pane */
 .requests-pane tbody tr { cursor: pointer; }
