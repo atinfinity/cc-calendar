@@ -1,4 +1,4 @@
-"""Notes, tags and outcome ratings the user attaches to sessions, kept in a JSON file of their own.
+"""Notes, tags and ratings the user attaches to sessions, kept in a JSON file of their own.
 
 The logs stay read-only; besides the full-text search index (a cache), this file is the only
 thing cc-calendar writes. It is keyed by session id, so one file serves every config directory,
@@ -20,7 +20,7 @@ TAG_LIMIT = 40
 TAGS_PER_SESSION = 20
 FILE_VERSION = 1
 # How a session went, as rated by the user; unset when not rated.
-OUTCOMES = ("done", "partial", "failed")
+RATINGS = ("done", "partial", "failed")
 
 
 def default_path() -> Path:
@@ -68,12 +68,12 @@ def clean_tags(tags: list[str], known: dict[str, str]) -> list[str]:
     return out
 
 
-def clean_outcome(outcome: str | None) -> str | None:
-    if not outcome:
+def clean_rating(rating: str | None) -> str | None:
+    if not rating:
         return None
-    if outcome not in OUTCOMES:
-        raise ValueError(f"the outcome must be one of {', '.join(OUTCOMES)}")
-    return outcome
+    if rating not in RATINGS:
+        raise ValueError(f"the rating must be one of {', '.join(RATINGS)}")
+    return rating
 
 
 class Notes:
@@ -122,9 +122,9 @@ class Notes:
             entry["note"] = note if isinstance(note, str) else ""
             tags = tags if isinstance(tags, list) else []
             entry["tags"] = [t for t in tags if isinstance(t, str)]
-            # Older files have no outcome; an unknown one (e.g. from a newer version) is ignored.
-            if entry.get("outcome") not in OUTCOMES:
-                entry.pop("outcome", None)
+            # Older files have no rating; an unknown one (e.g. from a newer version) is ignored.
+            if entry.get("rating") not in RATINGS:
+                entry.pop("rating", None)
             self.entries[sid] = entry
 
     def refresh(self) -> None:
@@ -138,7 +138,7 @@ class Notes:
         return {
             "note": entry.get("note", ""),
             "tags": list(entry.get("tags", [])),
-            "outcome": entry.get("outcome"),
+            "rating": entry.get("rating"),
         }
 
     def all_tags(self) -> list[dict]:
@@ -152,8 +152,8 @@ class Notes:
             for t, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].casefold()))
         ]
 
-    def set(self, sid: str, note: str, tags: list[str], outcome: str | None = None) -> dict:
-        """Replace the session's note and tags. `outcome=None` keeps its outcome; "" clears it."""
+    def set(self, sid: str, note: str, tags: list[str], rating: str | None = None) -> dict:
+        """Replace the session's note and tags. `rating=None` keeps its rating; "" clears it."""
         with self.lock:
             if self._stat() != self._mtime:
                 self._load()
@@ -168,17 +168,17 @@ class Notes:
             }
             note = clean_note(note)
             tags = clean_tags(tags, known)
-            if outcome is None:
-                outcome = self.entries.get(sid, {}).get("outcome")
-            outcome = clean_outcome(outcome)
-            if note or tags or outcome:
+            if rating is None:
+                rating = self.entries.get(sid, {}).get("rating")
+            rating = clean_rating(rating)
+            if note or tags or rating:
                 entry = self.entries.setdefault(sid, {})
                 updated = datetime.now().astimezone().isoformat(timespec="seconds")
                 entry.update(note=note, tags=tags, updated=updated)
-                if outcome:
-                    entry["outcome"] = outcome
+                if rating:
+                    entry["rating"] = rating
                 else:
-                    entry.pop("outcome", None)
+                    entry.pop("rating", None)
             else:
                 self.entries.pop(sid, None)
             self._save()

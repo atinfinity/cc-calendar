@@ -1,11 +1,11 @@
-// Extra filters of the list view: model, branch, source, outcome, tag, date range and cost range.
-import { OUTCOMES, h, shortModel } from "./util.js";
+// Extra filters of the list view: model, branch, source, rating, tag, date range and cost range.
+import { RATINGS, h, shortModel } from "./util.js";
 
-export const EMPTY_FILTER = { model: "", branch: "", source: "", outcome: "", tag: "", from: "", to: "", costMin: "", costMax: "" };
+export const EMPTY_FILTER = { model: "", branch: "", source: "", rating: "", tag: "", from: "", to: "", costMin: "", costMax: "" };
 
 // The tag filter's value for sessions without tags; tags are trimmed, so none starts with a space.
 const UNTAGGED = " untagged";
-// The outcome filter's value for sessions not rated yet.
+// The rating filter's value for sessions not rated yet.
 const UNRATED = "unrated";
 
 // Local midnight at the start of a "YYYY-MM-DD" date input value, plus `days`, in ms.
@@ -20,7 +20,7 @@ export function matchesListFilter(s, f) {
   if (f.model && s.model !== f.model) return false;
   if (f.branch && s.branch !== f.branch) return false;
   if (f.source && s.source !== f.source) return false;
-  if (f.outcome && (s.outcome || UNRATED) !== f.outcome) return false;
+  if (f.rating && (s.rating || UNRATED) !== f.rating) return false;
   if (f.tag === UNTAGGED ? s.tags.length : f.tag && !s.tags.some((t) => t.toLowerCase() === f.tag.toLowerCase())) return false;
   if (f.from && (s.end == null || s.end < midnight(f.from))) return false;
   if (f.to && (s.start == null || s.start >= midnight(f.to, 1))) return false;
@@ -59,16 +59,16 @@ function tagSelect(sessions, f, set) {
       h("option", { value: UNTAGGED, selected: f.tag === UNTAGGED }, `(untagged) (${untagged})`)));
 }
 
-// The outcome choices with their counts, then "(unrated)"; offered once any session is rated.
-function outcomeSelect(sessions, f, set) {
-  if (!f.outcome && !sessions.some((s) => s.outcome)) return null;
+// The rating choices with their counts, then "(unrated)"; offered once any session is rated.
+function ratingSelect(sessions, f, set) {
+  if (!f.rating && !sessions.some((s) => s.rating)) return null;
   const counts = new Map();
-  for (const s of sessions) counts.set(s.outcome || UNRATED, (counts.get(s.outcome || UNRATED) || 0) + 1);
-  const choices = [...OUTCOMES.map(([v, label]) => [v, label]), [UNRATED, "(unrated)"]];
-  return h("label", { class: "muted" }, "Outcome ",
-    h("select", { "data-key": "outcome", onchange: set("outcome") },
-      h("option", { value: "" }, "All outcomes"),
-      ...choices.map(([v, label]) => h("option", { value: v, selected: v === f.outcome }, `${label} (${counts.get(v) || 0})`))));
+  for (const s of sessions) counts.set(s.rating || UNRATED, (counts.get(s.rating || UNRATED) || 0) + 1);
+  const choices = [...RATINGS.map(([v, label]) => [v, label]), [UNRATED, "(unrated)"]];
+  return h("label", { class: "muted" }, "Rating ",
+    h("select", { "data-key": "rating", onchange: set("rating") },
+      h("option", { value: "" }, "All ratings"),
+      ...choices.map(([v, label]) => h("option", { value: v, selected: v === f.rating }, `${label} (${counts.get(v) || 0})`))));
 }
 
 // Renders the filter controls; `sessions` supply the model, branch and source choices.
@@ -91,7 +91,7 @@ export function renderListFilters(container, sessions, f, onChange, { sources = 
     select("model", "Model", "All models", shortModel),
     select("branch", "Branch", "All branches", (v) => v),
     sources ? select("source", "Source", "All sources", (v) => v) : null,
-    outcomeSelect(sessions, f, set),
+    ratingSelect(sessions, f, set),
     tagSelect(sessions, f, set),
     h("label", { class: "muted", title: "Sessions active on any day in this range" }, "Active ",
       input("from", { type: "date", "aria-label": "From date", max: f.to || null }), " – ",

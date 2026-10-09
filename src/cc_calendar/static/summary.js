@@ -1,6 +1,6 @@
 // Active time and cost per day and per project for the displayed range.
 import { projectLink, state } from "./app.js";
-import { OUTCOMES, fmtCost, fmtDuration, h } from "./util.js";
+import { RATINGS, fmtCost, fmtDuration, h } from "./util.js";
 
 const BUCKET_MS = 600_000;
 
@@ -60,18 +60,18 @@ export function summarize(sessions, bounds) {
     cost: days.reduce((n, d) => n + d.cost, 0),
     estimated: days.some((d) => d.estimated),
   };
-  return { days, rows, total, outcomes: byOutcome(sessions, bounds) };
+  return { days, rows, total, ratings: byRating(sessions, bounds) };
 }
 
 export function dayTotalLabel(d) {
   return d.ms || d.cost ? `${fmtDuration(d.ms)} · ${fmtCost(d.cost, d.estimated)}` : "";
 }
 
-// Active time, cost and sessions per rated outcome in the range; unrated sessions are left out.
-function byOutcome(sessions, bounds) {
+// Active time, cost and sessions per rated rating in the range; unrated sessions are left out.
+function byRating(sessions, bounds) {
   const out = new Map();
   for (const s of sessions) {
-    if (!s.outcome) continue;
+    if (!s.rating) continue;
     let ms = 0;
     let cost = 0;
     for (const [from, to] of bounds) {
@@ -79,33 +79,33 @@ function byOutcome(sessions, bounds) {
       cost += costIn(s, from, to);
     }
     if (!ms && !cost) continue;
-    const o = out.get(s.outcome) || { ms: 0, cost: 0, estimated: false, sessions: 0 };
+    const o = out.get(s.rating) || { ms: 0, cost: 0, estimated: false, sessions: 0 };
     o.ms += ms;
     o.cost += cost;
     o.estimated ||= s.cost_estimated;
     o.sessions++;
-    out.set(s.outcome, o);
+    out.set(s.rating, o);
   }
   return out;
 }
 
 // One line under the table: time and cost of the sessions rated done, partial and failed, and of
 // the rest, so it is easy to see what failed sessions cost. Shown once a session in range is rated.
-function outcomeLine(outcomes, total) {
-  if (!outcomes?.size) return null;
+function ratingLine(ratings, total) {
+  if (!ratings?.size) return null;
   let ms = total.ms;
   let cost = total.cost;
   const part = (cls, title, text, o) => h("span", { class: cls, title }, `${text} ${fmtDuration(o.ms)} · ${fmtCost(o.cost, o.estimated)}`);
-  const parts = OUTCOMES.filter(([v]) => outcomes.has(v)).map(([v, label, symbol]) => {
-    const o = outcomes.get(v);
+  const parts = RATINGS.filter(([v]) => ratings.has(v)).map(([v, label, symbol]) => {
+    const o = ratings.get(v);
     ms -= o.ms;
     cost -= o.cost;
-    return part(`outcome-${v}`, `${o.sessions} session${o.sessions > 1 ? "s" : ""} rated ${label.toLowerCase()}`, `${symbol} ${label}`, o);
+    return part(`rating-${v}`, `${o.sessions} session${o.sessions > 1 ? "s" : ""} rated ${label.toLowerCase()}`, `${symbol} ${label}`, o);
   });
   if (ms > 0 || cost > 0.005) {
-    parts.push(part("muted", "Sessions without an outcome", "Unrated", { ms: Math.max(0, ms), cost: Math.max(0, cost), estimated: total.estimated }));
+    parts.push(part("muted", "Sessions without a rating", "Unrated", { ms: Math.max(0, ms), cost: Math.max(0, cost), estimated: total.estimated }));
   }
-  return h("div", { class: "outcome-summary" }, h("span", { class: "muted" }, "By outcome:"), ...parts);
+  return h("div", { class: "rating-summary" }, h("span", { class: "muted" }, "By rating:"), ...parts);
 }
 
 export function renderSummary(container, summary, dayLabels) {
@@ -141,6 +141,6 @@ export function renderSummary(container, summary, dayLabels) {
     h("div", { class: "muted note" },
       "Active time is the drawn bars (split after the idle threshold). A session's cost is divided by when its requests ran."),
   );
-  const line = outcomeLine(summary.outcomes, total);
+  const line = ratingLine(summary.ratings, total);
   if (line) container.lastChild.before(line);
 }

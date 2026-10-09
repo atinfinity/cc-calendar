@@ -11,13 +11,13 @@ def test_set_get_and_file(tmp_path):
     path = tmp_path / "data" / "notes.json"
     notes = Notes(path)
     out = notes.set("s1", "  first line\r\nsecond  ", [" bug ", "Needs   review", "BUG", ""])
-    assert out == {"note": "first line\nsecond", "tags": ["bug", "Needs review"], "outcome": None}
+    assert out == {"note": "first line\nsecond", "tags": ["bug", "Needs review"], "rating": None}
     data = json.loads(path.read_text())
     assert data["version"] == 1
     assert data["sessions"]["s1"]["tags"] == ["bug", "Needs review"]
     assert "updated" in data["sessions"]["s1"]
     assert Notes(path).get("s1") == out
-    assert notes.get("missing") == {"note": "", "tags": [], "outcome": None}
+    assert notes.get("missing") == {"note": "", "tags": [], "rating": None}
     assert list(tmp_path.joinpath("data").iterdir()) == [path]  # no temporary file left
 
 
@@ -40,36 +40,36 @@ def test_empty_entry_is_removed(tmp_path):
     assert json.loads(path.read_text())["sessions"] == {}
 
 
-def test_outcome(tmp_path):
+def test_rating(tmp_path):
     path = tmp_path / "notes.json"
     notes = Notes(path)
     # A rating alone keeps the entry.
-    assert notes.set("s1", "", [], "failed")["outcome"] == "failed"
-    assert json.loads(path.read_text())["sessions"]["s1"]["outcome"] == "failed"
-    assert Notes(path).get("s1")["outcome"] == "failed"
+    assert notes.set("s1", "", [], "failed")["rating"] == "failed"
+    assert json.loads(path.read_text())["sessions"]["s1"]["rating"] == "failed"
+    assert Notes(path).get("s1")["rating"] == "failed"
     # Leaving it out keeps it; an empty string clears it.
-    assert notes.set("s1", "retry", [])["outcome"] == "failed"
-    assert notes.set("s1", "retry", [], "")["outcome"] is None
-    assert "outcome" not in json.loads(path.read_text())["sessions"]["s1"]
+    assert notes.set("s1", "retry", [])["rating"] == "failed"
+    assert notes.set("s1", "retry", [], "")["rating"] is None
+    assert "rating" not in json.loads(path.read_text())["sessions"]["s1"]
     notes.set("s1", "", [], "")
     assert json.loads(path.read_text())["sessions"] == {}
     with pytest.raises(ValueError):
         notes.set("s1", "", [], "great")
 
 
-def test_old_and_unknown_outcomes_load(tmp_path):
+def test_old_and_unknown_ratings_load(tmp_path):
     path = tmp_path / "notes.json"
     sessions = {
         "old": {"note": "from v0.5", "tags": ["x"]},
-        "rated": {"note": "", "tags": [], "outcome": "partial"},
-        "newer": {"note": "y", "tags": [], "outcome": "superb"},
+        "rated": {"note": "", "tags": [], "rating": "partial"},
+        "newer": {"note": "y", "tags": [], "rating": "superb"},
     }
     path.write_text(json.dumps({"version": 1, "sessions": sessions}))
     notes = Notes(path)
     assert notes.error is None
-    assert notes.get("old") == {"note": "from v0.5", "tags": ["x"], "outcome": None}
-    assert notes.get("rated")["outcome"] == "partial"
-    assert notes.get("newer")["outcome"] is None
+    assert notes.get("old") == {"note": "from v0.5", "tags": ["x"], "rating": None}
+    assert notes.get("rated")["rating"] == "partial"
+    assert notes.get("newer")["rating"] is None
 
 
 @pytest.mark.parametrize(
@@ -113,7 +113,7 @@ def client(claude_dir, tmp_path):
 def test_api(client, tmp_path):
     res = client.put("/api/sessions/s-basic/notes", json={"note": "check later", "tags": ["todo"]})
     assert res.status_code == 200
-    assert res.json() == {"note": "check later", "tags": ["todo"], "outcome": None}
+    assert res.json() == {"note": "check later", "tags": ["todo"], "rating": None}
     data = client.get("/api/sessions").json()
     basic = next(s for s in data["sessions"] if s["id"] == "s-basic")
     assert basic["note"] == "check later" and basic["tags"] == ["todo"]
@@ -123,17 +123,17 @@ def test_api(client, tmp_path):
     assert client.get("/api/sessions/s-sub").json()["note"] == ""
 
 
-def test_api_outcome(client):
+def test_api_rating(client):
     url = "/api/sessions/s-basic/notes"
-    res = client.put(url, json={"note": "", "tags": [], "outcome": "done"})
-    assert res.status_code == 200 and res.json()["outcome"] == "done"
+    res = client.put(url, json={"note": "", "tags": [], "rating": "done"})
+    assert res.status_code == 200 and res.json()["rating"] == "done"
     basic = next(s for s in client.get("/api/sessions").json()["sessions"] if s["id"] == "s-basic")
-    assert basic["outcome"] == "done"
-    assert client.get("/api/sessions/s-sub").json()["outcome"] is None
-    # A client that does not know about outcomes leaves the rating alone.
-    assert client.put(url, json={"note": "x", "tags": []}).json()["outcome"] == "done"
-    assert client.put(url, json={"note": "x", "outcome": ""}).json()["outcome"] is None
-    assert client.put(url, json={"outcome": "great"}).status_code == 422
+    assert basic["rating"] == "done"
+    assert client.get("/api/sessions/s-sub").json()["rating"] is None
+    # A client that does not know about ratings leaves the rating alone.
+    assert client.put(url, json={"note": "x", "tags": []}).json()["rating"] == "done"
+    assert client.put(url, json={"note": "x", "rating": ""}).json()["rating"] is None
+    assert client.put(url, json={"rating": "great"}).status_code == 422
 
 
 def test_api_errors(client):
