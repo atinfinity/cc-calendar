@@ -19,6 +19,15 @@
     - Month cells list the day's busiest projects.
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
+- **Monthly budget**: a line under the month view's legend shows the month's spend so far, the
+  daily average and, for the current month, the projected month-end total (the daily average so
+  far, today included, times the days in the month). Past months show their actual total.
+    - Click **Budget** to set a monthly budget. A bar then shows the spend and the projection
+      against it, and turns red when the projection is over budget.
+    - Set a **Plan price** (such as your subscription's monthly price) to compare: "API equivalent
+      \$X vs plan \$Y".
+    - Both are kept in this browser's local storage. The figures follow the current filters.
+    - These are rough estimates from the logs at API list prices, not billing data.
 - **Colors** by project, status, model, effort (the level most requests ran at), source (with
   several config directories), tag or cost
   (< \$1 / \$1–5 / \$5–20 / \$20–50 / ≥ \$50).
@@ -48,6 +57,12 @@
     - **Cost per output**: the Summary table also counts each project's commits and pull requests
       in the range, and divides its cost by the commits (**$/commit**). Pull requests carry no
       time, so they count in any range their session was active in.
+    - **Compare with previous**: the button above the Summary table shows each project's active
+      time, cost, sessions, commits and pull requests next to the previous day, week, month or
+      year, with the change (Δ). Hover a change for the previous value. Projects active in only
+      one of the two ranges are marked **new** or **absent**. The same filters apply to both
+      ranges, and a range still in progress is compared with the whole previous one. "Copy
+      report" then adds a line with the change in the totals.
     - A session's cost is split across days by when its requests ran.
 - **Markdown report**: "Copy report" copies the displayed range as Markdown. The report covers:
     - active time and cost per project

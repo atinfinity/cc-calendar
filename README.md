@@ -114,6 +114,9 @@ the logs it covers.
   shaded by active time, cost or commits (switch with "Shade by"). Month cells list the day's busiest
   projects; the year view adds per-month totals. Click a day to open it in the day view, or a
   month total to open that month.
+- **Monthly budget** — the month view shows the spend so far, the daily average and the projected
+  month-end total, against a monthly budget and an optional plan price ("API equivalent $X vs
+  plan $Y") kept in the browser. Rough estimates, not billing data.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
   table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.
@@ -121,6 +124,9 @@ the logs it covers.
   cost per commit; the list has a **$/commit** column and an **Output** filter, so **No output**
   plus a minimum cost finds sessions that cost a lot and produced nothing. The project page adds
   cost per commit and per changed line.
+- **Compare with previous** — the Summary table can show each project's active time, cost,
+  sessions, commits and pull requests next to the previous day, week, month or year, with the
+  change. Projects active in only one of the two ranges are marked new or absent.
 - **Markdown report** — "Copy report" copies the displayed day, week, month or year as Markdown:
   active time and cost per project, each session's title and tags (not notes) and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR
