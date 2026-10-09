@@ -210,10 +210,19 @@ def same_origin_json(request: Request) -> None:
 class Broadcaster:
     def __init__(self) -> None:
         self.queues: set[asyncio.Queue] = set()
+        self.loop: asyncio.AbstractEventLoop | None = None
+        self.closed = False
 
-    def publish(self, payload: dict) -> None:
+    def publish(self, payload: dict | None) -> None:
         for q in list(self.queues):
             q.put_nowait(payload)
+
+    def close(self) -> None:
+        """End the event streams. The server waits for open connections before it exits,
+        and a stream never ends on its own. Safe to call from a signal handler."""
+        self.closed = True
+        if self.loop is not None and not self.loop.is_closed():
+            self.loop.call_soon_threadsafe(self.publish, None)
 
 
 def open_index(path: Path | None) -> SearchIndex | None:
@@ -289,6 +298,7 @@ def create_app(
 
     app.state.store = store
     app.state.notes = notes
+    app.state.broadcaster = broadcaster
 
     def get_session(sid: str) -> SessionAcc:
         s = store.sessions.get(sid)
@@ -450,16 +460,19 @@ def create_app(
     async def events(request: Request) -> StreamingResponse:
         queue: asyncio.Queue = asyncio.Queue()
         broadcaster.queues.add(queue)
+        broadcaster.loop = asyncio.get_running_loop()
 
         async def stream():
             try:
                 yield "retry: 3000\n\n"
-                while not await request.is_disconnected():
+                while not broadcaster.closed and not await request.is_disconnected():
                     try:
                         payload = await asyncio.wait_for(queue.get(), timeout=15)
                     except TimeoutError:
                         yield ": keepalive\n\n"
                         continue
+                    if payload is None:  # shutting down
+                        break
                     yield f"data: {json.dumps(payload)}\n\n"
             finally:
                 broadcaster.queues.discard(queue)

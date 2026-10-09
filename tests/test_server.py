@@ -1,8 +1,10 @@
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
 from cc_calendar import __version__
-from cc_calendar.server import create_app
+from cc_calendar.server import Broadcaster, create_app
 from cc_calendar.store import ClaudeDir
 
 
@@ -217,3 +219,15 @@ def test_sessions_from_several_dirs(multi_client, claude_dir, laptop_dir):
     log = multi_client.get("/api/sessions/s-laptop/log").json()
     assert log["entries"][0]["kind"] == "user"
     assert multi_client.get("/api/sessions/s-laptop/stats").json()["prompts"] == 1
+
+
+def test_broadcaster_close_ends_streams():
+    async def run():
+        b = Broadcaster()
+        b.loop = asyncio.get_running_loop()
+        q: asyncio.Queue = asyncio.Queue()
+        b.queues.add(q)
+        b.close()
+        return b.closed, await asyncio.wait_for(q.get(), timeout=1)
+
+    assert asyncio.run(run()) == (True, None)
