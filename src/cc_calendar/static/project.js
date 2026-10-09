@@ -1,5 +1,6 @@
 // Project page: everything about one project over all time, ignoring the filters.
 import { select, state } from "./app.js";
+import { renderPrs } from "./prspane.js";
 import { activeMs, costPer, summarize } from "./summary.js";
 import {
   STATUS_LABELS, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, statusColor,
@@ -132,10 +133,21 @@ export function renderProject(container, project, { onBack }) {
       h("td", { class: "muted" }, sessionLink(c.session))))))
     : h("div", { class: "muted" }, "No commits detected.");
 
+  // Filled from the server; the detail pane's PR list asks to select one row.
+  const prPane = h("div", { class: "prs-pane" });
+  const ids = sessions.map((s) => s.id);
+  const highlight = state.highlightPr;
+  state.highlightPr = null;
+  renderPrs(prPane, {
+    slot: "project", ids, highlight, scope: "in this project", exportName: "pull-requests",
+    key: `${state.dataVersion}|${state.gap}|${ids.join(",")}`,
+  });
+
   const section = (title, body) => h("section", { class: "card" }, h("h3", {}, title), h("div", { class: "card-body" }, body));
   container.replaceChildren(head, h("div", { class: "project-body" },
     stats,
     section("Activity by month", monthTable),
+    section("Pull requests", prPane),
     section(`Sessions (${sessions.length})`, sessionTable),
     section(`Commits (${commits.length})`, commitList)));
 }

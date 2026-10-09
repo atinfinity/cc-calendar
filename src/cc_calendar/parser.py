@@ -57,6 +57,11 @@ def effort_mix(levels) -> dict[str, int]:
 COMMIT_OUTPUT_RE = re.compile(r"^\[([^\]\s]+)(?: \([^)]*\))? ([0-9a-f]{7,40})\] (.*)$", re.M)
 COMMIT_MSG_HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?\n(.*?)\n\s*\1", re.S)
 COMMIT_MSG_RE = re.compile(r"""(?:-m|--message)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))""")
+# Title and head branch given to `gh pr create`.
+PR_TITLE_RE = re.compile(
+    r"""(?<!\S)(?:-t|--title)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))"""
+)
+PR_HEAD_RE = re.compile(r"""(?<!\S)(?:-H|--head)(?:=|\s+)["']?([^\s"']+)""")
 TASK_ID_RE = re.compile(r"<task-id>(.*?)</task-id>", re.S)
 TASK_STATUS_RE = re.compile(r"<status>(.*?)</status>", re.S)
 TASK_SUMMARY_RE = re.compile(r"<summary>(.*?)</summary>", re.S)
@@ -177,6 +182,22 @@ def command_text(text: str) -> str:
     if args and args.group(1).strip():
         out += " " + args.group(1).strip()
     return out
+
+
+def pr_create_args(command: str) -> tuple[str | None, str | None]:
+    """(title, head branch) given to `gh pr create` in a shell command; None when not given."""
+    if "pr create" not in command:
+        return None, None
+    title = None
+    if m := PR_TITLE_RE.search(command):
+        title = next(g for g in m.groups() if g is not None).replace('\\"', '"').strip()
+        # A title read from a command substitution is not known from the command alone.
+        if not title or title.startswith("$("):
+            title = None
+    head = None
+    if m := PR_HEAD_RE.search(command):
+        head = m.group(1).rsplit(":", 1)[-1]  # owner:branch for a branch on a fork
+    return title, head
 
 
 def extract_commit_subject(command: str) -> str | None:
@@ -401,7 +422,10 @@ class SessionAcc:
     api_errors: list[int] = field(default_factory=list)
     commits: list[dict] = field(default_factory=list)
     files: Counter = field(default_factory=Counter)
+    # url -> {number, url, repo}, plus `created` (ms), `head` and `title` for PRs opened here.
     prs: dict[str, dict] = field(default_factory=dict)
+    branches: list[list] = field(default_factory=list)  # [ts, git branch] at each change
+    pending_sub_prs: dict[str, str] = field(default_factory=dict)  # tool_use id -> command
     subagents: dict[str, SubagentAcc] = field(default_factory=dict)
     background: dict[str, dict] = field(default_factory=dict)
     pending_tools: dict[str, dict] = field(default_factory=dict)
@@ -479,6 +503,8 @@ class SessionAcc:
             self.cwd = rec["cwd"]
         if rec.get("gitBranch"):
             self.git_branch = rec["gitBranch"]
+            if ts is not None and (not self.branches or self.branches[-1][1] != self.git_branch):
+                self.branches.append([ts, self.git_branch])
         if rec.get("version"):
             self.version = rec["version"]
 
@@ -518,11 +544,13 @@ class SessionAcc:
         elif rtype == "permission-mode":
             self.permission_mode = rec.get("permissionMode")
         elif rtype == "pr-link" and rec.get("prUrl"):
-            self.prs[rec["prUrl"]] = {
-                "number": rec.get("prNumber"),
-                "url": rec["prUrl"],
-                "repo": rec.get("prRepository"),
-            }
+            # Written when a PR is opened, also by a subagent, and again later on.
+            self.note_pr(
+                rec["prUrl"],
+                rec.get("prNumber"),
+                rec.get("prRepository"),
+                created=ts if ts is not None else self.end,
+            )
 
     def _feed_user(self, rec: dict, ts: int | None) -> None:
         if ts is not None:
@@ -566,6 +594,7 @@ class SessionAcc:
     def _feed_tool_results(self, rec: dict, content: Any, ts: int | None) -> None:
         tur = rec.get("toolUseResult")
         blocks = content if isinstance(content, list) else []
+        command = ""
         for b in blocks:
             if not isinstance(b, dict) or b.get("type") != "tool_result":
                 continue
@@ -574,6 +603,8 @@ class SessionAcc:
                 continue
             is_error = bool(b.get("is_error"))
             name = pending["name"]
+            if name == "Bash":
+                command = pending["input"].get("command", "")
             if is_error:
                 self.tool_calls[pending["call"]][2] = True
             if name == "Bash":
@@ -596,9 +627,44 @@ class SessionAcc:
             if isinstance(git_op, dict) and isinstance(git_op.get("pr"), dict):
                 pr = git_op["pr"]
                 if pr.get("url"):
-                    self.prs.setdefault(
-                        pr["url"], {"number": pr.get("number"), "url": pr["url"], "repo": None}
-                    )
+                    self.note_pr(pr["url"], pr.get("number"))
+                    if pr.get("action") == "created":
+                        self.pr_created(pr["url"], ts, command, git_op, rec.get("gitBranch"))
+
+    def note_pr(
+        self, url: str, number: Any, repo: str | None = None, created: int | None = None
+    ) -> dict:
+        pr = self.prs.setdefault(url, {"number": number, "url": url, "repo": repo})
+        pr["number"] = number if number is not None else pr["number"]
+        pr["repo"] = repo or pr["repo"]
+        if created is not None and (pr.get("created") is None or created < pr["created"]):
+            pr["created"] = created
+        return pr
+
+    def pr_created(
+        self,
+        url: str,
+        ts: int | None,
+        command: str,
+        git_op: dict,
+        branch: str | None,
+        agent: str | None = None,
+    ) -> None:
+        """A `gh pr create` that opened `url`: when, its title and its head branch, and the
+        subagent that ran it, if one did.
+
+        The head is the --head given, else the branch pushed with it, else the branch the
+        command ran on.
+        """
+        pr = self.note_pr(url, None, created=ts)
+        if agent:
+            pr["agent"] = agent
+        title, head = pr_create_args(command)
+        push = git_op.get("push")
+        pushed = push.get("branch") if isinstance(push, dict) else None
+        head = head or (pushed if isinstance(pushed, str) else None) or branch or self.git_branch
+        pr["title"] = pr.get("title") or title
+        pr["head"] = pr.get("head") or head
 
     def _bash_result(
         self, pending: dict, tur: Any, output: str, is_error: bool, ts: int | None
@@ -678,6 +744,15 @@ class SessionAcc:
                     i = self.pending_sub_calls.pop(b.get("tool_use_id"), None)
                     if i is not None and b.get("is_error"):
                         self.tool_calls[i][2] = True
+                    command = self.pending_sub_prs.pop(b.get("tool_use_id"), "")
+                    tur = rec.get("toolUseResult")
+                    git_op = tur.get("gitOperation") if isinstance(tur, dict) else None
+                    pr = git_op.get("pr") if isinstance(git_op, dict) else None
+                    # A PR the subagent opened; the main log's pr-link names it as well.
+                    if isinstance(pr, dict) and pr.get("url") and pr.get("action") == "created":
+                        ts = parse_ts(rec.get("timestamp"))
+                        branch = rec.get("gitBranch")
+                        self.pr_created(pr["url"], ts, command, git_op, branch, agent_id)
         if rec.get("type") != "assistant" or msg.get("model") == "<synthetic>":
             return
         ts = parse_ts(rec.get("timestamp"))
@@ -685,6 +760,9 @@ class SessionAcc:
             if isinstance(b, dict) and b.get("type") == "tool_use":
                 self.pending_sub_calls[b.get("id")] = len(self.tool_calls)
                 self.tool_calls.append([ts, b.get("name") or "?", False, agent_id])
+                command = (b.get("input") or {}).get("command")
+                if b.get("name") == "Bash" and isinstance(command, str) and "pr create" in command:
+                    self.pending_sub_prs[b.get("id")] = command
         if ts is not None:
             sa.first_ts = ts if sa.first_ts is None else min(sa.first_ts, ts)
             sa.last_ts = ts if sa.last_ts is None else max(sa.last_ts, ts)
@@ -710,6 +788,13 @@ class SessionAcc:
     @property
     def end(self) -> int | None:
         return max(self.activity) if self.activity else None
+
+    def branch_at(self, ts: int) -> str | None:
+        """The git branch the session was on at `ts` (its first one before that)."""
+        if not self.branches:
+            return self.git_branch
+        i = bisect_right(self.branches, ts, key=lambda b: b[0]) - 1
+        return self.branches[max(i, 0)][1]
 
     def title(self) -> str:
         if self.ai_title:

@@ -12,6 +12,7 @@ import { costPer } from "./summary.js";
 import { bloatTitle } from "./contextchart.js";
 import { bindShortcuts } from "./shortcuts.js";
 import { renderRequestsPane } from "./requestspane.js";
+import { renderPrs as renderPrsPane } from "./prspane.js";
 import { renderToolsPane } from "./toolspane.js";
 import { renderHoursPane } from "./hours.js";
 import { closeLog, openLog } from "./transcript.js";
@@ -49,6 +50,8 @@ export const state = {
   showTools: prefs.get("tools", false),
   showCosts: prefs.get("costs", false),
   showRequests: prefs.get("requests", false),
+  showPrs: prefs.get("prs", false),
+  highlightPr: null, // PR URL to select in the project page's Pull requests table
   showHours: prefs.get("hours", false),
   appVersion: null, // cc-calendar version reported by the server
   dataVersion: 0, // bumped on every reload so cached aggregates refresh
@@ -340,6 +343,7 @@ async function refreshDetail() {
       onOpenLog: (agent, target) => openLog(d, agent, target),
       onSelect: (sid) => select(sid),
       onOpenProject: () => openProject(d.project),
+      onOpenPr: (url) => { state.highlightPr = url; openProject(d.project); },
       searchHit: state.byId.has(d.id) ? searchHitFor(d.id) : null,
       showSource: multiSource(),
       sourcePath,
@@ -418,6 +422,7 @@ function renderMain() {
   renderTools(visible);
   renderCosts(visible);
   renderRequests(visible);
+  renderPrs(visible);
   renderHours(visible);
 }
 
@@ -462,6 +467,21 @@ function renderRequests(visible) {
   });
 }
 
+// PRs that sessions in the displayed range worked on, with their totals over all sessions.
+function renderPrs(visible) {
+  const pane = $("prs-pane");
+  pane.hidden = !(state.showPrs && state.view === "calendar");
+  if (pane.hidden) return;
+  const days = rangeDays();
+  const start = days[0].getTime();
+  const end = addDays(days[days.length - 1], 1).getTime();
+  const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
+  renderPrsPane(pane, {
+    slot: "pane", ids, scope: "worked on in this range", exportName: "pull-requests",
+    key: `${state.dataVersion}|${state.gap}|${ids.join(",")}`,
+  });
+}
+
 function renderHours(visible) {
   const pane = $("hours-pane");
   pane.hidden = !(state.showHours && state.view === "calendar");
@@ -482,6 +502,7 @@ function renderToolbar() {
   $("tools-toggle").classList.toggle("active", state.showTools);
   $("costs-toggle").classList.toggle("active", state.showCosts);
   $("requests-toggle").classList.toggle("active", state.showRequests);
+  $("prs-toggle").classList.toggle("active", state.showPrs);
   $("hours-toggle").classList.toggle("active", state.showHours);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
@@ -774,6 +795,11 @@ function bind() {
   $("requests-toggle").onclick = () => {
     state.showRequests = !state.showRequests;
     prefs.set("requests", state.showRequests);
+    renderAll();
+  };
+  $("prs-toggle").onclick = () => {
+    state.showPrs = !state.showPrs;
+    prefs.set("prs", state.showPrs);
     renderAll();
   };
   $("hours-toggle").onclick = () => {

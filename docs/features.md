@@ -104,6 +104,24 @@
     - Click a row to open the transcript at that prompt.
     - When a session has Claude Code's own cost record, its prompts' estimates are scaled to add
       up to it, so they match the session's cost.
+- **Cost per pull request**: the **Pull requests** pane lists the PRs that sessions in the
+  displayed range worked on, with their repository, how many sessions worked on each, active
+  time, cost and commits. The project page has the same table for all of the project's sessions.
+    - Totals cover every session that worked on a PR, also those outside the range or hidden by
+      the filters. Hover the Sessions cell for each session's share.
+    - A session's requests (subagents included), active time and commits up to a PR it opens go
+      to that PR. A session that opens several PRs gives each the work since the previous one.
+      A continued session counts as part of the session it continues.
+    - Later work on the branch a PR was opened from goes to that PR, also in other sessions, so
+      review fixes are added to it. It must be the same repository, and a session's own earlier
+      PR gives way to the next PR it opens.
+    - A subagent that opened a PR worked for that PR.
+    - Work that matches no PR is shown as unattributed.
+    - A PR is opened where its `gh pr create` result or first PR link is in the log. Titles and
+      branches come from `gh pr create`; PRs opened another way have no title.
+    - Click a row to show the session that opened the PR. The detail pane's Pull requests list
+      shows each PR's cost and links to the project page's table. **Export** downloads the table
+      as CSV or JSON (see [Export format](export.md#pull-requests)).
 - **Hours of the week**: the Hours pane is a weekday × hour-of-day heatmap of the displayed
   range, to show when you work with Claude Code.
     - Cells are shaded by active time, cost or commits, with the same "Shade by" control as the

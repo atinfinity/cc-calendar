@@ -6,6 +6,7 @@ import {
 import { notesCard } from "./notes.js";
 import { copyText } from "./report.js";
 import { contextCard } from "./contextchart.js";
+import { detailPrList } from "./prspane.js";
 
 const CHECKS = [
   ["turn_ended", "Turn ended", "Claude finished its last reply and was not interrupted with Esc"],
@@ -83,7 +84,7 @@ function sourceInfo(d, sourcePath) {
 }
 
 // `searchHit`: where a full-text search matched this session, as an element, or null.
-export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, showSource, sourcePath, notes, searchHit }) {
+export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, onOpenPr, showSource, sourcePath, notes, searchHit }) {
   const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
   const ctx = d.context_pct == null ? null : h("span", { class: "stat", title: "Context used by the latest response" },
     "ctx ", h("span", { class: "ctx" }, h("i", { style: { width: `${Math.min(100, d.context_pct)}%` } })), ` ${d.context_pct}%`);
@@ -155,12 +156,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
   outcome.push(h("details", {},
     h("summary", {}, `Files changed (${d.files.length})`),
     h("ul", { class: "file-list" }, d.files.map((f) => h("li", { title: f.path }, relPath(f.path, d.cwd), f.count > 1 ? h("span", { class: "muted" }, ` ×${f.count}`) : null)))));
-  if (d.prs.length) {
-    outcome.push(h("details", { open: true },
-      h("summary", {}, `Pull requests (${d.prs.length})`),
-      h("ul", { class: "plain-list" }, d.prs.map((p) =>
-        h("li", {}, h("a", { href: p.url, target: "_blank", rel: "noopener" }, p.number ? `#${p.number}` : p.url), p.repo ? ` ${p.repo}` : "")))));
-  }
+  // Hidden until it has a PR: also those the session only worked on (review fixes).
+  outcome.push(detailPrList(d, onOpenPr));
   if (d.cost_state && (d.cost_state.totalLinesAdded || d.cost_state.totalLinesRemoved)) {
     outcome.push(h("div", { class: "muted" }, `+${d.cost_state.totalLinesAdded} / −${d.cost_state.totalLinesRemoved} lines`));
   }

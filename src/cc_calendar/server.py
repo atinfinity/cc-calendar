@@ -23,6 +23,7 @@ from .expensive import expensive_requests
 from .logview import build_entries, find_entries, log_events
 from .notes import NOTE_LIMIT, TAGS_PER_SESSION, Notes, NotesUnavailable
 from .parser import SessionAcc
+from .prcosts import Attribution, pr_costs
 from .search import MIN_QUERY, SearchIndex, snippet
 from .stats import log_stats
 from .store import ClaudeDir, Store
@@ -177,6 +178,11 @@ class CostsQuery(BaseModel):
 
 class RequestsQuery(ToolsQuery):
     limit: int = Field(50, ge=1, le=500)
+
+
+class PrsQuery(BaseModel):
+    sessions: list[str] = Field(max_length=100_000)
+    gap: int = Field(15, ge=1, le=24 * 60)  # minutes, as for /api/sessions
 
 
 class NotesUpdate(BaseModel):
@@ -429,6 +435,14 @@ def create_app(
         with store.lock:
             picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
             return expensive_requests(picked, q.start, q.end, q.limit)
+
+    @app.post("/api/prs")
+    def prs(q: PrsQuery) -> dict:
+        """Pull requests the given sessions worked on, with cost, time and commits over all
+        their sessions, and what the given sessions did for no PR."""
+        with store.lock:
+            attr = Attribution(store.sessions, store.continued_from(), q.gap * 60_000)
+            return pr_costs(attr, q.sessions)
 
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:

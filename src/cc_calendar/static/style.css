@@ -494,6 +494,15 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .requests-pane .kind { font-size: 10px; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 4px; color: var(--muted); }
 .requests-pane .link-btn { display: block; }
 
+/* Pull requests pane and project section */
+.prs-pane tbody tr { cursor: pointer; }
+.prs-pane tbody tr:hover td { background: var(--bg-hover); }
+.prs-pane tbody tr.selected td { background: var(--accent-soft); }
+.prs-pane td:first-child { max-width: none; white-space: nowrap; }
+.prs-pane .title-cell { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prs-pane .note { margin-top: 6px; max-width: 760px; }
+.pr-export { margin-left: 12px; }
+
 /* Hours pane: weekday x hour-of-day heatmap */
 .legend.hours-legend { padding: 0 0 8px; }
 .summary table.hours-grid { min-width: 0; border-collapse: separate; border-spacing: 3px; }

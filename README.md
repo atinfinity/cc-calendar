@@ -147,6 +147,10 @@ the logs it covers.
   range by the cost of the requests that ran until the next prompt, subagents included, with
   project, session, time and tokens. Click a row to open the transcript at that prompt. It follows
   the current filters.
+- **Cost per pull request** — the Pull requests pane and the project page list the PRs your
+  sessions worked on, with repository, sessions involved, active time, cost and commits over all
+  their sessions. Work up to a PR goes to it, and later work on its branch (review fixes, continued
+  sessions) is added; the rest is shown as unattributed. Export the table as CSV or JSON.
 - **Hours of the week** — the Hours pane shades a weekday × hour-of-day grid of the displayed range
   by active time, cost or commits, so late-night sessions and the busiest weekday stand out. Hover
   a cell for its totals. Hours are in the browser's time zone; it follows the current filters.
