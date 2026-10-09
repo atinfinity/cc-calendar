@@ -430,6 +430,22 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .tools-pane td.warn { color: var(--interrupted); font-weight: 600; }
 .usage-bar { display: inline-block; height: 8px; border-radius: 2px; background: var(--accent); vertical-align: middle; }
 .tools-pane .link-btn { margin-top: 6px; }
+.costs-grid { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.cost-bar { display: inline-flex; height: 10px; border-radius: 2px; overflow: hidden; vertical-align: middle; }
+.cost-seg { height: 100%; }
+.cost-key { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+.cost-in { background: #4c8bf5; }
+.cost-out { background: var(--accent); }
+.cost-write { background: #e0a100; }
+.cost-read { background: #9aa4b2; }
+
+/* Most expensive requests pane */
+.requests-pane tbody tr { cursor: pointer; }
+.requests-pane tbody tr:hover td { background: var(--bg-hover); }
+.requests-pane td:first-child { max-width: none; }
+.requests-pane .prompt-cell, .requests-pane .title-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.requests-pane .kind { font-size: 10px; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 4px; color: var(--muted); }
+.requests-pane .link-btn { display: block; }
 
 /* Hours pane: weekday x hour-of-day heatmap */
 .legend.hours-legend { padding: 0 0 8px; }

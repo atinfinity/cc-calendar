@@ -4,7 +4,7 @@ import shutil
 import sqlite3
 
 import pytest
-from conftest import PROJECT, LogBuilder
+from conftest import PROJECT, LogBuilder, basic_session, continuation
 from fastapi.testclient import TestClient
 
 from cc_calendar.search import SearchIndex, fts_query, record_docs, snippet
@@ -194,3 +194,21 @@ def test_unreadable_index_path_falls_back_to_memory(claude_dir, tmp_path):
     finally:
         locked.chmod(0o700)
         shutil.rmtree(locked)
+
+
+def test_copy_under_own_session_id_is_not_indexed(claude_dir):
+    proj = claude_dir / "projects" / PROJECT
+    prev = basic_session("n0")
+    prev.write(proj / "n0.jsonl")
+    nxt = continuation(prev, "n1")
+    nxt.prompt(30, "Now the changelog")
+    nxt.write(proj / "n1.jsonl")
+    store = indexed_store(claude_dir)
+    assert set(hits(store, "Add a README")) == {("s-basic", None), ("n0", None)}
+    assert set(hits(store, "changelog")) == {("n1", None)}
+    # The log's later lines are indexed on their own; they hold no copy.
+    with open(proj / "n1.jsonl", "a") as f:
+        f.write(json.dumps({**nxt.records[0], "uuid": "late", "promptId": "p2"}) + "\n")
+    store.update_file(proj / "n1.jsonl")
+    assert store.index.wait_idle(10)
+    assert set(hits(store, "Add a README")) == {("s-basic", None), ("n0", None), ("n1", None)}
