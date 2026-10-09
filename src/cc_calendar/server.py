@@ -91,6 +91,7 @@ def summary(
         "tokens": s.tokens(),
         "cost": round(cost, 4),
         "cost_estimated": estimated,
+        "cost_basis": s.cost_basis(),
         "cache_hit": cache_hit,
         "cache_saved": round(cache_saved, 4),
         "model": models[0] if models else None,
@@ -143,11 +144,11 @@ def detail(
                 (sa.to_dict() for sa in s.subagents.values()), key=lambda d: d["start"] or 0
             ),
             "background": list(s.background.values()),
+            # A continuation's own share: its record carries over its predecessor's totals.
             "cost_state": {
-                k: s.cost_state.get(k)
-                for k in ("totalDuration", "totalLinesAdded", "totalLinesRemoved", "modelUsage")
+                k: own.get(k) for k in ("totalDuration", "totalLinesAdded", "totalLinesRemoved")
             }
-            if s.cost_state
+            if (own := s.own_cost_state())
             else None,
         }
     )
@@ -232,6 +233,10 @@ def create_app(
                     sid = await asyncio.to_thread(store.update_file, path)
                     if sid:
                         changed.add(sid)
+                        # Its continuation's cost is counted from its last cost record.
+                        s = store.sessions.get(sid)
+                        if s is not None and s.continued_in:
+                            changed.add(s.continued_in)
             if changed or live_changed:
                 broadcaster.publish({"sessions": sorted(changed), "live": live_changed})
 

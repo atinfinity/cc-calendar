@@ -140,6 +140,17 @@ class LogBuilder:
         return path
 
 
+def cost_totals(cost: float, added: int, removed: int, duration: int = 1000) -> dict:
+    """Fields of a cost-state record. All but totalDuration are cumulative over continuations."""
+    return {
+        "totalCostUSD": cost,
+        "totalLinesAdded": added,
+        "totalLinesRemoved": removed,
+        "totalDuration": duration,
+        "modelUsage": {},
+    }
+
+
 def basic_session(sid: str = "s-basic") -> LogBuilder:
     """One prompt, a split assistant message, an edit, a commit and a clean exit."""
     b = LogBuilder(sid)
@@ -232,6 +243,7 @@ def claude_dir(tmp_path: Path) -> Path:
     prev.prompt(120, "Long task")
     prev.tool_use(121, "t-sleep", "Bash", {"command": "sleep 100"}, msg_id="q1")
     prev.interrupt(122)
+    prev.meta("cost-state", **cost_totals(0.75, 2, 0, duration=2000))
     prev.meta("continued-in", continuedInSessionId="s-next")
     prev.write(proj / "s-prev.jsonl")
 
@@ -242,14 +254,8 @@ def claude_dir(tmp_path: Path) -> Path:
     nxt.assistant(201, [{"type": "text", "text": "ok"}], msg_id="n1", stop_reason="end_turn")
     nxt.turn_end(201)
     nxt.meta("pr-link", prNumber=7, prUrl="https://github.com/o/demo/pull/7", prRepository="o/demo")
-    nxt.meta(
-        "cost-state",
-        totalCostUSD=1.25,
-        totalLinesAdded=3,
-        totalLinesRemoved=1,
-        totalDuration=1000,
-        modelUsage={},
-    )
+    # Its cost record carries over s-prev's totals: its own share is $1.25, +3 / -1 lines.
+    nxt.meta("cost-state", **cost_totals(2.0, 5, 1, duration=1000))
     nxt.write(proj / "s-next.jsonl")
 
     # A session with no human prompt at all (e.g. started and closed).
