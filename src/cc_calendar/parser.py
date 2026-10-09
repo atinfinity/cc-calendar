@@ -56,6 +56,11 @@ COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
 DENSITY_BUCKET_MS = 10 * 60 * 1000
 # Totals in a cost record that a continuation carries over from its predecessor.
 CUMULATIVE_COST_KEYS = ("totalCostUSD", "totalLinesAdded", "totalLinesRemoved", "totalAPIDuration")
+# A cost record this far above the session's own token estimate is taken to be cumulative: a
+# continuation that names no predecessor. Real records stay below twice the estimate, while a
+# continuation's full record is many times its own share.
+CUMULATIVE_RATIO = 3
+CUMULATIVE_MARGIN_USD = 1.0
 
 
 def parse_ts(value: Any) -> int | None:
@@ -303,7 +308,9 @@ class SessionAcc:
         elif rtype == "cost-state":
             self.cost_state = rec
         elif rtype == "continued-in":
-            self.continued_in = rec.get("continuedInSessionId")
+            # A copy of the predecessor's record rewritten to this session's ID names itself.
+            if rec.get("continuedInSessionId") != self.session_id:
+                self.continued_in = rec.get("continuedInSessionId")
         elif rtype == "permission-mode":
             self.permission_mode = rec.get("permissionMode")
         elif rtype == "pr-link" and rec.get("prUrl"):
@@ -579,10 +586,12 @@ class SessionAcc:
         """The cost record with its cumulative totals cut down to this session's own share.
 
         A continuation's record starts from its predecessor's final totals, so those are
-        subtracted. Totals that cannot be told that way (the predecessor's record is gone, or
-        the cost is below its) are None.
+        subtracted. Totals that cannot be told that way (the predecessor's record is gone, the
+        cost is below its, or the record is cumulative with no known predecessor) are None.
         """
         cs = self.cost_state
+        if cs is not None and self.cost_basis() == "cumulative":
+            return {**cs, **dict.fromkeys(CUMULATIVE_COST_KEYS)}
         if cs is None or self.predecessor is None:
             return cs
         prior = self.prior_cost_state or {}
@@ -600,12 +609,18 @@ class SessionAcc:
         "record": Claude Code's cost record; "continued": this continuation's share of its
         cumulative record. Estimated from tokens: "estimate" (no record), "no_previous" (the
         predecessor's log or record is gone) or "negative" (the record is below the
-        predecessor's).
+        predecessor's) or "cumulative" (the record is far above the session's own token usage,
+        as when it continues a session nothing names).
         """
         cs = self.cost_state
         if not cs or not is_number(cs.get("totalCostUSD")):
             return "estimate"
         if self.predecessor is None:
+            # Newer continuations rewrite the copied records' session IDs, so nothing in the
+            # log names the predecessor once its own log is gone.
+            est = self.estimate()
+            if cs["totalCostUSD"] > max(est * CUMULATIVE_RATIO, est + CUMULATIVE_MARGIN_USD):
+                return "cumulative"
             return "record"
         prior = self.prior_cost_state
         if not prior or not is_number(prior.get("totalCostUSD")):
@@ -622,9 +637,12 @@ class SessionAcc:
         """(cost USD, estimated?)"""
         if self.cost_basis() in ("record", "continued"):
             return float(self.own_cost_state()["totalCostUSD"]), False
+        return self.estimate(), True
+
+    def estimate(self) -> float:
+        """Cost USD estimated from token usage, subagents included."""
         est = sum(estimate_cost(u.model, u.usage) for u in self.usages.values())
-        est += sum(s.cost() for s in self.subagents.values())
-        return est, True
+        return est + sum(s.cost() for s in self.subagents.values())
 
     def models(self) -> list[str]:
         c = Counter(u.model for u in self.usages.values() if u.model)

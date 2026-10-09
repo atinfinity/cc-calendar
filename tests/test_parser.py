@@ -1,5 +1,5 @@
 import pytest
-from conftest import BASE, LogBuilder, basic_session
+from conftest import BASE, LogBuilder, basic_session, cost_totals
 
 from cc_calendar.logview import build_entries, log_events
 from cc_calendar.parser import (
@@ -216,8 +216,21 @@ def test_cost_prefers_cost_state():
     s = feed(b)
     cost, estimated = s.cost()
     assert estimated and cost > 0
-    b.meta("cost-state", totalCostUSD=2.5)
-    assert feed(b).cost() == (2.5, False)
+    b.meta("cost-state", totalCostUSD=cost * 1.5)
+    s = feed(b)
+    assert s.cost() == (cost * 1.5, False) and s.cost_basis() == "record"
+
+
+def test_cumulative_record_without_predecessor():
+    # A continuation whose log names no predecessor: its record carries over the earlier total.
+    b = basic_session()
+    est = feed(b).cost()[0]
+    b.meta("cost-state", **cost_totals(est + 20, 400, 30))
+    s = feed(b)
+    assert s.cost_basis() == "cumulative"
+    assert s.cost() == (est, True)
+    assert s.own_lines() == (None, None)
+    assert s.own_cost_state()["totalDuration"] == 1000
 
 
 def test_pricing():

@@ -90,6 +90,22 @@ def test_continued_from_deleted_log(claude_dir):
     assert own(store, "c2") == (0.5, "continued", (0, 5))
 
 
+def test_continued_from_deleted_log_with_rewritten_ids(claude_dir):
+    # Newer continuations copy their predecessor's records under their own session ID, so
+    # once the predecessor's log is gone only the size of the record gives it away.
+    proj = claude_dir / "projects" / PROJECT
+    continued_chain(proj, [(30.0, 500, 20), (31.0, 510, 20)])
+    c1 = proj / "c1.jsonl"
+    recs = [json.loads(line) for line in c1.read_text().splitlines()]
+    c1.write_text("".join(json.dumps({**r, "sessionId": "c1"}) + "\n" for r in recs))
+    (proj / "c0.jsonl").unlink()
+    store = Store(claude_dir)
+    store.scan()
+    s = store.sessions["c1"]
+    assert s.predecessor is None and s.copied_from is None
+    assert s.cost_basis() == "cumulative" and s.cost()[1] and s.own_lines() == (None, None)
+
+
 def test_continued_cost_below_predecessor(claude_dir):
     proj = claude_dir / "projects" / PROJECT
     continued_chain(proj, [(2.0, 10, 2), (1.5, 12, 2)])

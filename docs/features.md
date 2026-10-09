@@ -71,6 +71,10 @@
     session's), its cost is estimated from its own token usage and its line counts are not
     shown. The cost tooltip says which applies.
 
+    Newer continuations do not always name the session they continue. So a cost record more than
+    3 times the session's own token estimate, and at least \$1 above it, is also taken to be
+    cumulative and treated the same way. Ordinary records stay well below that.
+
     Treat all costs as rough figures, not billing data. The price table uses Anthropic API list
     prices as of when it was last updated. It does not know about subscription plans, discounts or
     price changes.
