@@ -53,6 +53,14 @@ def test_sessions(client):
     assert basic["version"] == "2.1.0"  # Claude Code version from the log
     assert data["version"] == __version__
     assert basic["source"] == "local"
+    # Output for cost per commit / PR / line.
+    assert basic["files_changed"] == 1
+    assert basic["pr_list"] == []
+    assert basic["lines_added"] is None and basic["lines_removed"] is None
+    nxt = by_id["s-next"]
+    assert nxt["pr_list"] == [{"number": 7, "url": "https://github.com/o/demo/pull/7"}]
+    assert (nxt["lines_added"], nxt["lines_removed"]) == (3, 1)
+    assert nxt["files_changed"] == 0
     assert [d["name"] for d in data["claude_dirs"]] == ["local"]
 
 

@@ -567,6 +567,17 @@ class SessionAcc:
         est += sum(s.cost() for s in self.subagents.values())
         return est, True
 
+    def lines_changed(self) -> dict[str, int | None]:
+        """Lines added / removed, from Claude Code's cost record; None when it wrote none."""
+        cs = self.cost_state or {}
+        return {
+            k: v if isinstance(v, int) and not isinstance(v, bool) else None
+            for k, v in (
+                ("lines_added", cs.get("totalLinesAdded")),
+                ("lines_removed", cs.get("totalLinesRemoved")),
+            )
+        }
+
     def models(self) -> list[str]:
         c = Counter(u.model for u in self.usages.values() if u.model)
         return [m for m, _ in c.most_common()]
