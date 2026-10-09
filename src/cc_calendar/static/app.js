@@ -1,5 +1,6 @@
 // Entry point: state, data loading, filters, list view, live updates.
 import { renderCalendar } from "./calendar.js";
+import { renderCostsPane } from "./costspane.js";
 import { renderDetail } from "./detail.js";
 import { exportSessions } from "./export.js";
 import { EMPTY_FILTER, activeFilterCount, matchesListFilter, renderListFilters } from "./listfilter.js";
@@ -9,7 +10,9 @@ import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
 import { costPer } from "./summary.js";
 import { bindShortcuts } from "./shortcuts.js";
+import { renderRequestsPane } from "./requestspane.js";
 import { renderToolsPane } from "./toolspane.js";
+import { renderHoursPane } from "./hours.js";
 import { closeLog, openLog } from "./transcript.js";
 import { majorChange, readHash, stateHash } from "./urlstate.js";
 import {
@@ -27,7 +30,7 @@ export const state = {
   byId: new Map(),
   view: prefs.get("view", "calendar"),
   span: prefs.get("span", "week"), // "day" | "week" | "month" | "year"
-  heat: prefs.get("heat", "time"), // month and year shading: "time" | "cost"
+  heat: prefs.get("heat", "time"), // month, year and Hours shading: "time" | "cost" | "commits"
   anchor: startOfDay(new Date()), // any day inside the displayed range
   hourPx: prefs.get("hourPx", DEFAULT_HOUR_PX),
   colorBy: prefs.get("colorBy", "project"),
@@ -42,6 +45,9 @@ export const state = {
   listFilter: { ...EMPTY_FILTER, ...prefs.get("listFilter", {}) }, // list view only
   showSummary: prefs.get("summary", false),
   showTools: prefs.get("tools", false),
+  showCosts: prefs.get("costs", false),
+  showRequests: prefs.get("requests", false),
+  showHours: prefs.get("hours", false),
   appVersion: null, // cc-calendar version reported by the server
   dataVersion: 0, // bumped on every reload so cached aggregates refresh
   showMarks: prefs.get("marks", true),
@@ -408,6 +414,9 @@ function renderMain() {
     renderList(visible);
   }
   renderTools(visible);
+  renderCosts(visible);
+  renderRequests(visible);
+  renderHours(visible);
 }
 
 function renderTools(visible) {
@@ -419,6 +428,42 @@ function renderTools(visible) {
   const end = addDays(days[days.length - 1], 1).getTime();
   const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
   renderToolsPane(pane, { start, end, ids, key: `${start}|${end}|${state.dataVersion}|${ids.join(",")}` });
+}
+
+// Per-day rows in the week and month views; the day and year views get one total.
+function renderCosts(visible) {
+  const pane = $("costs-pane");
+  pane.hidden = !(state.showCosts && state.view === "calendar");
+  if (pane.hidden) return;
+  const days = rangeDays();
+  const start = days[0].getTime();
+  const end = addDays(days[days.length - 1], 1).getTime();
+  const perDay = state.span === "week" || state.span === "month";
+  const bounds = perDay ? days.map((d) => [d.getTime(), addDays(d, 1).getTime()]) : [[start, end]];
+  const labels = perDay ? days.map((d) => `${d.toLocaleDateString([], { weekday: "short" })} ${d.getDate()}`) : null;
+  const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
+  renderCostsPane(pane, { bounds, labels, ids, key: `${bounds.join(",")}|${state.dataVersion}|${ids.join(",")}` });
+}
+
+function renderRequests(visible) {
+  const pane = $("requests-pane");
+  pane.hidden = !(state.showRequests && state.view === "calendar");
+  if (pane.hidden) return;
+  const days = rangeDays();
+  const start = days[0].getTime();
+  const end = addDays(days[days.length - 1], 1).getTime();
+  const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
+  renderRequestsPane(pane, {
+    start, end, ids,
+    key: `${start}|${end}|${state.dataVersion}|${ids.join(",")}`,
+    onOpen: (id, ts) => openEvent(id, ts, "prompt"),
+  });
+}
+
+function renderHours(visible) {
+  const pane = $("hours-pane");
+  pane.hidden = !(state.showHours && state.view === "calendar");
+  if (!pane.hidden) renderHoursPane(pane, visible, { days: rangeDays(), rerender: renderMain });
 }
 
 function renderToolbar() {
@@ -433,6 +478,9 @@ function renderToolbar() {
   $("go-today").textContent = { day: "Today", week: "This week", month: "This month", year: "This year" }[state.span];
   $("summary-toggle").classList.toggle("active", state.showSummary);
   $("tools-toggle").classList.toggle("active", state.showTools);
+  $("costs-toggle").classList.toggle("active", state.showCosts);
+  $("requests-toggle").classList.toggle("active", state.showRequests);
+  $("hours-toggle").classList.toggle("active", state.showHours);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
 
@@ -706,6 +754,21 @@ function bind() {
   $("tools-toggle").onclick = () => {
     state.showTools = !state.showTools;
     prefs.set("tools", state.showTools);
+    renderAll();
+  };
+  $("costs-toggle").onclick = () => {
+    state.showCosts = !state.showCosts;
+    prefs.set("costs", state.showCosts);
+    renderAll();
+  };
+  $("requests-toggle").onclick = () => {
+    state.showRequests = !state.showRequests;
+    prefs.set("requests", state.showRequests);
+    renderAll();
+  };
+  $("hours-toggle").onclick = () => {
+    state.showHours = !state.showHours;
+    prefs.set("hours", state.showHours);
     renderAll();
   };
   $("copy-report").onclick = async () => {

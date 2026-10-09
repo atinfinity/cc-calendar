@@ -41,7 +41,7 @@ CSV and JSON carry the same fields, in this order.
 | `commits` | integer | Commits made in the session |
 | `pull_requests` | integer | Pull requests the session opened or linked to |
 | `files_changed` | integer | Files the session edited or wrote |
-| `lines_added` | integer or null | Lines added, from Claude Code's cost record; `null` when the session wrote none |
+| `lines_added` | integer or null | Lines added, from Claude Code's cost record (a continued session's own share); `null` when the session wrote none or its share is unknown |
 | `lines_removed` | integer or null | Lines removed, as for `lines_added` |
 | `cost_per_commit` | number or null | `cost_usd` divided by `commits`, four decimal places; `null` without commits |
 | `tags` | array of strings | Tags you gave the session, in the order shown. In CSV, joined with `;` (tags cannot contain commas). Empty when there are none. See [Notes and tags](getting-started.md#notes-and-tags) |

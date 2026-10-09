@@ -1,5 +1,5 @@
 import pytest
-from conftest import BASE, LogBuilder, basic_session
+from conftest import BASE, CWD, LogBuilder, basic_session, continuation, cost_totals, ts
 
 from cc_calendar.logview import build_entries, log_events
 from cc_calendar.parser import (
@@ -160,11 +160,13 @@ def test_pending_background_agents_mean_interrupted():
 def test_continued_copy_is_skipped():
     prev = LogBuilder("old")
     prev.prompt(0, "first")
+    prev.meta("cost-state", totalCostUSD=2.5)
     nxt = LogBuilder("new")
     nxt.records.extend(prev.records)
     nxt.prompt(10, "second")
     s = feed(nxt)
     assert [p["text"] for p in s.prompts] == ["second"]
+    assert s.cost_state is None and s.copied_from == "old"
 
 
 def test_duplicate_uuids_are_ignored():
@@ -214,8 +216,86 @@ def test_cost_prefers_cost_state():
     s = feed(b)
     cost, estimated = s.cost()
     assert estimated and cost > 0
-    b.meta("cost-state", totalCostUSD=2.5)
-    assert feed(b).cost() == (2.5, False)
+    b.meta("cost-state", totalCostUSD=cost * 1.5)
+    s = feed(b)
+    assert s.cost() == (cost * 1.5, False) and s.cost_basis() == "record"
+
+
+def test_cumulative_record_without_predecessor():
+    # A continuation whose log names no predecessor: its record carries over the earlier total.
+    b = basic_session()
+    est = feed(b).cost()[0]
+    b.meta("cost-state", **cost_totals(est + 20, 400, 30))
+    s = feed(b)
+    assert s.cost_basis() == "cumulative"
+    assert s.cost() == (est, True)
+    assert s.own_lines() == (None, None)
+    assert s.own_cost_state()["totalDuration"] == 1000
+
+
+RESUMED_AT = T0 + 1439 * MIN
+
+
+def resumed_session() -> tuple[SessionAcc, float, float]:
+    """A session run on day one, then resumed with `claude --resume` a day later.
+
+    Its cost record covers only the second run. -> (session, estimate before, estimate after)
+    """
+    b = LogBuilder("s-resumed")
+    b.prompt(0, "Start")
+    b.assistant(1, [{"type": "text", "text": "a"}], msg_id="r1", output_tokens=400_000)
+    b.assistant(30, [{"type": "text", "text": "b"}], msg_id="r2", output_tokens=2000)
+    b.prompt(1440, "Resume")
+    b.assistant(1441, [{"type": "text", "text": "c"}], msg_id="r3", output_tokens=1000)
+    b.meta("cost-state", **cost_totals(0, 7, 2), startTime=RESUMED_AT)
+    s = feed(b)
+    # A subagent of the first run.
+    agent = LogBuilder("s-resumed")
+    agent.assistant(2, [], msg_id="x1", model="claude-haiku-4-5", output_tokens=500)
+    for r in agent.records:
+        s.feed_subagent("a1", "agent-a1.jsonl", r)
+    before = sum(estimate_cost(u.model, u.usage) for u in s.all_usages() if u.ts < RESUMED_AT)
+    after = estimate_cost(s.usages["r3"].model, s.usages["r3"].usage)
+    s.cost_state["totalCostUSD"] = after * 1.2
+    return s, before, after
+
+
+def test_resumed_session_adds_earlier_runs():
+    s, before, after = resumed_session()
+    assert s.cost_basis() == "resumed"
+    assert {u.model for u in s.earlier_usages()} == {"claude-sonnet-5-5", "claude-haiku-4-5"}
+    cost, estimated = s.cost()
+    assert estimated and cost == pytest.approx(after * 1.2 + before)
+    # Its totals cover only the last run, so they are not shown as the session's.
+    assert s.own_lines() == (None, None)
+    assert s.own_cost_state()["totalDuration"] is None
+
+
+def test_resumed_cost_density():
+    s, before, after = resumed_session()
+    density = s.cost_density()
+    assert sum(density.values()) == pytest.approx(s.cost()[0], abs=1e-5)
+    start = RESUMED_AT // DENSITY_BUCKET_MS
+    # Earlier days get their estimate, the last run the record's cost.
+    assert sum(c for b, c in density.items() if b < start) == pytest.approx(before, abs=1e-5)
+    assert sum(c for b, c in density.items() if b >= start) == pytest.approx(after * 1.2)
+
+
+def test_record_covering_earlier_runs_is_not_resumed():
+    # Far above the last run's own usage: the record already counts the earlier runs.
+    s, before, after = resumed_session()
+    s.cost_state["totalCostUSD"] = (before + after) * 1.2
+    assert s.cost_basis() == "record"
+    assert s.cost() == ((before + after) * 1.2, False)
+
+
+def test_single_run_with_start_time_is_a_record():
+    b = basic_session()
+    b.meta("cost-state", **cost_totals(0.5, 3, 1), startTime=T0 - 5000)
+    s = feed(b)
+    assert s.earlier_usages() == []
+    assert s.cost() == (0.5, False) and s.cost_basis() == "record"
+    assert s.own_lines() == (3, 1)
 
 
 def test_pricing():
@@ -303,3 +383,112 @@ def test_compaction_sizes(tmp_path):
     entries = build_entries(b.write(tmp_path / "s.jsonl"), b.sid)
     compact = next(e for e in entries if e.get("event") == "compact")
     assert (compact["pre"], compact["post"], compact["trigger"]) == (167_000, 31_000, "auto")
+
+
+def continued_basic(upto: int | None = None) -> tuple[LogBuilder, LogBuilder]:
+    """basic_session continued in s-new, which adds one turn after the copy.
+
+    Also returns the new turn's records alone, as a log of their own.
+    """
+    prev = basic_session("s-old")
+    nxt = continuation(prev, "s-new", upto)
+    copied = len(nxt.records)
+    nxt.meta("file-history-snapshot", messageId="fh1", snapshot={"timestamp": ts(30)})
+    nxt.prompt(30, "Now the changelog")
+    nxt.tool_use(31, "t-edit", "Edit", {"file_path": f"{CWD}/CHANGES.md"}, msg_id="n1")
+    nxt.tool_result(32, "t-edit", "ok")
+    nxt.assistant(33, [{"type": "text", "text": "Done."}], msg_id="n2", stop_reason="end_turn")
+    nxt.turn_end(33)
+    alone = LogBuilder("s-new")
+    alone.records = nxt.records[copied:]
+    return nxt, alone
+
+
+def counted(s: SessionAcc) -> tuple:
+    return (
+        [p["text"] for p in s.prompts],
+        s.tokens(),
+        s.estimate(),
+        s.commits,
+        dict(s.files),
+        s.marks(),
+        s.segments(15 * MIN),
+        s.density(),
+        [c[1] for c in s.tool_calls],
+    )
+
+
+def test_copy_under_own_session_id_is_not_counted():
+    nxt, alone = continued_basic()
+    s = feed(nxt)
+    assert s.copied_head == 8  # the records with a uuid; the ai-title is not copied
+    assert counted(s) == counted(feed(alone))
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+    assert s.commits == [] and s.state(None)[0] == "done"
+    assert s.cwd == CWD and s.copied_from is None
+
+
+def test_copy_is_told_while_the_log_grows():
+    nxt, alone = continued_basic()
+    s = SessionAcc(session_id="s-new", path="x.jsonl", project_dir="p")
+    for r in nxt.records[:10]:  # the copy, the snapshot and the new prompt
+        s.feed(r)
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+    for r in nxt.records[10:] + nxt.records:  # the rest, then everything again
+        s.feed(r)
+    assert counted(s) == counted(feed(alone))
+
+
+def test_copy_ending_with_a_notification():
+    # The continuation's own first record may be a notification rather than a prompt.
+    nxt, _ = continued_basic()
+    first = next(i for i, r in enumerate(nxt.records) if r.get("timestamp") == ts(30))
+    note = "<task-notification>\n<task-id>bg1</task-id>\n<status>completed</status>"
+    rec = {**nxt.records[first], "uuid": "note", "message": {"role": "user", "content": note}}
+    nxt.records.insert(first, rec)
+    s = feed(nxt)
+    assert s.copied_head == 8
+    assert [p["text"] for p in s.prompts] == ["Now the changelog"]
+
+
+def test_ordinary_sessions_have_no_copied_head():
+    b = basic_session()
+    b.prompt(10, "And a licence")
+    b.tool_use(11, "t-sleep", "Bash", {"command": "sleep 9"}, msg_id="m9")
+    b.interrupt(12)
+    b.turn_end(12)
+    b.prompt(13, "Go on")
+    b.turn_end(14)
+    s = feed(b)
+    assert s.copied_head == 0
+    assert [p["text"] for p in s.prompts] == ["Add a README", "And a licence", "Go on"]
+    assert len(s.commits) == 1
+
+
+def test_copy_without_turn_end_or_prompt_ids_is_counted():
+    # Without them nothing tells the copy from the session's own first turn.
+    nxt = continuation(basic_session("s-old"), "s-new", upto=7)  # stops before the turn end
+    nxt.prompt(30, "Now the changelog")
+    s = feed(nxt)
+    assert s.copied_head == 0 and len(s.prompts) == 2
+    nxt, _ = continued_basic()
+    for r in nxt.records:
+        r.pop("promptId", None)
+    s = feed(nxt)
+    assert s.copied_head == 0 and len(s.prompts) == 2
+
+
+def test_log_hides_the_copied_head(tmp_path):
+    nxt, alone = continued_basic()
+    entries = build_entries(nxt.write(tmp_path / "s-new.jsonl"), nxt.sid)
+    assert entries[0] == {
+        "kind": "system",
+        "ts": None,
+        "text": "Continues an earlier session: the 8 records copied from it are not shown",
+        "i": 0,
+    }
+    assert all("README" not in str(e) for e in entries)
+    events = log_events(entries)
+    assert sorted(k for _, _, k in events) == sorted(m[1] for m in feed(nxt).marks())
+    shown = build_entries(alone.write(tmp_path / "alone.jsonl"), alone.sid)
+    assert [e["kind"] for e in entries[1:]] == [e["kind"] for e in shown]
