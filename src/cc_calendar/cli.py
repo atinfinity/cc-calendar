@@ -13,7 +13,7 @@ from pathlib import Path
 
 import uvicorn
 
-from . import __version__, notes, search
+from . import __version__, notes, search, update
 from .server import create_app
 from .store import ClaudeDir
 
@@ -99,6 +99,11 @@ def main(argv: list[str] | None = None) -> None:
         help="file that caches the full-text search index "
         f"(default: {search.default_path()}; safe to delete)",
     )
+    parser.add_argument(
+        "--no-update-check",
+        action="store_true",
+        help=f"do not ask PyPI whether a newer version is out (also: {update.ENV_OFF}=1)",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args(argv)
 
@@ -107,7 +112,8 @@ def main(argv: list[str] | None = None) -> None:
     dirs = claude_dirs(args.claude_dir or [str(Path.home() / ".claude")])
     notes_path = (args.notes or notes.default_path()).expanduser()
     index_path = (args.search_index or search.default_path()).expanduser()
-    app = create_app(dirs, notes_path=notes_path, index_path=index_path)
+    check = not (args.no_update_check or update.disabled_by_env())
+    app = create_app(dirs, notes_path=notes_path, index_path=index_path, update_check=check)
     reading = ", ".join(f"{d.name} ({d.path})" for d in dirs) or "nothing"
     print(f"cc-calendar {__version__}: reading {reading} — serving {url}")
     if error := app.state.notes.error:

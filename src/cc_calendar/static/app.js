@@ -95,19 +95,25 @@ async function fetchJSON(url) {
   return res.json();
 }
 
-// The version of the running server, which can differ from what is installed until it restarts.
-function showVersion(version) {
+// The version of the running server, which can differ from what is installed until it restarts,
+// and a later release on PyPI if there is one.
+function showVersion(version, update) {
   const badge = document.getElementById("app-version");
   badge.textContent = version ? `v${version}` : "";
   badge.title = version ? `cc-calendar ${version} is running` : "";
-  document.getElementById("help-version").textContent = version ? `cc-calendar ${version}` : "";
+  const link = document.getElementById("app-update");
+  link.hidden = !update;
+  link.textContent = update ? `v${update} available` : "";
+  link.title = update ? `cc-calendar ${update} is out. Click for how to update.` : "";
+  document.getElementById("help-version").textContent = version
+    ? `cc-calendar ${version}${update ? ` · ${update} is available` : ""}` : "";
 }
 
 async function loadSessions() {
   const data = await fetchJSON(`/api/sessions?gap=${state.gap}`);
   state.sessions = data.sessions;
   state.appVersion = data.version;
-  showVersion(data.version);
+  showVersion(data.version, data.update);
   state.claudeDirs = data.claude_dirs || [];
   state.tags = data.tags || [];
   state.notesError = data.notes_error || null;

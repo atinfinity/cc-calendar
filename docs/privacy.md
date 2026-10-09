@@ -13,7 +13,12 @@ Everything stays on your machine.
   off until it is fixed. `--search-index` and `--notes` move these files elsewhere.
 - Pages on other websites cannot change your notes: the server accepts changes only as JSON
   from its own page.
-- It makes no network requests. The page loads no external scripts, fonts or analytics.
+- Its only network request asks PyPI for the latest cc-calendar version
+  (`https://pypi.org/pypi/cc-calendar/json`), when it starts and once a day, to show when an
+  update is out. The request carries the running version in its User-Agent and nothing about your
+  sessions. `--no-update-check` or `CC_CALENDAR_NO_UPDATE_CHECK=1` turns it off, and then
+  cc-calendar makes no network requests at all.
+- The page loads no external scripts, fonts or analytics.
 - Viewing a log never contacts another host. Images linked in a transcript (`![](https://…)` or
   an `<img>` tag) are not loaded; they show as a link you can open yourself. The page's
   Content-Security-Policy stops the browser from loading anything else from other sites.
