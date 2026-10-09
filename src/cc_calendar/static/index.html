@@ -52,6 +52,7 @@
           <span class="muted" id="range-count"></span>
           <button id="summary-toggle" title="Active time and cost per project">Summary</button>
           <button id="tools-toggle" title="Tool calls, errors, MCP servers and subagents in the displayed range">Tools</button>
+          <button id="costs-toggle" title="Cost by model and token type in the displayed range">Costs</button>
           <button id="copy-report" title="Copy the displayed range as Markdown: time and cost per project, sessions and commits">Copy report</button>
           <div class="seg small" id="zoom">
             <button id="zoom-out" aria-label="Zoom out">−</button>
@@ -81,6 +82,7 @@
         <div class="legend" id="legend"></div>
         <div class="summary" id="summary" hidden></div>
         <div class="summary tools-pane" id="tools-pane" hidden></div>
+        <div class="summary tools-pane" id="costs-pane" hidden></div>
         <div class="calendar" id="calendar"></div>
       </div>
       <div id="list-view" hidden>

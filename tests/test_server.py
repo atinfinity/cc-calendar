@@ -109,6 +109,17 @@ def test_tools(client):
     assert [(a["type"], a["runs"]) for a in data["subagents"]] == [("Explore", 1)]
 
 
+def test_costs(client):
+    sessions = client.get("/api/sessions").json()["sessions"]
+    start = min(s["start"] for s in sessions)
+    end = max(s["end"] for s in sessions) + 1
+    res = client.post("/api/costs", json={"bounds": [[start, end]], "sessions": ["s-sub", "x"]})
+    data = res.json()
+    assert [m["model"] for m in data["models"]] == ["claude-sonnet-5-5", "claude-haiku-4-5"]
+    assert data["sessions"] == 1 and len(data["days"]) == 1
+    assert client.post("/api/costs", json={"bounds": [], "sessions": []}).status_code == 422
+
+
 @pytest.fixture
 def multi_client(claude_dir, laptop_dir):
     dirs = [ClaudeDir("local", claude_dir), ClaudeDir("laptop", laptop_dir)]

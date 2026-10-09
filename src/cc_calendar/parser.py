@@ -8,7 +8,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from .pricing import cache_hit_rate, cache_savings, context_window, estimate_cost
+from .pricing import (
+    TOKEN_TYPES,
+    cache_hit_rate,
+    cache_savings,
+    context_window,
+    cost_parts,
+    estimate_cost,
+)
 
 INTERRUPT_PREFIX = "[Request interrupted"
 GIT_COMMIT_RE = re.compile(r"\bgit\b(?:\s+-[cC]\s+\S+)*[^|;&\n]*?\bcommit\b")
@@ -540,6 +547,25 @@ class SessionAcc:
             if u.ts is not None:
                 out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
         return {b: round(c, 6) for b, c in out.items() if c}
+
+    def cost_breakdown(self) -> dict[int, dict[str, list[float]]]:
+        """Tokens and estimated cost per DENSITY_BUCKET_MS bucket and model, subagents included.
+
+        Each entry is [input, output, cache write, cache read] tokens followed by their costs,
+        so subagent requests count under the model they ran on.
+        """
+        out: dict[int, dict[str, list[float]]] = {}
+        for u in self.all_usages():
+            if u.ts is None:
+                continue
+            row = out.setdefault(u.ts // DENSITY_BUCKET_MS, {}).setdefault(
+                u.model or "unknown", [0] * 8
+            )
+            for i, k in enumerate(TOKEN_TYPES):
+                row[i] += u.usage.get(k, 0)
+            for i, c in enumerate(cost_parts(u.model, u.usage)):
+                row[4 + i] += c
+        return out
 
     def all_usages(self) -> list[Usage]:
         """API usage of the session and its subagents."""

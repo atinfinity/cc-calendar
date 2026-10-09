@@ -124,6 +124,11 @@ the logs it covers.
 - **Tool usage** — the Tools pane aggregates tool calls in the displayed range: most used tools,
   error counts and rates (10% or more is highlighted), calls made inside subagents, MCP servers,
   and subagent runs by type with their tool calls, tokens and cost. It follows the current filters.
+- **Cost breakdown** — the Costs pane splits the displayed range's cost by model into input,
+  output, cache write and cache read (hover a bar for cost and tokens), with subagents counted
+  under their own model. The week and month views add a row per day, so a spike can be traced to
+  one token type. It follows the current filters; sessions with Claude Code's own cost record are
+  split by the estimate's proportions.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).
