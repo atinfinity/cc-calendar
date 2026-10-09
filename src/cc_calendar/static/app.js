@@ -7,6 +7,7 @@ import { bindNotifyToggle, checkTransitions } from "./notify.js";
 import { overviewRange, renderOverview } from "./overview.js";
 import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
+import { costPer } from "./summary.js";
 import { bindShortcuts } from "./shortcuts.js";
 import { renderToolsPane } from "./toolspane.js";
 import { closeLog, openLog } from "./transcript.js";
@@ -507,6 +508,7 @@ const LIST_COLUMNS = [
   ["tokens", "Tokens", (s) => s.tokens, "desc", true],
   ["cost", "Cost", (s) => s.cost, "desc", true],
   ["cache", "Cache", (s) => s.cache_hit, "asc", true],
+  ["percommit", "$/commit", (s) => costPer(s.cost, (s.commit_list || []).length), "desc", true],
 ];
 
 function listColumns() {
@@ -562,7 +564,7 @@ function renderList(visible) {
     const sorted = state.sort.key === key;
     return h("th", {
       class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
-      title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : `Sort by ${label.toLowerCase()}`,
+      title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : key === "percommit" ? "Sort by cost per commit" : `Sort by ${label.toLowerCase()}`,
       onclick: () => setSort(key),
     }, label, sorted ? (state.sort.dir === "asc" ? " ▲" : " ▼") : "");
   });
@@ -593,9 +595,19 @@ function renderList(visible) {
           h("td", { class: "num" }, fmtCost(s.cost, s.cost_estimated)),
           h("td", { class: "num" + (s.cache_hit != null && s.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(s.cache_hit, s.cache_saved) },
             fmtPct(s.cache_hit)),
+          h("td", { class: "num", title: outputTitle(s) }, fmtCost(costPer(s.cost, (s.commit_list || []).length), s.cost_estimated)),
         ))),
     ),
   );
+}
+
+// What a session produced, for the $/commit cell's tooltip.
+function outputTitle(s) {
+  const n = (s.commit_list || []).length;
+  const prs = (s.pr_list || []).length;
+  const parts = [`${n} commit${n === 1 ? "" : "s"}`, `${prs} PR${prs === 1 ? "" : "s"}`, `${s.files_changed || 0} files edited`];
+  if (s.lines_added != null) parts.push(`+${s.lines_added} / −${s.lines_removed ?? 0} lines`);
+  return parts.join(" · ");
 }
 
 // The start of a note, for a tooltip.

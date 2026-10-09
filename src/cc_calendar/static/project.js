@@ -1,6 +1,6 @@
 // Project page: everything about one project over all time, ignoring the filters.
 import { select, state } from "./app.js";
-import { activeMs, summarize } from "./summary.js";
+import { activeMs, costPer, summarize } from "./summary.js";
 import {
   STATUS_LABELS, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtTokens, h, statusColor,
 } from "./util.js";
@@ -58,6 +58,11 @@ export function renderProject(container, project, { onBack }) {
   const total = byMonth.total;
   const commits = projectCommits(sessions);
   const commitsIn = ([from, to]) => commits.filter((c) => c.ts != null && c.ts >= from && c.ts < to).length;
+  const prs = new Set(sessions.flatMap((s) => (s.pr_list || []).map((pr) => pr.url)));
+  // Only sessions that wrote Claude Code's cost record know their line counts.
+  const counted = sessions.filter((s) => s.lines_added != null);
+  const lines = counted.reduce((n, s) => n + s.lines_added + (s.lines_removed || 0), 0);
+  const lineCost = counted.reduce((n, s) => n + (s.cost || 0), 0);
   const branches = new Set(sessions.map((s) => s.branch).filter(Boolean));
   const maxMs = Math.max(...byMonth.days.map((d) => d.ms), 1);
   const stat = (text, title) => h("span", { class: "stat", title }, text);
@@ -78,6 +83,10 @@ export function renderProject(container, project, { onBack }) {
     stat(`${sessions.reduce((n, s) => n + s.prompt_count, 0)} prompts`),
     stat(`${fmtTokens(sessions.reduce((n, s) => n + s.tokens, 0))} tok`),
     stat(`${commits.length} commits`),
+    stat(`${prs.size} PR${prs.size === 1 ? "" : "s"}`),
+    commits.length ? stat(`${fmtCost(costPer(total.cost, commits.length), total.estimated)}/commit`) : null,
+    lines ? stat(`${fmtCost(costPer(lineCost, lines), counted.some((s) => s.cost_estimated))}/line`,
+      `${lines} lines added or removed in ${counted.length} of ${sessions.length} sessions; only sessions with Claude Code's cost record count`) : null,
     branches.size ? stat(`${branches.size} branch${branches.size > 1 ? "es" : ""}`, [...branches].join("\n")) : null,
     stat(`First ${fmtDateTime(Math.min(...sessions.map((s) => s.start)))}`),
     stat(`Last activity ${fmtAgo(latest.end)}`, fmtDateTime(latest.end)));

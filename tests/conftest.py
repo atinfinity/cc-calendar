@@ -253,6 +253,7 @@ def claude_dir(tmp_path: Path) -> Path:
     nxt.prompt(200, "Carry on")
     nxt.assistant(201, [{"type": "text", "text": "ok"}], msg_id="n1", stop_reason="end_turn")
     nxt.turn_end(201)
+    nxt.meta("pr-link", prNumber=7, prUrl="https://github.com/o/demo/pull/7", prRepository="o/demo")
     # Its cost record carries over s-prev's totals: its own share is $1.25, +3 / -1 lines.
     nxt.meta("cost-state", **cost_totals(2.0, 5, 1, duration=1000))
     nxt.write(proj / "s-next.jsonl")

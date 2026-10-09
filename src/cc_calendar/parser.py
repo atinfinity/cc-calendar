@@ -644,6 +644,11 @@ class SessionAcc:
         est = sum(estimate_cost(u.model, u.usage) for u in self.usages.values())
         return est + sum(s.cost() for s in self.subagents.values())
 
+    def lines_changed(self) -> dict[str, int | None]:
+        """Lines added / removed in this session; None when unknown."""
+        added, removed = self.own_lines()
+        return {"lines_added": added, "lines_removed": removed}
+
     def models(self) -> list[str]:
         c = Counter(u.model for u in self.usages.values() if u.model)
         return [m for m, _ in c.most_common()]
