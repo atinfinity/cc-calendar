@@ -48,6 +48,8 @@
     - Click the marks key at the right of the legend to hide or show them.
 - **Activity density**: a heat strip behind each day shows prompts and responses per 10 minutes.
 - **Live updates**: new log lines are picked up within a second.
+- **Version**: the running cc-calendar version shows next to the logo and at the bottom of the
+  shortcut list. After an update it shows the new version only once `cc-calendar` is restarted.
 - **Views in the URL**: the address keeps the calendar or list view, the span, the date, the
   selected session and the open project page.
     - Reloading the page keeps your place, and you can bookmark a view.

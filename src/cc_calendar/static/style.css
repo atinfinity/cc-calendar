@@ -75,6 +75,7 @@ a { color: var(--accent); }
   padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--bg-soft);
 }
 .brand { font-weight: 700; color: var(--accent); font-size: 15px; }
+.brand-version { font-weight: 400; color: var(--muted); font-size: 12px; }
 #search { width: 180px; }
 .seg { display: inline-flex; }
 .seg button { border-radius: 0; margin-left: -1px; }
@@ -352,6 +353,7 @@ details > summary { cursor: pointer; padding: 3px 0; }
 .help-keys { border-collapse: collapse; margin: 8px 14px 14px; }
 .help-keys td { padding: 5px 8px; vertical-align: top; }
 .help-keys td:first-child { white-space: nowrap; text-align: right; }
+.help-version { margin: 0 14px 14px; }
 .help-keys th { padding: 12px 8px 4px; text-align: left; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); }
 kbd {
   display: inline-block; min-width: 1.6em; padding: 1px 6px; text-align: center; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
