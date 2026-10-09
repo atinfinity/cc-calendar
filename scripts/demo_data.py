@@ -417,12 +417,31 @@ def build_session(i: int, spec: tuple, root: Path, rng: random.Random) -> None:
             usages.append((model, u))
         if p_idx == len(prompts) - 1 and extras.get("pr"):
             n = extras["pr"]
+            url = f"https://github.com/example/{project}/pull/{n}"
+            head = "-".join(title.lower().split()[:3])
+            t += timedelta(seconds=30)
+            seed = rng.getstate()  # leave the other sessions' random data as it was
+            _, u = w.tool(
+                t,
+                model,
+                "Bash",
+                {"command": f'gh pr create --title "{title}" --head {head} --fill'},
+                url,
+                tur={
+                    "stdout": url,
+                    "gitOperation": {"pr": {"action": "created", "number": n, "url": url}},
+                },
+                delay=4,
+            )
+            rng.setstate(seed)
+            usages.append((model, u))
             w.records.append(
                 {
                     "type": "pr-link",
                     "sessionId": sid,
+                    "timestamp": (t + timedelta(seconds=4)).isoformat().replace("+00:00", "Z"),
                     "prNumber": n,
-                    "prUrl": f"https://github.com/example/{project}/pull/{n}",
+                    "prUrl": url,
                     "prRepository": f"example/{project}",
                 }
             )
