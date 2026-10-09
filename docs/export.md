@@ -80,7 +80,7 @@ JSON wraps the records in an object that identifies the format:
 {
   "format": "cc-calendar.sessions",
   "schema_version": 1,
-  "generator": "cc-calendar 0.5.0",
+  "generator": "cc-calendar 0.6.0",
   "exported_at": "2026-10-04T10:00:00+09:00",
   "sessions": [
     {
@@ -173,7 +173,7 @@ that went to no PR under `unattributed`:
 {
   "format": "cc-calendar.pull_requests",
   "schema_version": 1,
-  "generator": "cc-calendar 0.5.0",
+  "generator": "cc-calendar 0.6.0",
   "exported_at": "2026-10-04T10:00:00+09:00",
   "pull_requests": [
     {
@@ -220,4 +220,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
 | 1 | 0.4.0 | Added `source`, `tags` and `note` |
-| 1 | Unreleased | Added `rating`, `idle_recache_usd`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction`, and `context_avg`, `context_peak` and `context_bloated`. Added the pull request export (`cc-calendar.pull_requests`, schema version 1) |
+| 1 | 0.6.0 | Added `pull_requests`, `files_changed`, `lines_added`, `lines_removed`, `cost_per_commit`, `rating`, `idle_recache_usd`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction`, and `context_avg`, `context_peak` and `context_bloated`. Added the pull request export (`cc-calendar.pull_requests`, schema version 1) |
