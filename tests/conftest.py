@@ -24,6 +24,9 @@ class LogBuilder:
         self.sid = session_id
         self.records: list[dict] = []
         self._n = 0
+        # Claude Code stamps user records with the ID of the prompt they belong to.
+        self.prompt_id: str | None = None
+        self.next_prompt_id: str | None = None
 
     def _uuid(self) -> str:
         self._n += 1
@@ -39,17 +42,25 @@ class LogBuilder:
             "gitBranch": "main",
             "version": "2.1.0",
         }
+        if rtype == "user" and self.prompt_id:
+            rec["promptId"] = self.prompt_id
         rec.update(extra)
         self.records.append(rec)
         return rec
 
+    def _new_prompt(self) -> None:
+        self.prompt_id = self.next_prompt_id or f"{self.sid}-p{self._n + 1}"
+        self.next_prompt_id = None
+
     def prompt(self, minute: float, text: str) -> dict:
+        self._new_prompt()
         return self._base(
             "user", minute, origin={"kind": "human"}, message={"role": "user", "content": text}
         )
 
     def command(self, minute: float, name: str, args: str = "") -> dict:
         text = f"<command-name>{name}</command-name>\n<command-args>{args}</command-args>"
+        self._new_prompt()
         return self._base(
             "user", minute, origin={"kind": "human"}, message={"role": "user", "content": text}
         )
@@ -138,6 +149,35 @@ class LogBuilder:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("".join(json.dumps(r) + "\n" for r in self.records))
         return path
+
+
+def continuation(prev: LogBuilder, sid: str, upto: int | None = None) -> LogBuilder:
+    """A session continuing `prev` the way newer Claude Code writes it.
+
+    Its log starts with a copy of `prev`'s first `upto` records under its own session ID,
+    every user record's promptId rewritten to that of its own first prompt.
+    """
+    b = LogBuilder(sid)
+    b.next_prompt_id = f"{sid}-first"
+    for r in prev.records[:upto]:
+        if not r.get("uuid"):
+            continue
+        rec = {**json.loads(json.dumps(r)), "sessionId": sid}
+        if rec["type"] == "user":
+            rec["promptId"] = b.next_prompt_id
+        b.records.append(rec)
+    return b
+
+
+def cost_totals(cost: float, added: int, removed: int, duration: int = 1000) -> dict:
+    """Fields of a cost-state record. All but totalDuration are cumulative over continuations."""
+    return {
+        "totalCostUSD": cost,
+        "totalLinesAdded": added,
+        "totalLinesRemoved": removed,
+        "totalDuration": duration,
+        "modelUsage": {},
+    }
 
 
 def basic_session(sid: str = "s-basic") -> LogBuilder:
@@ -232,6 +272,7 @@ def claude_dir(tmp_path: Path) -> Path:
     prev.prompt(120, "Long task")
     prev.tool_use(121, "t-sleep", "Bash", {"command": "sleep 100"}, msg_id="q1")
     prev.interrupt(122)
+    prev.meta("cost-state", **cost_totals(0.75, 2, 0, duration=2000))
     prev.meta("continued-in", continuedInSessionId="s-next")
     prev.write(proj / "s-prev.jsonl")
 
@@ -241,14 +282,9 @@ def claude_dir(tmp_path: Path) -> Path:
     nxt.prompt(200, "Carry on")
     nxt.assistant(201, [{"type": "text", "text": "ok"}], msg_id="n1", stop_reason="end_turn")
     nxt.turn_end(201)
-    nxt.meta(
-        "cost-state",
-        totalCostUSD=1.25,
-        totalLinesAdded=3,
-        totalLinesRemoved=1,
-        totalDuration=1000,
-        modelUsage={},
-    )
+    nxt.meta("pr-link", prNumber=7, prUrl="https://github.com/o/demo/pull/7", prRepository="o/demo")
+    # Its cost record carries over s-prev's totals: its own share is $1.25, +3 / -1 lines.
+    nxt.meta("cost-state", **cost_totals(2.0, 5, 1, duration=1000))
     nxt.write(proj / "s-next.jsonl")
 
     # A session with no human prompt at all (e.g. started and closed).

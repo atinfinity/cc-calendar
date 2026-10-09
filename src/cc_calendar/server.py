@@ -18,6 +18,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from watchfiles import awatch
 
 from . import __version__, gitinfo
+from .costs import cost_breakdown
 from .expensive import expensive_requests
 from .logview import build_entries, find_entries, log_events
 from .notes import NOTE_LIMIT, TAGS_PER_SESSION, Notes, NotesUnavailable
@@ -92,6 +93,7 @@ def summary(
         "tokens": s.tokens(),
         "cost": round(cost, 4),
         "cost_estimated": estimated,
+        "cost_basis": s.cost_basis(),
         "cache_hit": cache_hit,
         "cache_saved": round(cache_saved, 4),
         "model": models[0] if models else None,
@@ -101,6 +103,9 @@ def summary(
             {"ts": c.get("ts"), "sha": c.get("sha"), "subject": c.get("subject")}
             for c in gitinfo.resolve_commits(s.commits)
         ],
+        "pr_list": [{"number": pr.get("number"), "url": pr["url"]} for pr in s.prs.values()],
+        "files_changed": len(s.files),
+        **s.lines_changed(),
         "repo_url": gitinfo.repo_url(s.cwd),
         "continued_in": s.continued_in,
         "continued_from": continued_from,
@@ -141,11 +146,11 @@ def detail(
                 (sa.to_dict() for sa in s.subagents.values()), key=lambda d: d["start"] or 0
             ),
             "background": list(s.background.values()),
+            # A continuation's own share: its record carries over its predecessor's totals.
             "cost_state": {
-                k: s.cost_state.get(k)
-                for k in ("totalDuration", "totalLinesAdded", "totalLinesRemoved", "modelUsage")
+                k: own.get(k) for k in ("totalDuration", "totalLinesAdded", "totalLinesRemoved")
             }
-            if s.cost_state
+            if (own := s.own_cost_state())
             else None,
         }
     )
@@ -155,6 +160,11 @@ def detail(
 class ToolsQuery(BaseModel):
     start: int
     end: int
+    sessions: list[str] = Field(max_length=100_000)
+
+
+class CostsQuery(BaseModel):
+    bounds: list[tuple[int, int]] = Field(min_length=1, max_length=400)  # [start, end) per day
     sessions: list[str] = Field(max_length=100_000)
 
 
@@ -234,6 +244,10 @@ def create_app(
                     sid = await asyncio.to_thread(store.update_file, path)
                     if sid:
                         changed.add(sid)
+                        # Its continuation's cost is counted from its last cost record.
+                        s = store.sessions.get(sid)
+                        if s is not None and s.continued_in:
+                            changed.add(s.continued_in)
             if changed or live_changed:
                 broadcaster.publish({"sessions": sorted(changed), "live": live_changed})
 
@@ -393,6 +407,12 @@ def create_app(
         with store.lock:
             picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
             return tool_usage(picked, q.start, q.end)
+
+    @app.post("/api/costs")
+    def costs(q: CostsQuery) -> dict:
+        with store.lock:
+            picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
+            return cost_breakdown(picked, q.bounds)
 
     @app.post("/api/requests")
     def requests(q: RequestsQuery) -> dict:
