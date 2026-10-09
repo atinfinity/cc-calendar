@@ -117,6 +117,10 @@ the logs it covers.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
   table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.
+- **Cost per output** — the Summary table counts commits and pull requests per project and shows
+  cost per commit; the list has a **$/commit** column and an **Output** filter, so **No output**
+  plus a minimum cost finds sessions that cost a lot and produced nothing. The project page adds
+  cost per commit and per changed line.
 - **Markdown report** — "Copy report" copies the displayed day, week, month or year as Markdown:
   active time and cost per project, each session's title and tags (not notes) and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR
@@ -161,14 +165,15 @@ the logs it covers.
 - **List view** with search over titles, the start of each prompt, notes and tags (a match inside a prompt or note is shown under the title), optional
   [full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search) over the whole transcripts, project and status filters, and sorting by
   any column (click a header; click again to reverse). List-only filters narrow it down further
-  by model, git branch, source (with several config directories), tag, date range (sessions active on
+  by model, git branch, source (with several config directories), tag, output, date range (sessions active on
   any day in the range) and cost range.
 - **Project page** — click a project name (in the list, the Summary table, the detail pane or the
   project menu) to see the project over all time: total active time and cost, activity by month,
   every session, and its commit history with links to the repository.
 - **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
   and sort order: start, end, active time, project, source directory, branch, status, prompts,
-  tokens, cost, cache hit rate, model, effort, Claude Code version, commit count, tags and note. Times are
+  tokens, cost, cache hit rate, model, effort, Claude Code version, commits, pull requests, files changed, lines added and removed, cost per
+  commit, tags and note. Times are
   ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
   `c` / `l` calendar / list, `/` search, `j` / `k` next / previous session, `Enter` open its

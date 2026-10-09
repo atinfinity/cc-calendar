@@ -38,6 +38,11 @@ CSV and JSON carry the same fields, in this order.
 | `effort` | string or null | Effort level most requests ran at: `max`, `xhigh`, `high`, `medium` or `low` |
 | `claude_code_version` | string or null | Claude Code version recorded in the log (the latest one if it changed) |
 | `commits` | integer | Commits made in the session |
+| `pull_requests` | integer | Pull requests the session opened or linked to |
+| `files_changed` | integer | Files the session edited or wrote |
+| `lines_added` | integer or null | Lines added, from Claude Code's cost record; `null` when the session wrote none |
+| `lines_removed` | integer or null | Lines removed, as for `lines_added` |
+| `cost_per_commit` | number or null | `cost_usd` divided by `commits`, four decimal places; `null` without commits |
 | `tags` | array of strings | Tags you gave the session, in the order shown. In CSV, joined with `;` (tags cannot contain commas). Empty when there are none. See [Notes and tags](getting-started.md#notes-and-tags) |
 | `note` | string | Your note on the session; empty when there is none. Line breaks are kept |
 
@@ -88,6 +93,11 @@ JSON wraps the records in an object that identifies the format:
       "effort": "high",
       "claude_code_version": "2.1.0",
       "commits": 2,
+      "pull_requests": 1,
+      "files_changed": 6,
+      "lines_added": 182,
+      "lines_removed": 40,
+      "cost_per_commit": 1.7177,
       "tags": ["redesign", "PR review"],
       "note": "Waiting for design sign-off"
     }

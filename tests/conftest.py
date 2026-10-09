@@ -241,6 +241,7 @@ def claude_dir(tmp_path: Path) -> Path:
     nxt.prompt(200, "Carry on")
     nxt.assistant(201, [{"type": "text", "text": "ok"}], msg_id="n1", stop_reason="end_turn")
     nxt.turn_end(201)
+    nxt.meta("pr-link", prNumber=7, prUrl="https://github.com/o/demo/pull/7", prRepository="o/demo")
     nxt.meta(
         "cost-state",
         totalCostUSD=1.25,
