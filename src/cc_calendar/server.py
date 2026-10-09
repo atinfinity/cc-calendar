@@ -7,7 +7,8 @@ import json
 import logging
 import sqlite3
 import sys
-from contextlib import asynccontextmanager
+import threading
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -272,9 +273,22 @@ def create_app(
 
     latest: dict[str, str] = {}
 
+    async def fetch_latest() -> str | None:
+        # A daemon thread, not asyncio.to_thread: shutdown would wait for a slow request.
+        loop = asyncio.get_running_loop()
+        done: asyncio.Future[str | None] = loop.create_future()
+
+        def work() -> None:
+            version = update.fetch_latest()
+            with suppress(RuntimeError):  # the loop has closed
+                loop.call_soon_threadsafe(lambda: done.done() or done.set_result(version))
+
+        threading.Thread(target=work, daemon=True).start()
+        return await done
+
     async def check_updates() -> None:
         while True:
-            version = await asyncio.to_thread(update.fetch_latest)
+            version = await fetch_latest()
             if version and version != latest.get("version"):
                 latest["version"] = version
                 if update.newer(version):
