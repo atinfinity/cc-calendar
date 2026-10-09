@@ -12,10 +12,7 @@ automatically if needed. pipx and pip work too.
     cc-calendar
     ```
 
-    Update it later with `uv tool upgrade cc-calendar`.
-
-    If you installed v0.3.0 or earlier from GitHub, switch to the PyPI package once with
-    `uv tool install --force cc-calendar`. `uv tool upgrade` works from then on.
+    See [Update](#update) for getting new versions.
 
 === "Run without installing"
 
@@ -32,7 +29,7 @@ automatically if needed. pipx and pip work too.
     cc-calendar
     ```
 
-    Update it later with `pipx upgrade cc-calendar`. Without pipx, install it into a virtual
+    Without pipx, install it into a virtual
     environment with pip:
 
     ```sh
@@ -56,6 +53,50 @@ Linux, macOS and Windows are supported. On Windows the logs are read from
 `%USERPROFILE%\.claude\projects\`; one limitation: **Copy resume command** joins two commands
 with `&&`, which cmd and PowerShell 7 accept but Windows PowerShell 5.1 does not — there,
 replace the `&&` with `;`.
+
+## Update
+
+Check which version you have with `cc-calendar --version`; the [releases](https://github.com/atinfinity/cc-calendar/releases)
+list what changed in each one.
+
+=== "Installed with uv tool"
+
+    ```sh
+    uv tool upgrade cc-calendar
+    ```
+
+    `uv tool list` shows the installed version. To install a given version, or to go back to
+    one, use `uv tool install cc-calendar==0.6.0`.
+
+    If you installed v0.3.0 or earlier from GitHub, switch to the PyPI package once with
+    `uv tool install --force cc-calendar`. `uv tool upgrade` works from then on.
+
+=== "Run with uvx"
+
+    `uvx cc-calendar` reuses the version it cached the first time. Ask for the latest one:
+
+    ```sh
+    uvx cc-calendar@latest
+    ```
+
+=== "pipx or pip"
+
+    ```sh
+    pipx upgrade cc-calendar
+    ```
+
+    In a virtual environment: `.venv/bin/pip install --upgrade cc-calendar`.
+
+=== "From a checkout"
+
+    ```sh
+    git pull
+    uv run cc-calendar
+    ```
+
+A running `cc-calendar` keeps serving the old version: stop it with ++ctrl+c++ and start it
+again. Notes, tags, ratings and the search index are kept outside the installation, so they
+carry over.
 
 ## Options
 
