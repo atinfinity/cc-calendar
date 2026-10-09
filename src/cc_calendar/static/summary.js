@@ -11,6 +11,32 @@ export function activeMs(s, from, to) {
   return ms;
 }
 
+// Time in [from, to) of [start, end] spans: a session's working or waiting spans (see
+// SessionAcc.work_spans), which the server cuts at the "Split after" setting like the segments.
+function spansMs(spans, from, to) {
+  let ms = 0;
+  for (const [a, b] of spans || []) ms += Math.max(0, Math.min(b, to) - Math.max(a, from));
+  return ms;
+}
+
+// Your reply times: the waits that ended (with your prompt) in [from, to).
+function replies(s, from, to) {
+  return (s.waiting || []).filter(([, b]) => b >= from && b < to).map(([a, b]) => b - a);
+}
+
+export function median(values) {
+  if (!values.length) return null;
+  const v = [...values].sort((a, b) => a - b);
+  const mid = v.length >> 1;
+  return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+}
+
+// A reply time: seconds below a minute, where fmtDuration would round to "0m" or "1m".
+export function fmtReply(ms) {
+  if (ms == null) return "–";
+  return ms < 60_000 ? `${Math.round(ms / 1000)}s` : fmtDuration(ms);
+}
+
 // Cost: the session's cost split by when its API requests happened.
 function costIn(s, from, to) {
   if (!s.cost) return 0;
@@ -55,7 +81,7 @@ export function summarize(sessions, bounds) {
     if (!row) {
       row = {
         project: s.project, name: s.project_name, days: bounds.map(() => 0), ms: 0, cost: 0, estimated: false, sessions: 0,
-        commitKeys: new Set(), prUrls: new Set(),
+        commitKeys: new Set(), prUrls: new Set(), working: 0, waiting: 0, replies: [],
       };
       projects.set(s.project, row);
     }
@@ -73,6 +99,9 @@ export function summarize(sessions, bounds) {
       row.ms += ms;
       row.cost += cost;
       row.estimated ||= s.cost_estimated;
+      row.working += spansMs(s.working, from, to);
+      row.waiting += spansMs(s.waiting, from, to);
+      row.replies.push(...replies(s, from, to));
       addCommits(s, from, to, row.commitKeys);
     });
     if (!touched) continue;
@@ -84,6 +113,7 @@ export function summarize(sessions, bounds) {
   for (const r of rows) {
     r.commits = r.commitKeys.size;
     r.prs = r.prUrls.size;
+    r.reply = median(r.replies);
   }
   const total = {
     ms: days.reduce((n, d) => n + d.ms, 0),
@@ -91,6 +121,9 @@ export function summarize(sessions, bounds) {
     estimated: days.some((d) => d.estimated),
     commits: rows.reduce((n, r) => n + r.commits, 0),
     prs: rows.reduce((n, r) => n + r.prs, 0),
+    working: rows.reduce((n, r) => n + r.working, 0),
+    waiting: rows.reduce((n, r) => n + r.waiting, 0),
+    reply: median(rows.flatMap((r) => r.replies)),
   };
   return { days, rows, total, ratings: byRating(sessions, bounds) };
 }
@@ -197,6 +230,7 @@ export function renderSummary(container, summary, dayLabels, compare) {
         h("th", {}, "Project"),
         ...(perDay ? dayLabels.map((l) => h("th", { class: "num" }, l)) : []),
         h("th", { class: "num" }, "Active time"),
+        ...workHeads(),
         h("th", { class: "num" }, "Cost"),
         h("th", { class: "num" }, "Sessions"),
         h("th", { class: "num" }, "Commits"),
@@ -208,6 +242,7 @@ export function renderSummary(container, summary, dayLabels, compare) {
             h("span", { class: "dot", style: { background: state.projectColors.get(r.project) } }), projectLink(r.project, r.name)),
           ...dayCells(r.days),
           h("td", { class: "num strong" }, fmtDuration(r.ms)),
+          ...workCells(r),
           h("td", { class: "num" }, fmtCost(r.cost, r.estimated)),
           h("td", { class: "num" }, r.sessions),
           ...outputCells(r)))),
@@ -215,15 +250,37 @@ export function renderSummary(container, summary, dayLabels, compare) {
         h("td", {}, "Total"),
         ...dayCells(days.map((d) => d.ms)),
         h("td", { class: "num strong" }, fmtDuration(total.ms)),
+        ...workCells(total),
         h("td", { class: "num" }, fmtCost(total.cost, total.estimated)),
         h("td", { class: "num" }, rows.reduce((n, r) => n + r.sessions, 0)),
         ...outputCells(total)))),
     h("div", { class: "muted note" },
-      "Active time is the drawn bars (split after the idle threshold). A session's cost is divided by when its requests ran. "
+      "Active time is the drawn bars (split after the idle threshold). Working is Claude's turns, from your prompt to the end "
+      + "of its reply, plus waits for its own background tasks; Waiting is the time until your next prompt, and Reply is its "
+      + "median. Waits longer than the idle threshold count as neither. A session's cost is divided by when its requests ran. "
       + "Pull requests count in any range their session was active in."),
   );
   const line = ratingLine(summary.ratings, total);
   if (line) container.lastChild.before(line);
+}
+
+const WORK_HEADS = [
+  ["Working", "Time Claude spent on its turns (your prompt to the end of its reply) and waiting for its own background tasks"],
+  ["Waiting", "Time Claude waited for your next prompt after a turn ended, up to the idle threshold"],
+  ["Reply", "Median time you took to send the next prompt after Claude's turn ended"],
+];
+
+function workHeads() {
+  return WORK_HEADS.map(([label, title]) => h("th", { class: "num", title }, label));
+}
+
+// Working and waiting time and the median reply of a Summary row or the total.
+function workCells(r) {
+  return [
+    h("td", { class: "num" }, r.working ? fmtDuration(r.working) : ""),
+    h("td", { class: "num" }, r.waiting ? fmtDuration(r.waiting) : ""),
+    h("td", { class: "num" }, fmtReply(r.reply)),
+  ];
 }
 
 // Commits, PRs and cost per commit of a Summary row or the total.

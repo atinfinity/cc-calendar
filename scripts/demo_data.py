@@ -365,6 +365,7 @@ def build_session(i: int, spec: tuple, root: Path, rng: random.Random) -> None:
         plan = EFFORT_PLANS[i % len(EFFORT_PLANS)]
         w.effort = plan[p_idx % len(plan)]
         w.prompt(t, text)
+        turn_start = t
         steps = rng.randint(5, 14)
         for s in range(steps):
             t += timedelta(seconds=rng.randint(30, 200))
@@ -440,7 +441,10 @@ def build_session(i: int, spec: tuple, root: Path, rng: random.Random) -> None:
             break  # still working on the last request
         u = w.assistant(t, [{"type": "text", "text": "Done."}], model, "end_turn")
         usages.append((model, u))
-        w.rec("system", t, subtype="turn_duration", pendingBackgroundAgentCount=0)
+        duration = int((t - turn_start).total_seconds() * 1000)
+        w.rec(
+            "system", t, subtype="turn_duration", durationMs=duration, pendingBackgroundAgentCount=0
+        )
         t += timedelta(minutes=rng.randint(3, 15))
 
     w.records.append({"type": "ai-title", "sessionId": sid, "aiTitle": title})

@@ -187,6 +187,15 @@ a { color: var(--accent); }
 .mark-sample.commit::after { left: 3px; top: 1.5px; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2.5px solid #1f2328; }
 .mark-sample.error::after { left: 3.5px; top: 2px; width: 7px; height: 7px; background: #e5484d; border: 1.5px solid #fff; transform: rotate(45deg); }
 .mark-sample.match { background: var(--accent-soft); outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
+/* Day view: sessions active at once, as a step line (further right = more sessions). */
+.conc { position: relative; border-left: 1px solid var(--border); background: var(--bg-soft); }
+.conc svg { position: absolute; top: 0; left: 0; display: block; }
+.conc-head { font-size: 12px; }
+.conc-guide { stroke: var(--border); stroke-dasharray: 2 3; }
+.conc-area { fill: var(--accent); opacity: 0.12; }
+.conc-line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.conc-hit { fill: transparent; }
+.conc-hit:hover { fill: var(--accent); opacity: 0.15; }
 .now-line { position: absolute; left: 0; right: 0; border-top: 2px solid var(--now); z-index: 4; pointer-events: none; }
 .now-line::before {
   content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px;
