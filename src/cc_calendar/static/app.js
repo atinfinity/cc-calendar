@@ -7,7 +7,7 @@ import { EMPTY_FILTER, activeFilterCount, matchesListFilter, renderListFilters }
 import { bindNotifyToggle, checkTransitions } from "./notify.js";
 import { overviewRange, renderOverview } from "./overview.js";
 import { renderProject } from "./project.js";
-import { buildReport, copyText } from "./report.js";
+import { buildReport, buildRetrospective, copyText } from "./report.js";
 import { costPer } from "./summary.js";
 import { bloatTitle } from "./contextchart.js";
 import { bindShortcuts } from "./shortcuts.js";
@@ -788,6 +788,13 @@ function bind() {
     btn.textContent = ok ? "Copied ✓" : "Copy failed";
     clearTimeout(btn.timer);
     btn.timer = setTimeout(() => { btn.textContent = "Copy report"; }, 1500);
+  };
+  $("copy-retro").onclick = async () => {
+    const btn = $("copy-retro");
+    const ok = await copyText(buildRetrospective(filtered(), rangeDays(), $("range-label").textContent, state.span));
+    btn.textContent = ok ? "Copied ✓" : "Copy failed";
+    clearTimeout(btn.timer);
+    btn.timer = setTimeout(() => { btn.textContent = "Copy retrospective"; }, 1500);
   };
   for (const btn of document.querySelectorAll("#export button")) {
     btn.onclick = () => exportSessions(listRows(filtered()), btn.dataset.format, state.appVersion);

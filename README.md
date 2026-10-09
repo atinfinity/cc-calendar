@@ -136,6 +136,10 @@ the logs it covers.
   active time and cost per project, each session's title and tags (not notes) and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR
   numbers such as `#12` become links to the repository's `origin` remote.
+- **Retrospective prompt** — "Copy retrospective" copies the displayed range's totals, the change
+  from the previous range, the most expensive sessions, sessions with no output and friction
+  signals as Markdown, followed by a request to draft a Keep / Problem / Try retrospective. Paste
+  it into Claude; cc-calendar itself sends nothing. Notes are left out, as in the report.
 - **Tool usage** — the Tools pane aggregates tool calls in the displayed range: most used tools,
   error counts and rates (10% or more is highlighted), calls made inside subagents, MCP servers,
   and subagent runs by type with their tool calls, tokens and cost. It follows the current filters.
