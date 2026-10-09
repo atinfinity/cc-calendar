@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -540,6 +541,42 @@ class SessionAcc:
             if u.ts is not None:
                 out[u.ts // DENSITY_BUCKET_MS] += estimate_cost(u.model, u.usage)
         return {b: round(c, 6) for b, c in out.items() if c}
+
+    def prompt_costs(self) -> list[dict]:
+        """Cost and tokens of each timestamped prompt, oldest first.
+
+        A prompt owns the requests from it until the next prompt, plus the subagents started in
+        that span. With Claude Code's own cost record, the estimates are scaled to add up to it
+        (requests before the first prompt keep their share), like the per-day split in the UI.
+        """
+        prompts = sorted((p for p in self.prompts if p["ts"] is not None), key=lambda p: p["ts"])
+        starts = [p["ts"] for p in prompts]
+        out = [dict(p, cost=0.0, tokens=0, requests=0, subagents=0) for p in prompts]
+
+        def owner(ts: int | None) -> dict | None:
+            i = bisect_right(starts, ts) - 1 if ts is not None else -1
+            return out[i] if i >= 0 else None
+
+        estimated = 0.0
+        for u in self.usages.values():
+            cost = estimate_cost(u.model, u.usage)
+            estimated += cost
+            if (row := owner(u.ts)) is not None:
+                row["cost"] += cost
+                row["tokens"] += u.total
+                row["requests"] += 1
+        for sa in self.subagents.values():
+            cost = sa.cost()
+            estimated += cost
+            if (row := owner(sa.first_ts)) is not None:
+                row["cost"] += cost
+                row["tokens"] += sa.tokens()
+                row["subagents"] += 1
+        total, _ = self.cost()
+        scale = total / estimated if estimated else 1.0
+        for row in out:
+            row["cost"] *= scale
+        return out
 
     def all_usages(self) -> list[Usage]:
         """API usage of the session and its subagents."""

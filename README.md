@@ -124,6 +124,10 @@ the logs it covers.
 - **Tool usage** — the Tools pane aggregates tool calls in the displayed range: most used tools,
   error counts and rates (10% or more is highlighted), calls made inside subagents, MCP servers,
   and subagent runs by type with their tool calls, tokens and cost. It follows the current filters.
+- **Most expensive requests** — the Top requests pane ranks the prompts sent in the displayed
+  range by the cost of the requests that ran until the next prompt, subagents included, with
+  project, session, time and tokens. Click a row to open the transcript at that prompt. It follows
+  the current filters.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).

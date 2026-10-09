@@ -109,6 +109,31 @@ def test_tools(client):
     assert [(a["type"], a["runs"]) for a in data["subagents"]] == [("Explore", 1)]
 
 
+def test_requests(client):
+    sessions = client.get("/api/sessions").json()["sessions"]
+    start = min(s["start"] for s in sessions)
+    end = max(s["end"] for s in sessions) + 1
+    ids = ["s-basic", "s-sub", "s-next", "missing"]
+    data = client.post(
+        "/api/requests", json={"start": start, "end": end, "sessions": ids, "limit": 2}
+    ).json()
+    # One prompt each; the copy of s-prev that s-next starts with is not counted again.
+    assert data["prompts"] == 3 and len(data["top"]) == 2
+    top = data["top"][0]
+    # s-next's recorded $1.25 all falls to "Carry on", the only prompt with requests.
+    assert (top["session"], top["text"], top["cost"], top["estimated"]) == (
+        "s-next",
+        "Carry on",
+        1.25,
+        False,
+    )
+    assert data["top"][1]["session"] == "s-basic"
+    sub = client.post("/api/requests", json={"start": start, "end": end, "sessions": ["s-sub"]})
+    assert [(r["requests"], r["subagents"]) for r in sub.json()["top"]] == [(2, 1)]
+    bad = client.post("/api/requests", json={"start": 0, "end": 1, "sessions": [], "limit": 0})
+    assert bad.status_code == 422
+
+
 @pytest.fixture
 def multi_client(claude_dir, laptop_dir):
     dirs = [ClaudeDir("local", claude_dir), ClaudeDir("laptop", laptop_dir)]

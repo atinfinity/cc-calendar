@@ -56,6 +56,16 @@
     - calls made inside subagents
     - MCP servers
     - subagent runs by type, with their tokens and cost
+- **Most expensive requests**: the **Top requests** pane ranks the prompts sent in the displayed
+  range by cost.
+    - A prompt's cost covers the requests from it until the next prompt, plus the subagents
+      started in that span.
+    - Each row shows the cost, the prompt, its project and session, when it was sent, tokens, and
+      how many requests and subagents it took.
+    - The top 10 are shown; **Show all** lists up to 50.
+    - Click a row to open the transcript at that prompt.
+    - When a session has Claude Code's own cost record, its prompts' estimates are scaled to add
+      up to it, so they match the session's cost.
 - **Cache efficiency**: each session shows its cache hit rate and roughly how much caching saved.
   Rates below 90% are highlighted.
 
