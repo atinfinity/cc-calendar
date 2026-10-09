@@ -44,6 +44,9 @@
 - **Time and cost totals**:
     - Each date shows that day's active time and cost.
     - The Summary table breaks the displayed range down by project.
+    - **Cost per output**: the Summary table also counts each project's commits and pull requests
+      in the range, and divides its cost by the commits (**$/commit**). Pull requests carry no
+      time, so they count in any range their session was active in.
     - A session's cost is split across days by when its requests ran.
 - **Markdown report**: "Copy report" copies the displayed range as Markdown. The report covers:
     - active time and cost per project
@@ -133,13 +136,19 @@
     - Filter by project and status; each status chip shows its count. **With prompts only** (on
       by default) hides sessions in which no prompt was sent. These filters apply to every view.
     - Narrow the list further by model, git branch, source (with several config directories),
-      tag, date range and cost range. The date range keeps sessions that were active on any day in it.
+      tag, output, date range and cost range. The date range keeps sessions that were active on any day in it.
+      **Output → No output** keeps sessions with no commit, pull request or edited file; with a
+      minimum cost it lists sessions that cost a lot and produced nothing.
       These filters apply to the list only; the **Clear N filters** button resets them.
-    - Sort by any column.
+    - Sort by any column. **$/commit** is the session's cost divided by its commits; sessions
+      without commits show `–` and sort last. Its tooltip counts commits, pull requests, edited
+      files and lines.
 - **Project page**: click a project name to open it. Project names can be clicked in the list,
   the Summary table, the detail pane, and the project menu (**Page**). The page covers all time
   and ignores the filters. It shows:
-    - total active time, cost, sessions, prompts, tokens and commits
+    - total active time, cost, sessions, prompts, tokens, commits and pull requests
+    - cost per commit, and cost per changed line (lines added plus removed). Only sessions with
+      Claude Code's cost record know their line counts, so cost per line uses those sessions alone
     - active time, cost, sessions and commits per month
     - every session of the project; click one to open its details
     - the commit history, newest first, with links to the commits on GitHub or GitLab
@@ -153,7 +162,8 @@
     - start and end (ISO 8601 with your UTC offset) and active time
     - project, source config directory, branch, status and rating
     - prompts, tokens, cost and cache hit rate
-    - model, effort, Claude Code version and number of commits
+    - model, effort, Claude Code version
+    - commits, pull requests, edited files, lines added and removed, and cost per commit
     - tags and note
 
     See [Export format](export.md) for the fields and the JSON envelope.

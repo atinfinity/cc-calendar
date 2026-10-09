@@ -100,6 +100,9 @@ def summary(
             {"ts": c.get("ts"), "sha": c.get("sha"), "subject": c.get("subject")}
             for c in gitinfo.resolve_commits(s.commits)
         ],
+        "pr_list": [{"number": pr.get("number"), "url": pr["url"]} for pr in s.prs.values()],
+        "files_changed": len(s.files),
+        **s.lines_changed(),
         "repo_url": gitinfo.repo_url(s.cwd),
         "continued_in": s.continued_in,
         "continued_from": continued_from,

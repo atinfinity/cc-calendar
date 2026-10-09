@@ -1,5 +1,5 @@
 // Export the sessions shown in the list view as CSV or JSON.
-import { activeMs } from "./summary.js";
+import { activeMs, costPer } from "./summary.js";
 
 // ISO 8601 in local time with its UTC offset, e.g. 2026-10-04T09:30:00+09:00.
 export function isoLocal(ms) {
@@ -38,6 +38,11 @@ export function sessionRecords(rows) {
     effort: s.effort || null,
     claude_code_version: s.version || null,
     commits: (s.commit_list || []).length,
+    pull_requests: (s.pr_list || []).length,
+    files_changed: s.files_changed ?? 0,
+    lines_added: s.lines_added ?? null,
+    lines_removed: s.lines_removed ?? null,
+    cost_per_commit: round(costPer(s.cost, (s.commit_list || []).length), 4),
     tags: [...(s.tags || [])],
     note: s.note || "",
   }));
@@ -61,7 +66,8 @@ export function toCSV(records, fields) {
 export const EXPORT_FIELDS = [
   "id", "title", "project", "project_path", "source", "branch", "status", "rating", "start", "end",
   "active_minutes", "span_minutes", "prompts", "tokens", "cost_usd", "cost_estimated",
-  "cache_hit_rate", "model", "effort", "claude_code_version", "commits", "tags", "note",
+  "cache_hit_rate", "model", "effort", "claude_code_version", "commits", "pull_requests", "files_changed", "lines_added", "lines_removed",
+  "cost_per_commit", "tags", "note",
 ];
 
 // Bump when a field is renamed, removed or changes meaning; adding fields does not need it.

@@ -1,7 +1,9 @@
-// Extra filters of the list view: model, branch, source, rating, tag, date range and cost range.
+// Extra filters of the list view: model, branch, source, rating, tag, output, date range and cost
+// range.
+import { hasOutput } from "./summary.js";
 import { RATINGS, h, shortModel } from "./util.js";
 
-export const EMPTY_FILTER = { model: "", branch: "", source: "", rating: "", tag: "", from: "", to: "", costMin: "", costMax: "" };
+export const EMPTY_FILTER = { model: "", branch: "", source: "", rating: "", tag: "", output: "", from: "", to: "", costMin: "", costMax: "" };
 
 // The tag filter's value for sessions without tags; tags are trimmed, so none starts with a space.
 const UNTAGGED = " untagged";
@@ -22,6 +24,7 @@ export function matchesListFilter(s, f) {
   if (f.source && s.source !== f.source) return false;
   if (f.rating && (s.rating || UNRATED) !== f.rating) return false;
   if (f.tag === UNTAGGED ? s.tags.length : f.tag && !s.tags.some((t) => t.toLowerCase() === f.tag.toLowerCase())) return false;
+  if (f.output && hasOutput(s) !== (f.output === "yes")) return false;
   if (f.from && (s.end == null || s.end < midnight(f.from))) return false;
   if (f.to && (s.start == null || s.start >= midnight(f.to, 1))) return false;
   if (f.costMin !== "" && !((s.cost || 0) >= Number(f.costMin))) return false;
@@ -93,6 +96,11 @@ export function renderListFilters(container, sessions, f, onChange, { sources = 
     sources ? select("source", "Source", "All sources", (v) => v) : null,
     ratingSelect(sessions, f, set),
     tagSelect(sessions, f, set),
+    h("label", { class: "muted", title: "Output: commits, pull requests or edited files" }, "Output ",
+      h("select", { "data-key": "output", onchange: set("output") },
+        h("option", { value: "" }, "Any output"),
+        h("option", { value: "yes", selected: f.output === "yes" }, "With output"),
+        h("option", { value: "no", selected: f.output === "no" }, "No output"))),
     h("label", { class: "muted", title: "Sessions active on any day in this range" }, "Active ",
       input("from", { type: "date", "aria-label": "From date", max: f.to || null }), " – ",
       input("to", { type: "date", "aria-label": "To date", min: f.from || null })),
