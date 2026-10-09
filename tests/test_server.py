@@ -58,6 +58,14 @@ def test_sessions(client):
     # Output for cost per commit / PR / line.
     assert basic["files_changed"] == 1
     assert basic["pr_list"] == []
+    assert basic["friction"] == {
+        "interrupts": 0,
+        "api_errors": 0,
+        "queued_prompts": 0,
+        "tool_calls": 2,
+        "tool_errors": 0,
+        "total": 0,
+    }
     assert basic["lines_added"] is None and basic["lines_removed"] is None
     nxt = by_id["s-next"]
     assert nxt["pr_list"] == [{"number": 7, "url": "https://github.com/o/demo/pull/7"}]

@@ -14,6 +14,21 @@ const CHECKS = [
     "The repository has no uncommitted changes. This is its current state, not the state when the session ended"],
 ];
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// Friction signals side by side: [key, text, hint]. The tool error rate is the main session's.
+export function frictionParts(f) {
+  const rate = f.tool_calls ? ` (${fmtPct(f.tool_errors / f.tool_calls)})` : "";
+  return [
+    ["interrupts", plural(f.interrupts, "interrupt"), "Times you stopped Claude with Esc"],
+    ["api_errors", plural(f.api_errors, "API error"), "Requests that failed, e.g. overloaded, rate limited or a lost connection"],
+    ["queued_prompts", plural(f.queued_prompts, "queued prompt"),
+      "Prompts you sent while Claude was still working, which it read before its turn ended"],
+    ["tool_errors", `${f.tool_errors} of ${plural(f.tool_calls, "tool call")} failed${rate}`,
+      "Tool calls that returned an error, including commands that exited non-zero and tool uses you rejected. Subagents' tool calls are not counted"],
+  ];
+}
+
 // Quote for POSIX shells unless the text is plainly safe.
 export function shellQuote(text) {
   return /^[\w@%+=:,./-]+$/.test(text) ? text : `'${text.replaceAll("'", "'\\''")}'`;
@@ -118,6 +133,11 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
     const title = v == null ? `${hint} (unknown)` : hint;
     return h("span", { class: `check-pill ${cls}`, title }, `${mark} ${label}`);
   }))));
+
+  // Most sessions have some failed tool calls, so only interrupts and API errors stand out.
+  const f = d.friction;
+  parts.push(card("Friction", h("div", { class: "stats" }, frictionParts(f).map(([key, text, hint]) =>
+    h("span", { class: "stat" + (f[key] && (key === "interrupts" || key === "api_errors") ? " warn" : ""), title: hint }, text)))));
 
   // Outcomes
   const outcome = [];
