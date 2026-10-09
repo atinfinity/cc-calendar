@@ -145,6 +145,7 @@ def shoot(url: str) -> None:
             ("requests", "requests-pane"),
             ("hours", "hours-pane"),
             ("tools", "tools-pane"),
+            ("prs", "prs-pane"),
         ]:
             toggle = "summary-toggle" if name == "summary" else f"{name}-toggle"
             page.click(f"#{toggle}")

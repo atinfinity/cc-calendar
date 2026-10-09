@@ -108,3 +108,59 @@ export function exportSessions(rows, format, appVersion) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
+
+// One flat record per pull request, from /api/prs.
+export function prRecords(prs) {
+  return prs.map((p) => ({
+    url: p.url,
+    number: p.number,
+    repository: p.repo,
+    title: p.title,
+    head_branch: p.head,
+    created: isoLocal(p.created),
+    opened_in: p.opened_in,
+    sessions: p.sessions.map((s) => s.id),
+    active_minutes: round(p.active_ms / 60000, 1),
+    requests: p.requests,
+    tokens: p.tokens,
+    cost_usd: round(p.cost, 4),
+    cost_estimated: p.estimated,
+    commits: p.commits,
+  }));
+}
+
+export const PR_EXPORT_FIELDS = [
+  "url", "number", "repository", "title", "head_branch", "created", "opened_in", "sessions",
+  "active_minutes", "requests", "tokens", "cost_usd", "cost_estimated", "commits",
+];
+
+// The rows of a Pull requests table; JSON also has each session's share and the work no PR took.
+export function exportPrs(data, format, appVersion, name = "pull-requests") {
+  const records = prRecords(data.prs);
+  const u = data.unattributed;
+  const body = format === "csv"
+    ? "﻿" + toCSV(records, PR_EXPORT_FIELDS)
+    : JSON.stringify({
+      format: "cc-calendar.pull_requests",
+      schema_version: SCHEMA_VERSION,
+      generator: appVersion ? `cc-calendar ${appVersion}` : "cc-calendar",
+      exported_at: isoLocal(Date.now()),
+      pull_requests: records.map((r, i) => ({
+        ...r,
+        sessions: data.prs[i].sessions.map((s) => ({ id: s.id, cost_usd: round(s.cost, 4) })),
+      })),
+      unattributed: {
+        sessions: u.sessions, active_minutes: round(u.active_ms / 60000, 1), requests: u.requests,
+        tokens: u.tokens, cost_usd: round(u.cost, 4), cost_estimated: u.estimated, commits: u.commits,
+      },
+    }, null, 2) + "\n";
+  const type = format === "csv" ? "text/csv;charset=utf-8" : "application/json";
+  const url = URL.createObjectURL(new Blob([body], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `cc-calendar-${name}-${isoLocal(Date.now()).slice(0, 10)}.${format}`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
