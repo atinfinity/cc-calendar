@@ -95,10 +95,19 @@ async function fetchJSON(url) {
   return res.json();
 }
 
+// The version of the running server, which can differ from what is installed until it restarts.
+function showVersion(version) {
+  const badge = document.getElementById("app-version");
+  badge.textContent = version ? `v${version}` : "";
+  badge.title = version ? `cc-calendar ${version} is running` : "";
+  document.getElementById("help-version").textContent = version ? `cc-calendar ${version}` : "";
+}
+
 async function loadSessions() {
   const data = await fetchJSON(`/api/sessions?gap=${state.gap}`);
   state.sessions = data.sessions;
   state.appVersion = data.version;
+  showVersion(data.version);
   state.claudeDirs = data.claude_dirs || [];
   state.tags = data.tags || [];
   state.notesError = data.notes_error || null;

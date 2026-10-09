@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">cc-calendar</div>
+    <div class="brand">cc-calendar <span class="brand-version" id="app-version"></span></div>
     <div class="seg" id="view-toggle">
       <button data-view="calendar" title="Calendar (c)">Calendar</button>
       <button data-view="list" title="List (l)">List</button>
@@ -136,6 +136,7 @@
         <button id="help-close" aria-label="Close">✕</button>
       </div>
       <table class="help-keys" id="help-keys"></table>
+      <p class="muted help-version" id="help-version"></p>
     </div>
   </div>
   <div class="tooltip" id="tooltip" hidden></div>
