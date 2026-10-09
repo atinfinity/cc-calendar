@@ -169,6 +169,18 @@
     - files changed and pull requests
     - subagents and background tasks
     - links between a session and the one it was continued in
+- **Friction**: the **Friction** card counts signs that a session went badly, side by side:
+    - **interrupts**: times you stopped Claude with Esc
+    - **API errors**: requests that failed, e.g. overloaded or rate limited
+    - **queued prompts**: prompts you sent while Claude was still working, which it read before
+      its turn ended
+    - **failed tool calls**, out of all tool calls, with the error rate. Commands that exited
+      non-zero and tool uses you rejected count as failures. Subagents' tool calls are left out:
+      their failures are retries you do not see.
+
+    The list view's **Friction** column adds the four counts up, so sorting by it puts the
+    roughest sessions first. Hover a cell for the counts. Longer sessions tend to collect more, so
+    compare it with the Prompts column.
 - **Notes and tags**: the **Notes** card in the detail pane keeps a rating, a note and
   tags for the session. Click **+ Add note or tags** to start.
     - **Rating** rates how the session went: **✓ Done**, **◐ Partial** or **✕ Failed**. One click
@@ -244,6 +256,7 @@
     - prompts, tokens, cost and cache hit rate
     - model, effort, Claude Code version
     - commits, pull requests, edited files, lines added and removed, and cost per commit
+    - friction: interrupts, API errors, queued prompts, tool calls and failed tool calls
     - tags and note
 
     See [Export format](export.md) for the fields and the JSON envelope.
