@@ -44,6 +44,7 @@ export const state = {
   sort: prefs.get("listSort", { key: "start", dir: "desc" }),
   listFilter: { ...EMPTY_FILTER, ...prefs.get("listFilter", {}) }, // list view only
   showSummary: prefs.get("summary", false),
+  compareRanges: prefs.get("compareRanges", false), // Summary: compare with the previous range
   showTools: prefs.get("tools", false),
   showCosts: prefs.get("costs", false),
   showRequests: prefs.get("requests", false),
@@ -773,7 +774,8 @@ function bind() {
   };
   $("copy-report").onclick = async () => {
     const btn = $("copy-report");
-    const ok = await copyText(buildReport(filtered(), rangeDays(), $("range-label").textContent));
+    const ok = await copyText(buildReport(filtered(), rangeDays(), $("range-label").textContent,
+      state.compareRanges ? state.span : null));
     btn.textContent = ok ? "Copied ✓" : "Copy failed";
     clearTimeout(btn.timer);
     btn.timer = setTimeout(() => { btn.textContent = "Copy report"; }, 1500);

@@ -48,6 +48,12 @@
     - **Cost per output**: the Summary table also counts each project's commits and pull requests
       in the range, and divides its cost by the commits (**$/commit**). Pull requests carry no
       time, so they count in any range their session was active in.
+    - **Compare with previous**: the button above the Summary table shows each project's active
+      time, cost, sessions, commits and pull requests next to the previous day, week, month or
+      year, with the change (Δ). Hover a change for the previous value. Projects active in only
+      one of the two ranges are marked **new** or **absent**. The same filters apply to both
+      ranges, and a range still in progress is compared with the whole previous one. "Copy
+      report" then adds a line with the change in the totals.
     - A session's cost is split across days by when its requests ran.
 - **Markdown report**: "Copy report" copies the displayed range as Markdown. The report covers:
     - active time and cost per project
