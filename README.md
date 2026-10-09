@@ -133,6 +133,10 @@ the logs it covers.
   under their own model. The week and month views add a row per day, so a spike can be traced to
   one token type. It follows the current filters; sessions with Claude Code's own cost record are
   split by the estimate's proportions.
+- **Most expensive requests** — the Top requests pane ranks the prompts sent in the displayed
+  range by the cost of the requests that ran until the next prompt, subagents included, with
+  project, session, time and tokens. Click a row to open the transcript at that prompt. It follows
+  the current filters.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).

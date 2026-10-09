@@ -10,6 +10,7 @@ import { renderProject } from "./project.js";
 import { buildReport, copyText } from "./report.js";
 import { costPer } from "./summary.js";
 import { bindShortcuts } from "./shortcuts.js";
+import { renderRequestsPane } from "./requestspane.js";
 import { renderToolsPane } from "./toolspane.js";
 import { closeLog, openLog } from "./transcript.js";
 import { majorChange, readHash, stateHash } from "./urlstate.js";
@@ -44,6 +45,7 @@ export const state = {
   showSummary: prefs.get("summary", false),
   showTools: prefs.get("tools", false),
   showCosts: prefs.get("costs", false),
+  showRequests: prefs.get("requests", false),
   appVersion: null, // cc-calendar version reported by the server
   dataVersion: 0, // bumped on every reload so cached aggregates refresh
   showMarks: prefs.get("marks", true),
@@ -411,6 +413,7 @@ function renderMain() {
   }
   renderTools(visible);
   renderCosts(visible);
+  renderRequests(visible);
 }
 
 function renderTools(visible) {
@@ -439,6 +442,21 @@ function renderCosts(visible) {
   renderCostsPane(pane, { bounds, labels, ids, key: `${bounds.join(",")}|${state.dataVersion}|${ids.join(",")}` });
 }
 
+function renderRequests(visible) {
+  const pane = $("requests-pane");
+  pane.hidden = !(state.showRequests && state.view === "calendar");
+  if (pane.hidden) return;
+  const days = rangeDays();
+  const start = days[0].getTime();
+  const end = addDays(days[days.length - 1], 1).getTime();
+  const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
+  renderRequestsPane(pane, {
+    start, end, ids,
+    key: `${start}|${end}|${state.dataVersion}|${ids.join(",")}`,
+    onOpen: (id, ts) => openEvent(id, ts, "prompt"),
+  });
+}
+
 function renderToolbar() {
   document.querySelectorAll("#view-toggle button").forEach((b) =>
     b.classList.toggle("active", state.project == null && b.dataset.view === state.view));
@@ -452,6 +470,7 @@ function renderToolbar() {
   $("summary-toggle").classList.toggle("active", state.showSummary);
   $("tools-toggle").classList.toggle("active", state.showTools);
   $("costs-toggle").classList.toggle("active", state.showCosts);
+  $("requests-toggle").classList.toggle("active", state.showRequests);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
 
@@ -727,6 +746,11 @@ function bind() {
   $("costs-toggle").onclick = () => {
     state.showCosts = !state.showCosts;
     prefs.set("costs", state.showCosts);
+    renderAll();
+  };
+  $("requests-toggle").onclick = () => {
+    state.showRequests = !state.showRequests;
+    prefs.set("requests", state.showRequests);
     renderAll();
   };
   $("copy-report").onclick = async () => {

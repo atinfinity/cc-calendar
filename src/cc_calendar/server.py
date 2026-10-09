@@ -19,6 +19,7 @@ from watchfiles import awatch
 
 from . import __version__, gitinfo
 from .costs import cost_breakdown
+from .expensive import expensive_requests
 from .logview import build_entries, find_entries, log_events
 from .notes import NOTE_LIMIT, TAGS_PER_SESSION, Notes, NotesUnavailable
 from .parser import SessionAcc
@@ -165,6 +166,10 @@ class ToolsQuery(BaseModel):
 class CostsQuery(BaseModel):
     bounds: list[tuple[int, int]] = Field(min_length=1, max_length=400)  # [start, end) per day
     sessions: list[str] = Field(max_length=100_000)
+
+
+class RequestsQuery(ToolsQuery):
+    limit: int = Field(50, ge=1, le=500)
 
 
 class NotesUpdate(BaseModel):
@@ -408,6 +413,13 @@ def create_app(
         with store.lock:
             picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
             return cost_breakdown(picked, q.bounds)
+
+    @app.post("/api/requests")
+    def requests(q: RequestsQuery) -> dict:
+        """The costliest prompts sent in the range, among the given sessions."""
+        with store.lock:
+            picked = [store.sessions[i] for i in q.sessions if i in store.sessions]
+            return expensive_requests(picked, q.start, q.end, q.limit)
 
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:
