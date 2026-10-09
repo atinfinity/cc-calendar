@@ -58,6 +58,14 @@ def test_sessions(client):
     # Output for cost per commit / PR / line.
     assert basic["files_changed"] == 1
     assert basic["pr_list"] == []
+    assert basic["friction"] == {
+        "interrupts": 0,
+        "api_errors": 0,
+        "queued_prompts": 0,
+        "tool_calls": 2,
+        "tool_errors": 0,
+        "total": 0,
+    }
     assert basic["lines_added"] is None and basic["lines_removed"] is None
     nxt = by_id["s-next"]
     assert nxt["pr_list"] == [{"number": 7, "url": "https://github.com/o/demo/pull/7"}]
@@ -135,6 +143,11 @@ def test_costs(client):
     data = res.json()
     assert [m["model"] for m in data["models"]] == ["claude-sonnet-5-5", "claude-haiku-4-5"]
     assert data["sessions"] == 1 and len(data["days"]) == 1
+    assert {(u["model"], u["agent"]) for u in data["usage"]} == {
+        ("claude-sonnet-5-5", False),
+        ("claude-haiku-4-5", True),
+    }
+    assert data["prices"] and all(len(p["rates"]) == 4 for p in data["prices"])
     assert client.post("/api/costs", json={"bounds": [], "sessions": []}).status_code == 422
 
 

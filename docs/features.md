@@ -19,6 +19,15 @@
     - Month cells list the day's busiest projects.
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
+- **Monthly budget**: a line under the month view's legend shows the month's spend so far, the
+  daily average and, for the current month, the projected month-end total (the daily average so
+  far, today included, times the days in the month). Past months show their actual total.
+    - Click **Budget** to set a monthly budget. A bar then shows the spend and the projection
+      against it, and turns red when the projection is over budget.
+    - Set a **Plan price** (such as your subscription's monthly price) to compare: "API equivalent
+      \$X vs plan \$Y".
+    - Both are kept in this browser's local storage. The figures follow the current filters.
+    - These are rough estimates from the logs at API list prices, not billing data.
 - **Colors** by project, status, model, effort (the level most requests ran at), source (with
   several config directories), tag or cost
   (< \$1 / \$1–5 / \$5–20 / \$20–50 / ≥ \$50).
@@ -48,6 +57,12 @@
     - **Cost per output**: the Summary table also counts each project's commits and pull requests
       in the range, and divides its cost by the commits (**$/commit**). Pull requests carry no
       time, so they count in any range their session was active in.
+    - **Compare with previous**: the button above the Summary table shows each project's active
+      time, cost, sessions, commits and pull requests next to the previous day, week, month or
+      year, with the change (Δ). Hover a change for the previous value. Projects active in only
+      one of the two ranges are marked **new** or **absent**. The same filters apply to both
+      ranges, and a range still in progress is compared with the whole previous one. "Copy
+      report" then adds a line with the change in the totals.
     - A session's cost is split across days by when its requests ran.
 - **Markdown report**: "Copy report" copies the displayed range as Markdown. The report covers:
     - active time and cost per project
@@ -69,6 +84,16 @@
 
     It follows the current filters. A session with Claude Code's own cost record keeps that
     total, split by the estimate's proportions.
+- **What-if cost**: the **What if** section at the bottom of the Costs pane re-prices the
+  displayed range as if one model's requests (or all of them) had run on another model:
+    - pick the model, the model to price it as, and main thread, subagents or both
+    - shows the actual cost, the re-priced cost and the difference
+    - target models are those in the price table
+
+    It keeps the same token counts, so it is a rough estimate: a different model or effort
+    level would write different amounts. A session with Claude Code's own cost record is
+    re-priced at the same ratio of recorded to estimated cost, so both figures compare on the
+    same footing.
 - **Most expensive requests**: the **Top requests** pane ranks the prompts sent in the displayed
   range by cost.
     - A prompt's cost covers the requests from it until the next prompt, plus the subagents
@@ -163,6 +188,18 @@
     - files changed and pull requests
     - subagents and background tasks
     - links between a session and the one it was continued in
+- **Friction**: the **Friction** card counts signs that a session went badly, side by side:
+    - **interrupts**: times you stopped Claude with Esc
+    - **API errors**: requests that failed, e.g. overloaded or rate limited
+    - **queued prompts**: prompts you sent while Claude was still working, which it read before
+      its turn ended
+    - **failed tool calls**, out of all tool calls, with the error rate. Commands that exited
+      non-zero and tool uses you rejected count as failures. Subagents' tool calls are left out:
+      their failures are retries you do not see.
+
+    The list view's **Friction** column adds the four counts up, so sorting by it puts the
+    roughest sessions first. Hover a cell for the counts. Longer sessions tend to collect more, so
+    compare it with the Prompts column.
 - **Notes and tags**: the **Notes** card in the detail pane keeps a rating, a note and
   tags for the session. Click **+ Add note or tags** to start.
     - **Rating** rates how the session went: **✓ Done**, **◐ Partial** or **✕ Failed**. One click
@@ -238,6 +275,7 @@
     - prompts, tokens, cost, cache hit rate and idle re-cache cost
     - model, effort, Claude Code version
     - commits, pull requests, edited files, lines added and removed, and cost per commit
+    - friction: interrupts, API errors, queued prompts, tool calls and failed tool calls
     - tags and note
 
     See [Export format](export.md) for the fields and the JSON envelope.

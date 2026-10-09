@@ -385,6 +385,8 @@ class SessionAcc:
     last_turn_end_ts: int | None = None
     last_prompt_ts: int | None = None
     last_interrupt_ts: int | None = None
+    interrupts: int = 0  # times the user stopped Claude with Esc
+    queued_prompts: int = 0  # prompts typed while Claude was working, read mid-turn
     pending_background: int = 0
     compactions: list[dict] = field(default_factory=list)  # {ts, trigger, pre, post}
     efforts: dict[str, str] = field(default_factory=dict)  # API request id -> effort level
@@ -489,6 +491,10 @@ class SessionAcc:
             if att.get("type") == "queued_command" and isinstance(prompt, str):
                 if "<task-notification>" in prompt:
                     self._feed_notification(prompt)
+                elif att.get("commandMode") == "prompt" and isinstance(att.get("origin"), dict):
+                    # A prompt typed while Claude was working, which it read before its turn ended.
+                    if att["origin"].get("kind") == "human":
+                        self.queued_prompts += 1
         elif rtype == "ai-title":
             self.ai_title = rec.get("aiTitle") or self.ai_title
         elif rtype == "agent-name":
@@ -528,6 +534,7 @@ class SessionAcc:
                 self.density_events.append(ts)
         elif kind == "interrupt":
             self.last_interrupt_ts = ts
+            self.interrupts += 1
         elif kind == "notification":
             self._feed_notification(content_text(content))
         elif kind == "tool_result":
@@ -728,6 +735,25 @@ class SessionAcc:
         out += [(c["ts"], "compact", compact_extra(c)) for c in self.compactions]
         out += [(t, "error") for t in self.api_errors]
         return sorted(out, key=lambda m: (m[0], m[1]))
+
+    def friction(self) -> dict[str, int]:
+        """Signs that the session went badly, counted side by side.
+
+        Tool calls and errors are the main session's: a subagent's failures are its own retries,
+        which the user does not see. `total` adds up the events, as a sort key.
+        """
+        calls = [c for c in self.tool_calls if c[3] is None]
+        out = {
+            "interrupts": self.interrupts,
+            "api_errors": len(self.api_errors),
+            "queued_prompts": self.queued_prompts,
+            "tool_calls": len(calls),
+            "tool_errors": sum(1 for c in calls if c[2]),
+        }
+        out["total"] = (
+            out["interrupts"] + out["api_errors"] + out["queued_prompts"] + out["tool_errors"]
+        )
+        return out
 
     def effort_mix(self) -> dict[str, int]:
         """API requests per effort level, highest level first."""

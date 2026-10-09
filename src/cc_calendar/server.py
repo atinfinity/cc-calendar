@@ -107,6 +107,7 @@ def summary(
         "pr_list": [{"number": pr.get("number"), "url": pr["url"]} for pr in s.prs.values()],
         "files_changed": len(s.files),
         **s.lines_changed(),
+        "friction": s.friction(),
         "repo_url": gitinfo.repo_url(s.cwd),
         "continued_in": s.continued_in,
         "continued_from": continued_from,

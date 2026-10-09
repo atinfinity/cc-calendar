@@ -45,6 +45,12 @@ CSV and JSON carry the same fields, in this order.
 | `lines_added` | integer or null | Lines added, from Claude Code's cost record (a continued session's own share); `null` when the session wrote none or its share is unknown |
 | `lines_removed` | integer or null | Lines removed, as for `lines_added` |
 | `cost_per_commit` | number or null | `cost_usd` divided by `commits`, four decimal places; `null` without commits |
+| `interrupts` | integer | Times you stopped Claude with Esc |
+| `api_errors` | integer | API requests that failed (overloaded, rate limited, connection lost and the like) |
+| `queued_prompts` | integer | Prompts you sent while Claude was still working, which it read before its turn ended |
+| `tool_calls` | integer | Tool calls in the main session; subagents' calls are not counted |
+| `tool_errors` | integer | Of `tool_calls`, those that returned an error, including commands that exited non-zero and tool uses you rejected |
+| `friction` | integer | `interrupts` + `api_errors` + `queued_prompts` + `tool_errors`, as in the Friction column |
 | `tags` | array of strings | Tags you gave the session, in the order shown. In CSV, joined with `;` (tags cannot contain commas). Empty when there are none. See [Notes and tags](getting-started.md#notes-and-tags) |
 | `note` | string | Your note on the session; empty when there is none. Line breaks are kept |
 
@@ -102,6 +108,12 @@ JSON wraps the records in an object that identifies the format:
       "lines_added": 182,
       "lines_removed": 40,
       "cost_per_commit": 1.7177,
+      "interrupts": 1,
+      "api_errors": 0,
+      "queued_prompts": 2,
+      "tool_calls": 84,
+      "tool_errors": 5,
+      "friction": 8,
       "tags": ["redesign", "PR review"],
       "note": "Waiting for design sign-off"
     }
@@ -130,4 +142,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
 | 1 | 0.4.0 | Added `source`, `tags` and `note` |
-| 1 | Unreleased | Added `rating` and `idle_recache_usd` |
+| 1 | Unreleased | Added `rating`, `idle_recache_usd`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction` |
