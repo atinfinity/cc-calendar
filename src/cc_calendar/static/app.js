@@ -449,7 +449,7 @@ function renderTools(visible) {
   const start = days[0].getTime();
   const end = addDays(days[days.length - 1], 1).getTime();
   const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
-  renderToolsPane(pane, { start, end, ids, key: `${start}|${end}|${state.dataVersion}|${ids.join(",")}` });
+  renderToolsPane(pane, { start, end, ids, key: `${start}|${end}|${ids.join(",")}`, version: state.dataVersion });
 }
 
 // Per-day rows in the week and month views; the day and year views get one total.
@@ -464,7 +464,7 @@ function renderCosts(visible) {
   const bounds = perDay ? days.map((d) => [d.getTime(), addDays(d, 1).getTime()]) : [[start, end]];
   const labels = perDay ? days.map((d) => `${d.toLocaleDateString([], { weekday: "short" })} ${d.getDate()}`) : null;
   const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
-  renderCostsPane(pane, { bounds, labels, ids, key: `${bounds.join(",")}|${state.dataVersion}|${ids.join(",")}` });
+  renderCostsPane(pane, { bounds, labels, ids, key: `${bounds.join(",")}|${ids.join(",")}`, version: state.dataVersion });
 }
 
 function renderRequests(visible) {
@@ -477,7 +477,7 @@ function renderRequests(visible) {
   const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
   renderRequestsPane(pane, {
     start, end, ids,
-    key: `${start}|${end}|${state.dataVersion}|${ids.join(",")}`,
+    key: `${start}|${end}|${ids.join(",")}`, version: state.dataVersion,
     onOpen: (id, ts) => openEvent(id, ts, "prompt"),
   });
 }
@@ -493,7 +493,7 @@ function renderPrs(visible) {
   const ids = visible.filter((s) => s.segments.some(([a, b]) => b >= start && a < end)).map((s) => s.id);
   renderPrsPane(pane, {
     slot: "pane", ids, scope: "worked on in this range", exportName: "pull-requests",
-    key: `${state.dataVersion}|${state.gap}|${ids.join(",")}`,
+    key: `${state.gap}|${ids.join(",")}`,
   });
 }
 

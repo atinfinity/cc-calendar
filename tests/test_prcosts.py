@@ -2,7 +2,7 @@ import pytest
 from conftest import BASE, PROJECT, LogBuilder, continuation, cost_totals, parse_minute, ts
 from fastapi.testclient import TestClient
 
-from cc_calendar.parser import SessionAcc, pr_create_args
+from cc_calendar.parser import SessionAcc, pr_create_args, pr_create_calls
 from cc_calendar.prcosts import Attribution, pr_costs
 from cc_calendar.server import create_app
 from cc_calendar.store import Store
@@ -67,6 +67,56 @@ def test_pr_create_args():
     title = 'gh pr create --title "$(git log -1 --format=%s)"'
     assert pr_create_args(title) == (None, None)
     assert pr_create_args('git commit -m "--title x"') == (None, None)
+    # Shell variables are not known from the command; single quotes keep a "$" as it is.
+    assert pr_create_args('gh pr create --title "$t" --head "$br"') == (None, None)
+    assert pr_create_args("gh pr create -t ${TITLE} -H $BRANCH") == (None, None)
+    assert pr_create_args("gh pr create -t 'Costs in $' -H feat") == ("Costs in $", "feat")
+    assert pr_create_args('gh pr create -t "Save $5 a month"') == (None, None)
+    assert pr_create_args(r'gh pr create -t "Save \$5 a month"') == ("Save $5 a month", None)
+
+
+def test_pr_create_calls():
+    cmd = (
+        'gh pr create -H one -t "First" -F a.md && '
+        "u=$(gh pr create --head two --title 'Second'); echo $u"
+    )
+    assert pr_create_calls(cmd) == [("First", "one"), ("Second", "two")]
+    assert pr_create_args(cmd) == (None, None)
+    assert pr_create_calls("gh pr list") == []
+    # A body that mentions the command, as text or in a here-document, is not a call.
+    body = "gh pr create -t 'Doc' --body \"Use \\`gh pr create\\` to open one\""
+    assert pr_create_calls(body) == [("Doc", None)]
+    heredoc = "gh pr create -t 'Doc' -F - <<'EOF'\ngh pr create opens a PR\nEOF"
+    assert pr_create_calls(heredoc) == [("Doc", None)]
+
+
+def test_several_prs_in_one_command():
+    """Claude Code's result names one of the PRs; the printed links pair with the calls."""
+    b = LogBuilder("s1")
+    work(b, 0, 2, "a")
+    urls = [f"{REPO}/pull/{n}" for n in (21, 22)]
+    cmd = 'gh pr create -H one -t "First" -F a.md && gh pr create -H two -t "Second" -F b.md'
+    b.tool_use(5, "t-two", "Bash", {"command": cmd}, msg_id="pr-two")
+    tur = {"gitOperation": {"pr": {"action": "created", "number": 22, "url": urls[1]}}}
+    b.tool_result(5.5, "t-two", "\n".join(urls), tur)
+    s = feed(b)
+    assert [(s.prs[u]["number"], s.prs[u]["title"], s.prs[u]["head"]) for u in urls] == [
+        (21, "First", "one"),
+        (22, "Second", "two"),
+    ]
+    # Without one link per call, which call opened the PR is not known.
+    c = LogBuilder("s2")
+    c.tool_use(5, "t-x", "Bash", {"command": cmd}, msg_id="pr-x")
+    c.tool_result(5.5, "t-x", urls[1], tur)
+    pr = feed(c).prs[urls[1]]
+    assert pr["title"] is None and pr["head"] is None and pr["created"] is not None
+    # One call in a loop that opened both: neither is known.
+    loop = LogBuilder("s3")
+    cmd = 'for b in one two; do gh pr create -H "$b" -t "Same title"; done'
+    loop.tool_use(5, "t-l", "Bash", {"command": cmd, "description": "x"}, msg_id="pr-l")
+    loop.tool_result(5.5, "t-l", "\n".join(urls), tur)
+    pr = feed(loop).prs[urls[1]]
+    assert pr["title"] is None and pr["head"] is None
 
 
 def test_parser_records_pr_creation():
