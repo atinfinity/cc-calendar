@@ -34,6 +34,7 @@ export function sessionRecords(rows) {
     cost_usd: round(s.cost, 4),
     cost_estimated: Boolean(s.cost_estimated),
     cache_hit_rate: round(s.cache_hit, 4),
+    idle_recache_usd: round(s.idle_recache ?? 0, 4),
     model: s.model || null,
     effort: s.effort || null,
     claude_code_version: s.version || null,
@@ -72,7 +73,7 @@ export function toCSV(records, fields) {
 export const EXPORT_FIELDS = [
   "id", "title", "project", "project_path", "source", "branch", "status", "rating", "start", "end",
   "active_minutes", "span_minutes", "prompts", "tokens", "cost_usd", "cost_estimated",
-  "cache_hit_rate", "model", "effort", "claude_code_version", "commits", "pull_requests", "files_changed", "lines_added", "lines_removed",
+  "cache_hit_rate", "idle_recache_usd", "model", "effort", "claude_code_version", "commits", "pull_requests", "files_changed", "lines_added", "lines_removed",
   "cost_per_commit", "interrupts", "api_errors", "queued_prompts", "tool_calls", "tool_errors", "friction",
   "tags", "note",
 ];

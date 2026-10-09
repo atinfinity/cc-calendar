@@ -35,6 +35,7 @@ CSV and JSON carry the same fields, in this order.
 | `cost_usd` | number | Cost in US dollars, four decimal places |
 | `cost_estimated` | boolean | `true` when the cost is estimated from token usage (shown with `~` in the app) |
 | `cache_hit_rate` | number or null | Cache reads as a share of all input-side tokens (input, cache writes and cache reads), from 0 to 1 |
+| `idle_recache_usd` | number | Estimated cost of rewriting the prompt cache after idle gaps, four decimal places. See [Idle re-cache](features.md#time-cost-and-usage) |
 | `model` | string or null | Model used for the most requests |
 | `effort` | string or null | Effort level most requests ran at: `max`, `xhigh`, `high`, `medium` or `low` |
 | `claude_code_version` | string or null | Claude Code version recorded in the log (the latest one if it changed) |
@@ -97,6 +98,7 @@ JSON wraps the records in an object that identifies the format:
       "cost_usd": 3.4354,
       "cost_estimated": true,
       "cache_hit_rate": 0.9712,
+      "idle_recache_usd": 0.1825,
       "model": "claude-sonnet-5-5",
       "effort": "high",
       "claude_code_version": "2.1.0",
@@ -140,4 +142,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
 | 1 | 0.4.0 | Added `source`, `tags` and `note` |
-| 1 | Unreleased | Added `rating`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction` |
+| 1 | Unreleased | Added `rating`, `idle_recache_usd`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction` |

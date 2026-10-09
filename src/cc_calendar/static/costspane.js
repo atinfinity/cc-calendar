@@ -1,5 +1,5 @@
 // Cost across the sessions in the displayed range, by model and token type, and per day.
-import { fmtCost, fmtTokens, h, shortModel } from "./util.js";
+import { fmtCost, fmtTokens, h, idleRecacheTitle, shortModel } from "./util.js";
 
 // In the order the server sends tokens and costs.
 const TYPES = [["in", "Input"], ["out", "Output"], ["write", "Cache write"], ["read", "Cache read"]];
@@ -46,6 +46,15 @@ function bar(row, max, est) {
     })));
 }
 
+// Requests in the range that rewrote an expired cache after a break; always an estimate.
+function idleLine(idle) {
+  if (!idle?.requests) return null;
+  return h("div", { class: "muted", title: idleRecacheTitle(idle.requests, idle.tokens) },
+    `Idle re-cache ${fmtCost(idle.cost, true)}: ${idle.requests} request${idle.requests > 1 ? "s" : ""} in `
+    + `${idle.sessions} session${idle.sessions > 1 ? "s" : ""} rewrote an expired cache after a break. `
+    + "/clear or /compact before a long break is cheaper.");
+}
+
 function draw(container, d, labels) {
   if (!d.models.length) {
     container.replaceChildren(h("div", { class: "muted" }, "No API requests in this range."));
@@ -84,6 +93,7 @@ function draw(container, d, labels) {
       h("strong", {}, fmtCost(total, est)),
       ` · ${d.sessions} session${d.sessions > 1 ? "s" : ""} · `,
       TYPES.map(([, label], i) => `${label} ${total ? Math.round((100 * typeTotals[i]) / total) : 0}%`).join(" · ")),
+    idleLine(d.idle_recache),
     h("div", { class: "costs-grid" }, models, days),
     h("div", { class: "muted note" },
       "Subagent requests count under their own model. Hover a bar for cost and tokens. ",

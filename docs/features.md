@@ -80,6 +80,7 @@
     - hover a bar segment for its cost and tokens
     - subagent requests count under the model they ran on
     - the week and month views add a row per day, so a spike can be traced to one token type
+    - a line with the range's estimated [idle re-cache](#time-cost-and-usage) cost, when there is any
 
     It follows the current filters. A session with Claude Code's own cost record keeps that
     total, split by the estimate's proportions.
@@ -112,6 +113,24 @@
     - It follows the current filters.
 - **Cache efficiency**: each session shows its cache hit rate and roughly how much caching saved.
   Rates below 90% are highlighted.
+- **Idle re-cache**: the prompt cache expires when no request uses it for a while, so the first
+  request after a break writes the context to the cache again. cc-calendar estimates what that
+  cost.
+    - The detail pane shows it per session (**idle re-cache**) and the Costs pane for the
+      displayed range. Hover it for the requests and tokens.
+    - A request counts when it came longer than the cache lifetime after the previous request of
+      the same thread: the main session and each subagent are counted on their own. The lifetime
+      is 1 hour when the request's usage shows a 1-hour cache write (Claude Code's main thread
+      usually asks for one) and 5 minutes otherwise.
+    - Only the part of its cache write that the previous request had cached counts, at the
+      difference between the cache write and cache read prices: what a warm cache would have
+      saved. Requests after a compaction or a model switch are left out.
+    - It is an estimate and always uses the price table, even when the session has Claude Code's
+      cost record. The table prices every cache write at the 5-minute rate, so 1-hour writes are
+      undercounted.
+
+    `/clear` or `/compact` before a long break is cheaper: the next request then writes a short
+    context instead of the whole conversation.
 
 !!! info "About costs"
 
@@ -253,7 +272,7 @@
   the current filters and sort order. It covers:
     - start and end (ISO 8601 with your UTC offset) and active time
     - project, source config directory, branch, status and rating
-    - prompts, tokens, cost and cache hit rate
+    - prompts, tokens, cost, cache hit rate and idle re-cache cost
     - model, effort, Claude Code version
     - commits, pull requests, edited files, lines added and removed, and cost per commit
     - friction: interrupts, API errors, queued prompts, tool calls and failed tool calls

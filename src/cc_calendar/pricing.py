@@ -94,6 +94,14 @@ def cache_savings(model: str | None, usage: dict) -> float:
     ) / 1_000_000
 
 
+def recache_cost(model: str | None, tokens: int) -> float:
+    """What writing `tokens` to the cache cost over reading them from a warm cache."""
+    price = price_for(model)
+    if price is None:
+        return 0.0
+    return tokens * (price.cache_write - price.cache_read_rate) / 1_000_000
+
+
 def cache_hit_rate(usages: list[dict]) -> float | None:
     """Cache reads as a share of all input-side tokens, or None without any input."""
     read = sum(u.get("cache_read_input_tokens", 0) for u in usages)

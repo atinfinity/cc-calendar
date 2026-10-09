@@ -153,6 +153,10 @@ the logs it covers.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).
+- **Idle re-cache** — the prompt cache expires after a break (5 minutes, or 1 hour when Claude
+  Code asks for it), so the next request writes the whole context again. The detail pane and the
+  Costs pane estimate what that cost, subagents included. `/clear` or `/compact` before a long
+  break is cheaper.
 - **Friction** — the detail pane counts interrupts, API errors, prompts sent while Claude was
   still working, and failed tool calls with their error rate. The list's **Friction** column adds
   them up, so sorting by it brings the roughest sessions to the top.
@@ -201,7 +205,7 @@ the logs it covers.
   every session, and its commit history with links to the repository.
 - **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
   and sort order: start, end, active time, project, source directory, branch, status, prompts,
-  tokens, cost, cache hit rate, model, effort, Claude Code version, commits, pull requests, files changed, lines added and removed, cost per
+  tokens, cost, cache hit rate, idle re-cache cost, model, effort, Claude Code version, commits, pull requests, files changed, lines added and removed, cost per
   commit, friction counts, tags and note. Times are
   ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
