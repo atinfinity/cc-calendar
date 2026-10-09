@@ -63,6 +63,11 @@ PR_TITLE_RE = re.compile(
     r"""(?<!\S)(?:-t|--title)(?:=|\s+)(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))"""
 )
 PR_HEAD_RE = re.compile(r"""(?<!\S)(?:-H|--head)(?:=|\s+)["']?([^\s"']+)""")
+# `gh pr create` where a command starts, not where text such as a PR body mentions it.
+PR_CREATE_RE = re.compile(r"(?:^|[;&|(\n]|\$\()\s*gh\s+pr\s+create\b")
+PR_URL_RE = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)")
+# A shell variable or command substitution, whose value the command alone does not show.
+SHELL_EXPANSION_RE = re.compile(r"(?<!\\)\$[\w{(]")
 TASK_ID_RE = re.compile(r"<task-id>(.*?)</task-id>", re.S)
 TASK_STATUS_RE = re.compile(r"<status>(.*?)</status>", re.S)
 TASK_SUMMARY_RE = re.compile(r"<summary>(.*?)</summary>", re.S)
@@ -187,18 +192,34 @@ def command_text(text: str) -> str:
 
 def pr_create_args(command: str) -> tuple[str | None, str | None]:
     """(title, head branch) given to `gh pr create` in a shell command; None when not given."""
-    if "pr create" not in command:
-        return None, None
-    title = None
-    if m := PR_TITLE_RE.search(command):
-        title = next(g for g in m.groups() if g is not None).replace('\\"', '"').strip()
-        # A title read from a command substitution is not known from the command alone.
-        if not title or title.startswith("$("):
-            title = None
-    head = None
-    if m := PR_HEAD_RE.search(command):
-        head = m.group(1).rsplit(":", 1)[-1]  # owner:branch for a branch on a fork
-    return title, head
+    calls = pr_create_calls(command)
+    return calls[0] if len(calls) == 1 else (None, None)
+
+
+def pr_create_calls(command: str) -> list[tuple[str | None, str | None]]:
+    """(title, head branch) of each `gh pr create` in a shell command, in order; None when not
+    given, or when it comes from a shell variable or command substitution."""
+    # Here-documents hold text such as a PR body, not commands.
+    command = COMMIT_MSG_HEREDOC_RE.sub("", command)
+    starts = [m.start() for m in PR_CREATE_RE.finditer(command)]
+    calls = []
+    for start, end in zip(starts, [*starts[1:], len(command)], strict=False):
+        part = command[start:end]
+        title = None
+        if m := PR_TITLE_RE.search(part):
+            title = next(g for g in m.groups() if g is not None).replace('\\"', '"').strip()
+            # Single quotes keep a "$" as it is; double quotes and bare words expand it.
+            if not title or (m.group(2) is None and SHELL_EXPANSION_RE.search(title)):
+                title = None
+            elif m.group(2) is None:
+                title = title.replace("\\$", "$")
+        head = None
+        if m := PR_HEAD_RE.search(part):
+            head = m.group(1).rsplit(":", 1)[-1]  # owner:branch for a branch on a fork
+            if "$" in head:
+                head = None
+        calls.append((title, head))
+    return calls
 
 
 def extract_commit_subject(command: str) -> str | None:
@@ -658,7 +679,7 @@ class SessionAcc:
     def _feed_tool_results(self, rec: dict, content: Any, ts: int | None) -> None:
         tur = rec.get("toolUseResult")
         blocks = content if isinstance(content, list) else []
-        command = ""
+        command = output = ""
         for b in blocks:
             if not isinstance(b, dict) or b.get("type") != "tool_result":
                 continue
@@ -669,6 +690,7 @@ class SessionAcc:
             name = pending["name"]
             if name == "Bash":
                 command = pending["input"].get("command", "")
+                output = tool_result_text(b.get("content"))
             if is_error:
                 self.tool_calls[pending["call"]][2] = True
             if name == "Bash":
@@ -693,7 +715,8 @@ class SessionAcc:
                 if pr.get("url"):
                     self.note_pr(pr["url"], pr.get("number"))
                     if pr.get("action") == "created":
-                        self.pr_created(pr["url"], ts, command, git_op, rec.get("gitBranch"))
+                        branch = rec.get("gitBranch")
+                        self.pr_created(pr["url"], ts, command, git_op, branch, output=output)
 
     def note_pr(
         self, url: str, number: Any, repo: str | None = None, created: int | None = None
@@ -713,20 +736,38 @@ class SessionAcc:
         git_op: dict,
         branch: str | None,
         agent: str | None = None,
+        output: str = "",
     ) -> None:
         """A `gh pr create` that opened `url`: when, its title and its head branch, and the
         subagent that ran it, if one did.
 
         The head is the --head given, else the branch pushed with it, else the branch the
-        command ran on.
+        command ran on. A command with several `gh pr create` names only one PR in its result;
+        when its output has one PR link per call, the calls and links pair up in order.
+        Otherwise, or when one call ran in a loop, which call opened the PR is not known, and
+        it gets no title or head.
         """
-        pr = self.note_pr(url, None, created=ts)
-        if agent:
-            pr["agent"] = agent
-        title, head = pr_create_args(command)
+        calls = pr_create_calls(command)
+        urls = list(dict.fromkeys(m.group(0) for m in PR_URL_RE.finditer(output)))
+        # More links than calls: a loop opened several PRs, or the output names others.
+        if len(calls) > 1 or len(urls) > max(len(calls), 1):
+            if len(urls) == len(calls) and url in urls:
+                for u, (title, head) in zip(urls, calls, strict=True):
+                    n = int(u.rsplit("/", 1)[-1])
+                    self._set_pr(self.note_pr(u, n, created=ts), agent, title, head)
+            else:
+                self._set_pr(self.note_pr(url, None, created=ts), agent, None, None)
+            return
+        title, head = calls[0] if calls else (None, None)
         push = git_op.get("push")
         pushed = push.get("branch") if isinstance(push, dict) else None
         head = head or (pushed if isinstance(pushed, str) else None) or branch or self.git_branch
+        self._set_pr(self.note_pr(url, None, created=ts), agent, title, head)
+
+    @staticmethod
+    def _set_pr(pr: dict, agent: str | None, title: str | None, head: str | None) -> None:
+        if agent:
+            pr["agent"] = agent
         pr["title"] = pr.get("title") or title
         pr["head"] = pr.get("head") or head
 
@@ -816,7 +857,8 @@ class SessionAcc:
                     if isinstance(pr, dict) and pr.get("url") and pr.get("action") == "created":
                         ts = parse_ts(rec.get("timestamp"))
                         branch = rec.get("gitBranch")
-                        self.pr_created(pr["url"], ts, command, git_op, branch, agent_id)
+                        output = tool_result_text(b.get("content"))
+                        self.pr_created(pr["url"], ts, command, git_op, branch, agent_id, output)
         if rec.get("type") != "assistant" or msg.get("model") == "<synthetic>":
             return
         ts = parse_ts(rec.get("timestamp"))
