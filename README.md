@@ -70,7 +70,7 @@ A session found in more than one directory is shown once, from the copy with the
 
 ### Notes and tags
 
-Notes and tags you add to sessions are saved in one JSON file, keyed by session ID:
+Notes, tags and outcome ratings you add to sessions are saved in one JSON file, keyed by session ID:
 
 | Platform | Default location |
 | --- | --- |
@@ -158,6 +158,10 @@ the logs it covers.
   tag, with suggestions from tags already in use. Tags that differ only in case count as one.
   Tags show in the list (**Tags** column and filter) and the calendar tooltip, and a 📝 marks
   sessions with a note. See [where they are saved](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags).
+- **Outcome rating** — rate a session **Done**, **Partial** or **Failed** with one click in the
+  detail pane (click again to clear). The rating shows in the list (**Outcome** column and filter),
+  the calendar tooltip and exports, and the Summary adds the active time and cost per outcome, so
+  you can see what failed sessions cost.
 - **List view** with search over titles, the start of each prompt, notes and tags (a match inside a prompt or note is shown under the title), optional
   [full-text search](https://atinfinity.github.io/cc-calendar/features/#full-text-search) over the whole transcripts, project and status filters, and sorting by
   any column (click a header; click again to reverse). List-only filters narrow it down further
@@ -200,7 +204,7 @@ as $0, so it needs updating when new models ship.
 
 Everything stays on your machine. The server listens only on localhost, reads your logs read-only,
 and makes no network requests; images linked in transcripts are shown as links, not loaded. It writes two files: the notes file
-([Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)), only when you add or change a note or tag, and the
+([Notes and tags](https://atinfinity.github.io/cc-calendar/getting-started/#notes-and-tags)), only when you add or change a note, tag or outcome, and the
 [full-text search index](https://atinfinity.github.io/cc-calendar/features/#full-text-search), a cache built from your logs. Requests from other
 websites cannot change either. Commit hashes that do not appear in the
 logs are looked up with `git log` in the session's working directory.

@@ -1,10 +1,12 @@
-// Extra filters of the list view: model, branch, source, tag, date range and cost range.
-import { h, shortModel } from "./util.js";
+// Extra filters of the list view: model, branch, source, outcome, tag, date range and cost range.
+import { OUTCOMES, h, shortModel } from "./util.js";
 
-export const EMPTY_FILTER = { model: "", branch: "", source: "", tag: "", from: "", to: "", costMin: "", costMax: "" };
+export const EMPTY_FILTER = { model: "", branch: "", source: "", outcome: "", tag: "", from: "", to: "", costMin: "", costMax: "" };
 
 // The tag filter's value for sessions without tags; tags are trimmed, so none starts with a space.
 const UNTAGGED = " untagged";
+// The outcome filter's value for sessions not rated yet.
+const UNRATED = "unrated";
 
 // Local midnight at the start of a "YYYY-MM-DD" date input value, plus `days`, in ms.
 function midnight(value, days = 0) {
@@ -18,6 +20,7 @@ export function matchesListFilter(s, f) {
   if (f.model && s.model !== f.model) return false;
   if (f.branch && s.branch !== f.branch) return false;
   if (f.source && s.source !== f.source) return false;
+  if (f.outcome && (s.outcome || UNRATED) !== f.outcome) return false;
   if (f.tag === UNTAGGED ? s.tags.length : f.tag && !s.tags.some((t) => t.toLowerCase() === f.tag.toLowerCase())) return false;
   if (f.from && (s.end == null || s.end < midnight(f.from))) return false;
   if (f.to && (s.start == null || s.start >= midnight(f.to, 1))) return false;
@@ -56,6 +59,18 @@ function tagSelect(sessions, f, set) {
       h("option", { value: UNTAGGED, selected: f.tag === UNTAGGED }, `(untagged) (${untagged})`)));
 }
 
+// The outcome choices with their counts, then "(unrated)"; offered once any session is rated.
+function outcomeSelect(sessions, f, set) {
+  if (!f.outcome && !sessions.some((s) => s.outcome)) return null;
+  const counts = new Map();
+  for (const s of sessions) counts.set(s.outcome || UNRATED, (counts.get(s.outcome || UNRATED) || 0) + 1);
+  const choices = [...OUTCOMES.map(([v, label]) => [v, label]), [UNRATED, "(unrated)"]];
+  return h("label", { class: "muted" }, "Outcome ",
+    h("select", { "data-key": "outcome", onchange: set("outcome") },
+      h("option", { value: "" }, "All outcomes"),
+      ...choices.map(([v, label]) => h("option", { value: v, selected: v === f.outcome }, `${label} (${counts.get(v) || 0})`))));
+}
+
 // Renders the filter controls; `sessions` supply the model, branch and source choices.
 // `onChange(changes)` merges into the current filter, so a control rendered earlier stays correct.
 // The source filter is offered only when `sources` is set (several config directories).
@@ -76,6 +91,7 @@ export function renderListFilters(container, sessions, f, onChange, { sources = 
     select("model", "Model", "All models", shortModel),
     select("branch", "Branch", "All branches", (v) => v),
     sources ? select("source", "Source", "All sources", (v) => v) : null,
+    outcomeSelect(sessions, f, set),
     tagSelect(sessions, f, set),
     h("label", { class: "muted", title: "Sessions active on any day in this range" }, "Active ",
       input("from", { type: "date", "aria-label": "From date", max: f.to || null }), " – ",

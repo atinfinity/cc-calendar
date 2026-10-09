@@ -109,6 +109,21 @@ def test_tools(client):
     assert [(a["type"], a["runs"]) for a in data["subagents"]] == [("Explore", 1)]
 
 
+def test_outcome_rating(client):
+    url = "/api/sessions/s-basic/notes"
+    assert client.put(url, json={"outcome": "partial"}).json()["outcome"] == "partial"
+    by_id = {s["id"]: s for s in client.get("/api/sessions").json()["sessions"]}
+    assert by_id["s-basic"]["outcome"] == "partial" and by_id["s-sub"]["outcome"] is None
+    assert client.get("/api/sessions/s-basic").json()["outcome"] == "partial"
+    # Only the same origin may change it.
+    foreign = client.put(
+        url, json={"outcome": "failed"}, headers={"Origin": "https://evil.example"}
+    )
+    assert foreign.status_code == 403
+    assert client.get("/api/sessions/s-basic").json()["outcome"] == "partial"
+    assert client.put(url, json={"outcome": ""}).json()["outcome"] is None
+
+
 @pytest.fixture
 def multi_client(claude_dir, laptop_dir):
     dirs = [ClaudeDir("local", claude_dir), ClaudeDir("laptop", laptop_dir)]

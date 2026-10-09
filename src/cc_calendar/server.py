@@ -104,7 +104,7 @@ def summary(
         "continued_in": s.continued_in,
         "continued_from": continued_from,
         "search": search,
-        **notes.get(s.session_id),  # note, tags
+        **notes.get(s.session_id),  # note, tags, outcome
     }
 
 
@@ -160,6 +160,8 @@ class ToolsQuery(BaseModel):
 class NotesUpdate(BaseModel):
     note: str = Field("", max_length=NOTE_LIMIT * 2)  # checked exactly after trimming
     tags: list[str] = Field(default_factory=list, max_length=TAGS_PER_SESSION * 5)
+    # One of notes.OUTCOMES, "" to clear it, or left out to keep it.
+    outcome: str | None = Field(None, max_length=20)
 
 
 def same_origin_json(request: Request) -> None:
@@ -328,7 +330,7 @@ def create_app(
     async def update_notes(sid: str, body: NotesUpdate) -> dict:
         get_session(sid)
         try:
-            out = await asyncio.to_thread(notes.set, sid, body.note, body.tags)
+            out = await asyncio.to_thread(notes.set, sid, body.note, body.tags, body.outcome)
         except NotesUnavailable as e:
             raise HTTPException(409, str(e)) from e
         except ValueError as e:

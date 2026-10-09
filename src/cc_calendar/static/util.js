@@ -161,6 +161,16 @@ export function tagChips(tags) {
   return tags?.length ? h("span", { class: "tags" }, tags.map((t) => h("span", { class: "tag" }, t))) : null;
 }
 
+// How a session went, as rated by the user: [value, label, symbol]. Unset when not rated.
+export const OUTCOMES = [["done", "Done", "✓"], ["partial", "Partial", "◐"], ["failed", "Failed", "✕"]];
+
+export const outcomeLabel = (outcome) => OUTCOMES.find(([v]) => v === outcome)?.[1] ?? "";
+
+export function outcomeBadge(outcome) {
+  const o = OUTCOMES.find(([v]) => v === outcome);
+  return o ? h("span", { class: `outcome outcome-${o[0]}`, title: `Outcome: ${o[1]}` }, `${o[2]} ${o[1]}`) : null;
+}
+
 export function matchSnippet(s, query) {
   const q = query.trim().toLowerCase();
   if (!q || s.title.toLowerCase().includes(q)) return null;
