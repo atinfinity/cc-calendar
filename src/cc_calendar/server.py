@@ -96,6 +96,7 @@ def summary(
         "cost_basis": s.cost_basis(),
         "cache_hit": cache_hit,
         "cache_saved": round(cache_saved, 4),
+        "idle_recache": round(s.idle_recache_cost(), 4),  # estimate, see SessionAcc.idle_recaches
         "model": models[0] if models else None,
         "effort": s.effort(),
         "version": s.version,  # Claude Code version
@@ -129,6 +130,7 @@ def detail(
                 owner = p
         if owner is not None:
             owner["commits"].append(c.get("sha") or c.get("subject"))
+    recaches = s.idle_recaches()
     out.update(
         {
             "cwd": s.cwd,
@@ -137,6 +139,8 @@ def detail(
             "compactions": s.compactions,
             "permission_mode": s.permission_mode,
             "context_pct": s.context_pct(),
+            "idle_recache_requests": len(recaches),
+            "idle_recache_tokens": sum(n for _, n, _ in recaches),
             "checks": checks,
             "prompts": prompts,
             "commits": commits,

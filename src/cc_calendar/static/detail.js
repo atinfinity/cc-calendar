@@ -1,7 +1,7 @@
 // Right-hand detail pane for one session.
 import {
   STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, compactDetail, costTitle, fmtEffortMix, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
-  shortModel, statusColor,
+  idleRecacheTitle, shortModel, statusColor,
 } from "./util.js";
 import { notesCard } from "./notes.js";
 import { copyText } from "./report.js";
@@ -93,6 +93,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
       h("span", { class: "stat", title: costTitle(d) }, fmtCost(d.cost, d.cost_estimated)),
       d.cache_hit == null ? null : h("span", { class: "stat" + (d.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(d.cache_hit, d.cache_saved) },
         `cache ${fmtPct(d.cache_hit)}`),
+      d.idle_recache_requests ? h("span", { class: "stat", title: idleRecacheTitle(d.idle_recache_requests, d.idle_recache_tokens) },
+        `idle re-cache ${fmtCost(d.idle_recache, true)}`) : null,
       ctx,
       ...d.models.map((m) => h("span", { class: "stat" }, shortModel(m))),
       fmtEffortMix(d.efforts) ? h("span", { class: "stat", title: "Effort level: share of API requests" }, `effort ${fmtEffortMix(d.efforts)}`) : null,

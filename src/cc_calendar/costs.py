@@ -12,12 +12,14 @@ def cost_breakdown(sessions: Iterable[SessionAcc], bounds: list[tuple[int, int]]
 
     A bucket counts in the period its start falls in, as the Summary splits cost. Sessions
     with Claude Code's own cost record keep that total, split by the estimate's proportions.
+    `idle_recache` adds up the requests in the periods that rewrote an expired cache.
     """
     models: dict[str, list[float]] = {}
     days = [[0.0] * 8 for _ in bounds]
     used = set()
     recorded = 0
     estimated = False
+    idle = {"cost": 0.0, "tokens": 0, "requests": 0, "sessions": 0}  # re-caching after idle gaps
     for s in sessions:
         buckets = s.cost_breakdown()
         cost, is_estimate = s.cost()
@@ -40,6 +42,13 @@ def cost_breakdown(sessions: Iterable[SessionAcc], bounds: list[tuple[int, int]]
             used.add(s.session_id)
             recorded += not is_estimate
             estimated |= is_estimate
+        # Always an estimate: not scaled to a cost record.
+        recaches = [r for r in s.idle_recaches() if any(a <= r[0] < b for a, b in bounds)]
+        if recaches:
+            idle["sessions"] += 1
+            idle["requests"] += len(recaches)
+            idle["tokens"] += sum(n for _, n, _ in recaches)
+            idle["cost"] += sum(c for _, _, c in recaches)
 
     def split(row: list[float]) -> dict:
         return {"tokens": [int(n) for n in row[:4]], "cost": [round(c, 4) for c in row[4:]]}
@@ -52,4 +61,5 @@ def cost_breakdown(sessions: Iterable[SessionAcc], bounds: list[tuple[int, int]]
         "estimated": estimated,
         "models": rows,
         "days": [split(row) for row in days],
+        "idle_recache": {**idle, "cost": round(idle["cost"], 4)},
     }
