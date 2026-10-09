@@ -95,7 +95,7 @@ list what changed in each one.
     ```
 
 A running `cc-calendar` keeps serving the old version: stop it with ++ctrl+c++ and start it
-again. Notes, tags, ratings and the search index are kept outside the installation, so they
+again. The version it runs shows next to the logo in the top bar. Notes, tags, ratings and the search index are kept outside the installation, so they
 carry over.
 
 ## Options
