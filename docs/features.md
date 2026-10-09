@@ -70,6 +70,18 @@
     - the commits made in the range
 
     Issue and PR numbers such as `#12` become links to the repository's `origin` remote.
+- **Retrospective prompt**: "Copy retrospective" copies the displayed range as Markdown to paste
+  into Claude, ending with a request to draft a Keep / Problem / Try retrospective. It covers:
+    - totals (active time, cost, sessions, commits, pull requests, cost per commit), the change
+      from the previous day, week, month or year, and the count per rating
+    - the top projects, with their change; projects active only in the previous range are named
+    - the most expensive sessions, with their time, cost and commits in the range
+    - sessions with a cost but no commit, pull request or edited file
+    - friction: interrupts, API errors, prompts sent while Claude was working and failed tool
+      calls in total, and the sessions with the most
+
+    Lists stop at five entries. It follows the current filters, leaves notes out like the report,
+    and cc-calendar sends nothing anywhere: you paste it yourself.
 - **Tool usage**: the Tools pane aggregates tool calls in the displayed range:
     - most used tools, with error counts and rates
     - calls made inside subagents
