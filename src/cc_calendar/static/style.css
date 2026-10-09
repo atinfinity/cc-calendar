@@ -426,6 +426,18 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .month-total { min-height: 1.3em; font-size: 11px; }
 .month-project { display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .month-project .dot { flex: none; }
+.budget { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.budget button { padding: 1px 8px; font-size: 12px; }
+.budget input[type="number"] { width: 72px; margin-left: 2px; }
+.budget-edit { display: inline-flex; gap: 10px; }
+.budget-bar { position: relative; display: inline-block; width: 120px; height: 8px; border-radius: 4px; background: var(--bg-soft); border: 1px solid var(--border); overflow: hidden; }
+.budget-bar i { position: absolute; left: 0; top: 0; bottom: 0; }
+.budget-bar .projected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.budget-bar .spent { background: var(--accent); }
+.budget-bar.over .spent, .budget-bar.over .projected { background: var(--interrupted); }
+.budget-bar.over .projected { opacity: 0.35; }
+.budget-over { color: var(--interrupted); }
+.budget-note { margin-left: auto; font-style: italic; }
 .year { padding: 16px 14px; }
 .year-grid { display: grid; grid-auto-rows: 14px; gap: 3px; font-size: 10px; color: var(--muted); }
 .year-month { white-space: nowrap; overflow: visible; }

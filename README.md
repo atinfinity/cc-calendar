@@ -114,6 +114,9 @@ the logs it covers.
   shaded by active time, cost or commits (switch with "Shade by"). Month cells list the day's busiest
   projects; the year view adds per-month totals. Click a day to open it in the day view, or a
   month total to open that month.
+- **Monthly budget** — the month view shows the spend so far, the daily average and the projected
+  month-end total, against a monthly budget and an optional plan price ("API equivalent $X vs
+  plan $Y") kept in the browser. Rough estimates, not billing data.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
   table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.

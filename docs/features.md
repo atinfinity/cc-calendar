@@ -19,6 +19,15 @@
     - Month cells list the day's busiest projects.
     - The year view adds per-month totals.
     - Click a day to open it in the day view, or a month total to open that month.
+- **Monthly budget**: a line under the month view's legend shows the month's spend so far, the
+  daily average and, for the current month, the projected month-end total (the daily average so
+  far, today included, times the days in the month). Past months show their actual total.
+    - Click **Budget** to set a monthly budget. A bar then shows the spend and the projection
+      against it, and turns red when the projection is over budget.
+    - Set a **Plan price** (such as your subscription's monthly price) to compare: "API equivalent
+      \$X vs plan \$Y".
+    - Both are kept in this browser's local storage. The figures follow the current filters.
+    - These are rough estimates from the logs at API list prices, not billing data.
 - **Colors** by project, status, model, effort (the level most requests ran at), source (with
   several config directories), tag or cost
   (< \$1 / \$1–5 / \$5–20 / \$20–50 / ≥ \$50).
