@@ -49,6 +49,51 @@ def test_classify_user():
     assert classify_user(compact) == "compact"
 
 
+PASTED = (
+    '\n\n<pasted_content id="ab12">\nhttps://example.com/a\n</pasted_content id="ab12">\n\n see'
+)
+
+
+def test_pasted_content_is_a_prompt():
+    b = LogBuilder("s")
+    b.prompt(0, PASTED)
+    b.prompt(1, 'look at <pasted_content id="cd34">\nlog line\n</pasted_content id="cd34">')
+    assert classify_user(b.records[0]) == "prompt"
+    s = feed(b)
+    texts = [p["text"] for p in s.prompts]
+    assert texts == ["https://example.com/a\n\n\n see", "look at \nlog line"]
+    assert s.title() == "https://example.com/a"
+    # Claude Code's own wrappers stay meta even with a human origin.
+    for text in ("<system-reminder>x</system-reminder>", "<bash-stdout>ok</bash-stdout>"):
+        assert classify_user(b.prompt(2, text)) == "meta"
+    # Pasted-looking text without a human origin is not a prompt.
+    queued = b.prompt(3, PASTED)
+    del queued["origin"]
+    assert classify_user(queued) == "meta"
+
+
+def desktop(b: LogBuilder, text: str, **extra) -> dict:
+    rec = b.prompt(0, text)
+    del rec["origin"]
+    rec.update({"entrypoint": "claude-desktop", "promptSource": "sdk", **extra})
+    return rec
+
+
+def test_claude_desktop_prompts():
+    b = LogBuilder("s")
+    assert classify_user(desktop(b, "how do I build one package?")) == "prompt"
+    assert classify_user(desktop(b, PASTED)) == "prompt"
+    assert classify_user(desktop(b, "hi", promptSource="system")) == "meta"
+    assert classify_user(desktop(b, "caveat", isMeta=True)) == "meta"
+    assert classify_user(desktop(b, "<local-command-stdout>x</local-command-stdout>")) == "meta"
+    result = desktop(b, "")
+    result["message"]["content"] = [{"type": "tool_result", "tool_use_id": "t", "content": "ok"}]
+    assert classify_user(result) == "tool_result"
+    # A CLI record without `origin` is still synthetic.
+    cli = desktop(b, "caveat", entrypoint="cli", promptSource=None)
+    assert classify_user(cli) == "meta"
+
+
 def test_command_text():
     text = "<command-name>/review</command-name>\n<command-args>42</command-args>"
     assert command_text(text) == "/review 42"

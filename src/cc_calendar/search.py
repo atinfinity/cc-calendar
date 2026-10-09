@@ -19,7 +19,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .parser import classify_user, command_text, content_text, parse_ts, tool_result_text
+from .parser import (
+    classify_user,
+    command_text,
+    content_text,
+    parse_ts,
+    prompt_text,
+    tool_result_text,
+)
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +85,7 @@ def record_docs(rec: dict) -> list[tuple[str, str | None, str]]:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
                     out.append(("tool_result", None, tool_result_text(b.get("content"))))
         elif kind == "prompt":
-            out.append(("prompt", None, content_text(content)))
+            out.append(("prompt", None, prompt_text(content)))
         elif kind == "command":
             out.append(("prompt", None, command_text(content_text(content))))
         elif kind == "notification":
