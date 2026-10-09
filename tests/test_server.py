@@ -163,6 +163,19 @@ def test_requests(client):
     assert bad.status_code == 422
 
 
+def test_rating(client):
+    url = "/api/sessions/s-basic/notes"
+    assert client.put(url, json={"rating": "partial"}).json()["rating"] == "partial"
+    by_id = {s["id"]: s for s in client.get("/api/sessions").json()["sessions"]}
+    assert by_id["s-basic"]["rating"] == "partial" and by_id["s-sub"]["rating"] is None
+    assert client.get("/api/sessions/s-basic").json()["rating"] == "partial"
+    # Only the same origin may change it.
+    foreign = client.put(url, json={"rating": "failed"}, headers={"Origin": "https://evil.example"})
+    assert foreign.status_code == 403
+    assert client.get("/api/sessions/s-basic").json()["rating"] == "partial"
+    assert client.put(url, json={"rating": ""}).json()["rating"] is None
+
+
 @pytest.fixture
 def multi_client(claude_dir, laptop_dir):
     dirs = [ClaudeDir("local", claude_dir), ClaudeDir("laptop", laptop_dir)]

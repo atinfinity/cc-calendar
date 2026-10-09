@@ -134,6 +134,7 @@ a { color: var(--accent); }
 .summary tfoot td { font-weight: 600; border-bottom: none; border-top: 1px solid var(--border-strong); }
 .summary .dot { margin-right: 6px; }
 .summary .note { margin-top: 6px; }
+.summary .rating-summary { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
 .cal-body { display: grid; position: relative; }
 .gutter { position: relative; }
 .gutter span {
@@ -243,6 +244,11 @@ a { color: var(--accent); }
   border: 1px solid var(--border); white-space: nowrap;
 }
 .tooltip .tags { display: flex; margin: 3px 0; }
+.rating { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.rating-done { color: var(--done); }
+.rating-partial { color: var(--waiting); }
+.rating-failed { color: var(--interrupted); }
+.tooltip .rating { display: block; margin: 3px 0; }
 
 /* ---------------------------------------------------------------- detail */
 .notes-card textarea {
@@ -262,6 +268,12 @@ a { color: var(--accent); }
 .notes-card.collapsed { border: none; margin: 6px 0; }
 .notes-card.collapsed > h3, .notes-card.collapsed > .card-body { display: none; }
 .notes-add { font-size: 12px; color: var(--muted); }
+/* Outside the card body, so a rating stays one click away while the card is collapsed. */
+.rating-row { display: flex; align-items: center; gap: 6px; padding: 8px 10px 0; font-size: 12px; }
+.notes-card.collapsed .rating-row { padding: 0 0 4px; }
+.rating-row .seg button.active.rating-done { border-color: var(--done); }
+.rating-row .seg button.active.rating-partial { border-color: var(--waiting); }
+.rating-row .seg button.active.rating-failed { border-color: var(--interrupted); }
 .detail-pane {
   width: 480px; flex: none; border-left: 1px solid var(--border); overflow: auto;
   padding: 12px 14px 40px; background: var(--bg);

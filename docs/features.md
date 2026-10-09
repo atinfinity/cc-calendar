@@ -144,8 +144,10 @@
     - files changed and pull requests
     - subagents and background tasks
     - links between a session and the one it was continued in
-- **Notes and tags**: the **Notes** card in the detail pane keeps a note and tags for the
-  session. Click **+ Add note or tags** to start.
+- **Notes and tags**: the **Notes** card in the detail pane keeps a rating, a note and
+  tags for the session. Click **+ Add note or tags** to start.
+    - **Rating** rates how the session went: **✓ Done**, **◐ Partial** or **✕ Failed**. One click
+      sets it, even while the card is collapsed; click the active one again to clear it.
     - The note is plain text, up to 2,000 characters. It saves when you leave the box, with
       ++cmd+enter++ / ++ctrl+enter++, or with ++esc++.
     - Type a tag and press ++enter++ or a comma to add it; tags already in use are suggested.
@@ -153,7 +155,10 @@
     - Tags that differ only in case count as one, written the way they were first used.
     - The list view has a **Tags** column and a **Tag** filter, including "(untagged)". A 📝
       next to a title marks a note; hover it to read the start.
-    - The calendar tooltip shows the tags, and the search box matches notes and tags.
+    - The list view has a **Rating** column and, once a session is rated, a **Rating**
+      filter, including "(unrated)". The Summary adds a line with the active time and cost of the
+      sessions rated done, partial and failed, and of the unrated rest.
+    - The calendar tooltip shows the rating and tags, and the search box matches notes and tags.
     - They are saved in a file of their own; see
       [Notes and tags](getting-started.md#notes-and-tags) for where.
 - **Resume**: "Copy resume command" copies
@@ -210,7 +215,7 @@
 - **Export**: download the sessions shown in the list view as CSV or JSON. The file follows
   the current filters and sort order. It covers:
     - start and end (ISO 8601 with your UTC offset) and active time
-    - project, source config directory, branch and status
+    - project, source config directory, branch, status and rating
     - prompts, tokens, cost and cache hit rate
     - model, effort, Claude Code version
     - commits, pull requests, edited files, lines added and removed, and cost per commit

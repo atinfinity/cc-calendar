@@ -17,7 +17,7 @@ import { closeLog, openLog } from "./transcript.js";
 import { majorChange, readHash, stateHash } from "./urlstate.js";
 import {
   CACHE_LOW, EFFORT_COLORS, MIN_HOUR_PX, STATUS_HINTS, STATUS_LABELS, addDays, cacheTitle, fmtAgo, fmtCost, fmtDateTime,
-  fmtDuration, fmtPct, fmtTokens, h, hitSnippet, matchSnippet, paletteColor,
+  fmtDuration, fmtPct, fmtTokens, h, hitSnippet, matchSnippet, RATINGS, ratingBadge, paletteColor,
   prefs, searchText, shortModel, startOfDay, startOfWeek, statusColor, tagChips,
 } from "./util.js";
 
@@ -541,12 +541,14 @@ function renderProjectMenu() {
 }
 
 const STATUS_ORDER = Object.keys(STATUS_LABELS);
+const RATING_ORDER = RATINGS.map(([v]) => v);
 
 // [key, header, sort value, first direction when clicked, numeric column?]
 const LIST_COLUMNS = [
   ["status", "", (s) => STATUS_ORDER.indexOf(s.status), "asc", false],
   ["title", "Title", (s) => s.title.toLowerCase(), "asc", false],
   ["tags", "Tags", (s) => (s.tags.length ? s.tags.join(", ").toLowerCase() : null), "asc", false],
+  ["rating", "Rating", (s) => (s.rating ? RATING_ORDER.indexOf(s.rating) : null), "asc", false],
   ["project", "Project", (s) => s.project_name.toLowerCase(), "asc", false],
   ["source", "Source", (s) => s.source.toLowerCase(), "asc", false],
   ["start", "Started", (s) => s.start, "desc", true],
@@ -630,6 +632,7 @@ function renderList(visible) {
             s.note ? h("span", { class: "note-mark", title: noteTitle(s.note) }, " 📝") : null,
             searchSnippet(s, { openable: true })),
           h("td", { class: "tags-cell" }, tagChips(s.tags)),
+          h("td", {}, ratingBadge(s.rating)),
           h("td", { title: s.project }, h("span", { class: "dot", style: { background: state.projectColors.get(s.project), marginRight: "5px" } }),
             projectLink(s.project, s.project_name)),
           multiSource()

@@ -176,6 +176,19 @@ export function tagChips(tags) {
   return tags?.length ? h("span", { class: "tags" }, tags.map((t) => h("span", { class: "tag" }, t))) : null;
 }
 
+// How a session went, as rated by the user: [value, label, symbol]. Unset when not rated.
+export const RATINGS = [["done", "Done", "✓"], ["partial", "Partial", "◐"], ["failed", "Failed", "✕"]];
+
+export const ratingLabel = (rating) => RATINGS.find(([v]) => v === rating)?.[1] ?? "";
+
+// `named` prefixes "Rating:", for places without a Rating heading where the status (e.g. Done)
+// shows too.
+export function ratingBadge(rating, { named = false } = {}) {
+  const o = RATINGS.find(([v]) => v === rating);
+  return o ? h("span", { class: `rating rating-${o[0]}`, title: `Rating: ${o[1]}` },
+    `${named ? "Rating: " : ""}${o[2]} ${o[1]}`) : null;
+}
+
 export function matchSnippet(s, query) {
   const q = query.trim().toLowerCase();
   if (!q || s.title.toLowerCase().includes(q)) return null;
