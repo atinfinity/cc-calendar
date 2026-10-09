@@ -230,7 +230,7 @@ function showTip(e, s, p) {
       `${s.project_name}${s.branch ? " · " + s.branch : ""}${multiSource() ? " · from " + s.source : ""}`),
     h("div", {}, `${fmtTime(p.segStart)} – ${fmtTime(p.segEnd)} (${fmtDuration(p.segEnd - p.segStart)})`),
     h("div", { class: "muted" }, `${STATUS_LABELS[s.status]} · ${s.prompt_count} prompts · ${fmtCost(s.cost, s.cost_estimated)}`),
-    ratingBadge(s.rating),
+    ratingBadge(s.rating, { named: true }),
     tagChips(s.tags),
     markCounts(s, p.segStart, p.segEnd),
     searchSnippet(s),

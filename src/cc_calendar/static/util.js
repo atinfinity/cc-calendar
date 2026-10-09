@@ -166,9 +166,12 @@ export const RATINGS = [["done", "Done", "✓"], ["partial", "Partial", "◐"], 
 
 export const ratingLabel = (rating) => RATINGS.find(([v]) => v === rating)?.[1] ?? "";
 
-export function ratingBadge(rating) {
+// `named` prefixes "Rating:", for places without a Rating heading where the status (e.g. Done)
+// shows too.
+export function ratingBadge(rating, { named = false } = {}) {
   const o = RATINGS.find(([v]) => v === rating);
-  return o ? h("span", { class: `rating rating-${o[0]}`, title: `Rating: ${o[1]}` }, `${o[2]} ${o[1]}`) : null;
+  return o ? h("span", { class: `rating rating-${o[0]}`, title: `Rating: ${o[1]}` },
+    `${named ? "Rating: " : ""}${o[2]} ${o[1]}`) : null;
 }
 
 export function matchSnippet(s, query) {

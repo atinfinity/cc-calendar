@@ -122,9 +122,8 @@ class Notes:
             entry["note"] = note if isinstance(note, str) else ""
             tags = tags if isinstance(tags, list) else []
             entry["tags"] = [t for t in tags if isinstance(t, str)]
-            # Older files have no rating; an unknown one (e.g. from a newer version) is ignored.
-            if entry.get("rating") not in RATINGS:
-                entry.pop("rating", None)
+            # Older files have no rating. An unknown one (e.g. from a newer version) is kept in
+            # the file, since saving rewrites every entry, but not shown.
             self.entries[sid] = entry
 
     def refresh(self) -> None:
@@ -138,7 +137,7 @@ class Notes:
         return {
             "note": entry.get("note", ""),
             "tags": list(entry.get("tags", [])),
-            "rating": entry.get("rating"),
+            "rating": entry.get("rating") if entry.get("rating") in RATINGS else None,
         }
 
     def all_tags(self) -> list[dict]:
@@ -153,7 +152,8 @@ class Notes:
         ]
 
     def set(self, sid: str, note: str, tags: list[str], rating: str | None = None) -> dict:
-        """Replace the session's note and tags. `rating=None` keeps its rating; "" clears it."""
+        """Replace the session's note and tags. `rating=None` keeps its rating, even one this
+        version does not know; "" clears it."""
         with self.lock:
             if self._stat() != self._mtime:
                 self._load()
@@ -170,7 +170,8 @@ class Notes:
             tags = clean_tags(tags, known)
             if rating is None:
                 rating = self.entries.get(sid, {}).get("rating")
-            rating = clean_rating(rating)
+            else:
+                rating = clean_rating(rating)
             if note or tags or rating:
                 entry = self.entries.setdefault(sid, {})
                 updated = datetime.now().astimezone().isoformat(timespec="seconds")

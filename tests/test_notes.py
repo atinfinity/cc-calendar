@@ -70,6 +70,14 @@ def test_old_and_unknown_ratings_load(tmp_path):
     assert notes.get("old") == {"note": "from v0.5", "tags": ["x"], "rating": None}
     assert notes.get("rated")["rating"] == "partial"
     assert notes.get("newer")["rating"] is None
+    # Saving keeps the unknown rating: in this entry when it changes, and in every other one.
+    notes.set("newer", "z", [])
+    notes.set("old", "from v0.5", ["x"], "done")
+    saved = json.loads(path.read_text())["sessions"]
+    assert saved["newer"]["rating"] == "superb" and saved["newer"]["note"] == "z"
+    assert saved["old"]["rating"] == "done"
+    notes.set("newer", "z", [], "")
+    assert "rating" not in json.loads(path.read_text())["sessions"]["newer"]
 
 
 @pytest.mark.parametrize(
