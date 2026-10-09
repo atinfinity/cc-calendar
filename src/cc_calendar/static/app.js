@@ -12,6 +12,7 @@ import { costPer } from "./summary.js";
 import { bindShortcuts } from "./shortcuts.js";
 import { renderRequestsPane } from "./requestspane.js";
 import { renderToolsPane } from "./toolspane.js";
+import { renderHoursPane } from "./hours.js";
 import { closeLog, openLog } from "./transcript.js";
 import { majorChange, readHash, stateHash } from "./urlstate.js";
 import {
@@ -29,7 +30,7 @@ export const state = {
   byId: new Map(),
   view: prefs.get("view", "calendar"),
   span: prefs.get("span", "week"), // "day" | "week" | "month" | "year"
-  heat: prefs.get("heat", "time"), // month and year shading: "time" | "cost"
+  heat: prefs.get("heat", "time"), // month, year and Hours shading: "time" | "cost" | "commits"
   anchor: startOfDay(new Date()), // any day inside the displayed range
   hourPx: prefs.get("hourPx", DEFAULT_HOUR_PX),
   colorBy: prefs.get("colorBy", "project"),
@@ -46,6 +47,7 @@ export const state = {
   showTools: prefs.get("tools", false),
   showCosts: prefs.get("costs", false),
   showRequests: prefs.get("requests", false),
+  showHours: prefs.get("hours", false),
   appVersion: null, // cc-calendar version reported by the server
   dataVersion: 0, // bumped on every reload so cached aggregates refresh
   showMarks: prefs.get("marks", true),
@@ -414,6 +416,7 @@ function renderMain() {
   renderTools(visible);
   renderCosts(visible);
   renderRequests(visible);
+  renderHours(visible);
 }
 
 function renderTools(visible) {
@@ -457,6 +460,12 @@ function renderRequests(visible) {
   });
 }
 
+function renderHours(visible) {
+  const pane = $("hours-pane");
+  pane.hidden = !(state.showHours && state.view === "calendar");
+  if (!pane.hidden) renderHoursPane(pane, visible, { days: rangeDays(), rerender: renderMain });
+}
+
 function renderToolbar() {
   document.querySelectorAll("#view-toggle button").forEach((b) =>
     b.classList.toggle("active", state.project == null && b.dataset.view === state.view));
@@ -471,6 +480,7 @@ function renderToolbar() {
   $("tools-toggle").classList.toggle("active", state.showTools);
   $("costs-toggle").classList.toggle("active", state.showCosts);
   $("requests-toggle").classList.toggle("active", state.showRequests);
+  $("hours-toggle").classList.toggle("active", state.showHours);
   $("gap").value = String(state.gap);
   $("hide-noprompt").checked = state.hideNoPrompt;
 
@@ -751,6 +761,11 @@ function bind() {
   $("requests-toggle").onclick = () => {
     state.showRequests = !state.showRequests;
     prefs.set("requests", state.showRequests);
+    renderAll();
+  };
+  $("hours-toggle").onclick = () => {
+    state.showHours = !state.showHours;
+    prefs.set("hours", state.showHours);
     renderAll();
   };
   $("copy-report").onclick = async () => {
