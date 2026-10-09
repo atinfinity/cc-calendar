@@ -4,16 +4,22 @@ import { fmtCost, fmtDateTime, fmtTokens, h } from "./util.js";
 
 const TOP = 10;
 let lastKey = null;
+let lastVersion = null;
 let lastData = null;
 let showAll = false;
 
-// `key` changes when the range, the filtered sessions or the data change.
+// `key` changes with the range or the filtered sessions, `version` with each reload of the data.
 // `onOpen(id, ts)` opens the session's transcript at the prompt sent at `ts`.
-export async function renderRequestsPane(container, { start, end, ids, key, onOpen }) {
-  if (key !== lastKey) {
+export async function renderRequestsPane(container, { start, end, ids, key, version, onOpen }) {
+  if (key !== lastKey || version !== lastVersion) {
+    // A reload keeps the table for the same range and sessions until the new one is in, instead
+    // of flashing "Loading" each time a transcript changes.
+    if (key !== lastKey || !lastData) {
+      lastData = null;
+      container.replaceChildren(h("div", { class: "muted" }, "Loading requests…"));
+    }
     lastKey = key;
-    lastData = null;
-    container.replaceChildren(h("div", { class: "muted" }, "Loading requests…"));
+    lastVersion = version;
     let data;
     try {
       const res = await fetch("/api/requests", {
@@ -24,10 +30,10 @@ export async function renderRequestsPane(container, { start, end, ids, key, onOp
       if (!res.ok) throw new Error(String(res.status));
       data = await res.json();
     } catch (e) {
-      if (key === lastKey) container.replaceChildren(h("div", { class: "muted" }, `Could not load requests (${e.message}).`));
+      if (key === lastKey && version === lastVersion) container.replaceChildren(h("div", { class: "muted" }, `Could not load requests (${e.message}).`));
       return;
     }
-    if (key !== lastKey) return; // a newer request superseded this one
+    if (key !== lastKey || version !== lastVersion) return; // a newer request superseded this one
     lastData = data;
   }
   if (lastData) draw(container, lastData, onOpen);

@@ -10,13 +10,16 @@ export const ATTRIBUTION_NOTE = "A session's requests up to a PR it opens go to 
 
 // Results by caller ("pane", "project", "detail"), so a redraw does not fetch again.
 const cache = new Map();
+// The last answer by caller, whatever the data version, shown while a reload fetches the new one.
+const latest = new Map();
 
-// The PRs the sessions `ids` worked on: {prs, unattributed}. `key` changes with the sessions,
-// the data or the idle gap; a stale answer resolves to null.
+// The PRs the sessions `ids` worked on: {prs, unattributed}. `key` changes with the sessions
+// or the idle gap; a reload of the data fetches again. A stale answer resolves to null.
 export async function fetchPrs(slot, ids, key) {
+  const full = `${state.dataVersion}|${key}`;
   const hit = cache.get(slot);
-  if (hit?.key === key && hit.data) return hit.data;
-  const promise = hit?.key === key ? hit.promise : fetch("/api/prs", {
+  if (hit?.key === full && hit.data) return hit.data;
+  const promise = hit?.key === full ? hit.promise : fetch("/api/prs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessions: ids, gap: state.gap }),
@@ -24,16 +27,17 @@ export async function fetchPrs(slot, ids, key) {
     if (!res.ok) throw new Error(String(res.status));
     return res.json();
   });
-  cache.set(slot, { key, promise });
+  cache.set(slot, { key: full, promise });
   let data;
   try {
     data = await promise;
   } catch (e) {
-    if (cache.get(slot)?.key === key) cache.delete(slot); // try again next time
+    if (cache.get(slot)?.key === full) cache.delete(slot); // try again next time
     throw e;
   }
-  if (cache.get(slot)?.key !== key) return null; // a newer request superseded this one
-  cache.set(slot, { key, data });
+  if (cache.get(slot)?.key !== full) return null; // a newer request superseded this one
+  cache.set(slot, { key: full, data });
+  latest.set(slot, { key, data });
   return data;
 }
 
@@ -94,9 +98,14 @@ function exportButtons(data, name) {
 // Fill `container` with the PR table for the sessions `ids`. `scope` names them in the
 // heading ("in this range", "in this project").
 export async function renderPrs(container, { slot, ids, key, scope, exportName, highlight }) {
-  let data = cache.get(slot)?.key === key ? cache.get(slot).data : null;
+  const hit = cache.get(slot);
+  let data = hit?.key === `${state.dataVersion}|${key}` ? hit.data : null;
   if (!data) {
-    container.replaceChildren(h("div", { class: "muted" }, "Loading pull requests…"));
+    // A reload keeps the table it had for these sessions until the new one is in, instead of
+    // flashing "Loading" each time a transcript changes.
+    const prev = latest.get(slot);
+    if (prev?.key === key) draw(container, prev.data, { scope, exportName, highlight });
+    else container.replaceChildren(h("div", { class: "muted" }, "Loading pull requests…"));
     try {
       data = await fetchPrs(slot, ids, key);
     } catch (e) {
@@ -105,6 +114,10 @@ export async function renderPrs(container, { slot, ids, key, scope, exportName, 
     }
     if (!data) return;
   }
+  draw(container, data, { scope, exportName, highlight });
+}
+
+function draw(container, data, { scope, exportName, highlight }) {
   const total = data.prs.reduce((n, p) => n + p.cost, 0);
   container.replaceChildren(
     h("div", { class: "tools-head" },
@@ -125,7 +138,7 @@ export function detailPrList(d, onOpenPr) {
   const list = h("ul", { class: "plain-list" }, d.prs.map((p) => prItem(p)));
   const box = h("details", { open: true, hidden: !d.prs.length },
     h("summary", {}, `Pull requests (${d.prs.length})`), list);
-  const key = `${d.id}|${state.dataVersion}|${state.gap}`;
+  const key = `${d.id}|${state.gap}`;
   fetchPrs("detail", [d.id], key).then((data) => {
     if (!data) return;
     const known = new Map(data.prs.map((p) => [p.url, p]));
