@@ -139,6 +139,10 @@ the logs it covers.
   under their own model. The week and month views add a row per day, so a spike can be traced to
   one token type. It follows the current filters; sessions with Claude Code's own cost record are
   split by the estimate's proportions.
+- **What-if cost** — the Costs pane's What if section re-prices the range as if one model (or
+  all) had run on another, for the main thread, subagents or both, next to the actual cost and
+  the difference. Token counts stay the same, so it is a rough estimate: another model or effort
+  level would write different amounts.
 - **Most expensive requests** — the Top requests pane ranks the prompts sent in the displayed
   range by the cost of the requests that ran until the next prompt, subagents included, with
   project, session, time and tokens. Click a row to open the transcript at that prompt. It follows
