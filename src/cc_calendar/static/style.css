@@ -134,6 +134,10 @@ a { color: var(--accent); }
 .summary tfoot td { font-weight: 600; border-bottom: none; border-top: 1px solid var(--border-strong); }
 .summary .dot { margin-right: 6px; }
 .summary .note { margin-top: 6px; }
+.summary .summary-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.summary .delta { color: var(--muted); padding-left: 2px; }
+.summary .range-mark { margin-left: 6px; padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 8px; font-size: 10px; color: var(--muted); }
+.summary tr.absent td { color: var(--muted); }
 .summary .rating-summary { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
 .cal-body { display: grid; position: relative; }
 .gutter { position: relative; }
