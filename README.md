@@ -236,6 +236,10 @@ the logs it covers.
 | ![Detail pane](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/detail.png) | ![Transcript viewer](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/transcript.png) |
 | **List view** | **Month view** |
 | ![List view](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/list.png) | ![Month view](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/month.png) |
+| **Day view with Parallel column** | **Month view with a budget** |
+| ![Day view](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/day.png) | ![Monthly budget](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/budget.png) |
+| **Costs and what-if** | **Friction and context size** |
+| ![Costs pane](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/costs.png) | ![Context size](https://raw.githubusercontent.com/atinfinity/cc-calendar/main/docs/images/detail-context.png) |
 
 Screenshots show fictional demo data.
 
