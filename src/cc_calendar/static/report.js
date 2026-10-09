@@ -1,5 +1,5 @@
 // Markdown report of the displayed range, for a standup note or a daily report.
-import { activeMs, fmtDelta, summarize, summarizePrevious } from "./summary.js";
+import { activeMs, fmtDelta, previousRange, summarize, summarizePrevious } from "./summary.js";
 import { addDays, fmtCost, fmtDuration } from "./util.js";
 
 // `days` are the displayed dates; `label` is the range as shown in the toolbar. With `compareSpan`
@@ -19,7 +19,9 @@ export function buildReport(visible, days, label, compareSpan = null) {
   lines.push(`**${fmtDuration(total.ms)}** active · ${fmtCost(total.cost, total.estimated)} · ${sessions.length} session${sessions.length > 1 ? "s" : ""}`, "");
   if (compareSpan) {
     const prev = summarizePrevious(visible, compareSpan, days[0]);
-    const prevSessions = prev.rows.reduce((n, r) => n + r.sessions, 0);
+    // Sessions overlapping the range, counted the same way as for the displayed one.
+    const [pf, pt] = previousRange(compareSpan, days[0]).map((d) => d.getTime());
+    const prevSessions = visible.filter((s) => s.segments.some(([a, b]) => b >= pf && a < pt)).length;
     lines.push(`vs. previous ${compareSpan}: ${[
       fmtDelta(total.ms - prev.total.ms, fmtDuration, 30_000),
       fmtDelta(total.cost - prev.total.cost, (c) => fmtCost(c), 0.005),
