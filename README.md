@@ -108,8 +108,9 @@ the logs it covers.
 
 - **Week and day calendar** — each session is drawn as bars covering its active periods; a session is
   split wherever it sat idle longer than the **Split after** threshold (15 minutes by default). Overlapping
-  sessions sit side by side. Click a date in the week view to open that day on its own. Zoom with
-  the − / + buttons or Ctrl/⌘ + mouse wheel.
+  sessions sit side by side. Click a date in the week view to open that day on its own; the day
+  view adds a line of how many sessions were active at once. Zoom with the − / + buttons or
+  Ctrl/⌘ + mouse wheel.
 - **Month and year views** — a month calendar and a GitHub-style yearly heatmap, one cell per day
   shaded by active time, cost or commits (switch with "Shade by"). Month cells list the day's busiest
   projects; the year view adds per-month totals. Click a day to open it in the day view, or a
@@ -120,6 +121,10 @@ the logs it covers.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
   table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.
+- **Working vs waiting** — the Summary table and the detail pane split active time into the time
+  Claude spent on its turns (prompt to end of turn, plus waits for its own background tasks) and
+  the time it waited for your next prompt, with the median time you took to reply. Waits longer
+  than the **Split after** threshold count as neither.
 - **Cost per output** — the Summary table counts commits and pull requests per project and shows
   cost per commit; the list has a **$/commit** column and an **Output** filter, so **No output**
   plus a minimum cost finds sessions that cost a lot and produced nothing. The project page adds
@@ -131,6 +136,10 @@ the logs it covers.
   active time and cost per project, each session's title and tags (not notes) and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR
   numbers such as `#12` become links to the repository's `origin` remote.
+- **Retrospective prompt** — "Copy retrospective" copies the displayed range's totals, the change
+  from the previous range, the most expensive sessions, sessions with no output and friction
+  signals as Markdown, followed by a request to draft a Keep / Problem / Try retrospective. Paste
+  it into Claude; cc-calendar itself sends nothing. Notes are left out, as in the report.
 - **Tool usage** — the Tools pane aggregates tool calls in the displayed range: most used tools,
   error counts and rates (10% or more is highlighted), calls made inside subagents, MCP servers,
   and subagent runs by type with their tool calls, tokens and cost. It follows the current filters.

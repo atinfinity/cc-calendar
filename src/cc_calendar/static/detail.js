@@ -7,6 +7,7 @@ import { notesCard } from "./notes.js";
 import { copyText } from "./report.js";
 import { contextCard } from "./contextchart.js";
 import { detailPrList } from "./prspane.js";
+import { fmtReply } from "./summary.js";
 
 const CHECKS = [
   ["turn_ended", "Turn ended", "Claude finished its last reply and was not interrupted with Esc"],
@@ -83,6 +84,17 @@ function sourceInfo(d, sourcePath) {
   }, ` · from ${d.source}${also.length ? ` (also in ${also.join(", ")})` : ""}`);
 }
 
+// Working vs waiting time; nothing for a session without a turn.
+function workStat(d) {
+  if (!d.working_ms && !d.waiting_ms) return null;
+  return h("span", {
+    class: "stat",
+    title: "Working: Claude's turns, from your prompt to the end of its reply, and waits for its own background tasks.\n"
+      + "Waiting: time until your next prompt, up to the idle threshold.\nReply: the median of those waits.",
+  }, `working ${fmtDuration(d.working_ms)} · waiting ${fmtDuration(d.waiting_ms)}`
+    + (d.reply_median_ms == null ? "" : ` · reply ${fmtReply(d.reply_median_ms)}`));
+}
+
 // `searchHit`: where a full-text search matched this session, as an element, or null.
 export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProject, onOpenPr, showSource, sourcePath, notes, searchHit }) {
   const statusBadge = h("span", { class: "badge", title: STATUS_HINTS[d.status], style: { background: statusColor(d.status) } }, STATUS_LABELS[d.status]);
@@ -106,6 +118,7 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
       `Started ${fmtDateTime(d.start)} · last activity ${fmtAgo(d.end)} · span ${fmtDuration(d.end - d.start)}`),
     h("div", { class: "stats" },
       h("span", { class: "stat" }, `${d.prompt_count} prompts`),
+      workStat(d),
       h("span", { class: "stat", title: "Input + output + cache tokens, including subagents" }, `${fmtTokens(d.tokens)} tok`),
       h("span", { class: "stat", title: costTitle(d) }, fmtCost(d.cost, d.cost_estimated)),
       d.cache_hit == null ? null : h("span", { class: "stat" + (d.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(d.cache_hit, d.cache_saved) },

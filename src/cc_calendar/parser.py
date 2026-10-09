@@ -7,6 +7,7 @@ from bisect import bisect_right
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
+from statistics import median
 from typing import Any
 
 from .pricing import (
@@ -259,6 +260,25 @@ class CopiedHead:
         return False
 
 
+def clip_spans(spans: list[list[int]], segments: list[list[int]]) -> list[list[int]]:
+    """The parts of `spans` (sorted, not overlapping) inside `segments`, adjoining ones merged."""
+    out: list[list[int]] = []
+    i = 0
+    for a, b in spans:
+        while i < len(segments) and segments[i][1] < a:
+            i += 1
+        j = i
+        while j < len(segments) and segments[j][0] < b:
+            lo, hi = max(a, segments[j][0]), min(b, segments[j][1])
+            if hi > lo:
+                if out and out[-1][1] >= lo:
+                    out[-1][1] = max(out[-1][1], hi)
+                else:
+                    out.append([lo, hi])
+            j += 1
+    return out
+
+
 def copied_head_length(records: list[dict]) -> int:
     """How many of `records` (one log's, in order) were copied from the session it continues."""
     head = CopiedHead()
@@ -417,6 +437,9 @@ class SessionAcc:
     interrupts: int = 0  # times the user stopped Claude with Esc
     queued_prompts: int = 0  # prompts typed while Claude was working, read mid-turn
     pending_background: int = 0
+    # Main-thread turns, ended: [start, end, opener] each, oldest first (see work_spans).
+    turns: list[list] = field(default_factory=list)
+    open_turn: list | None = None  # [start, last activity, opener] of a turn not ended yet
     compactions: list[dict] = field(default_factory=list)  # {ts, trigger, pre, post}
     efforts: dict[str, str] = field(default_factory=dict)  # API request id -> effort level
     api_errors: list[int] = field(default_factory=list)
@@ -508,6 +531,8 @@ class SessionAcc:
         if rec.get("version"):
             self.version = rec["version"]
 
+        if ts is not None and not rec.get("isSidechain"):
+            self._track_turn(rec, rtype, ts)
         if rtype == "user":
             self._feed_user(rec, ts)
         elif rtype == "assistant":
@@ -551,6 +576,45 @@ class SessionAcc:
                 rec.get("prRepository"),
                 created=ts if ts is not None else self.end,
             )
+
+    def _track_turn(self, rec: dict, rtype: str | None, ts: int) -> None:
+        """Follow the main thread's turns, from what started each to its end.
+
+        A turn ends at its `turn_duration` record, whose durationMs says when it started (that
+        also covers turns started by a prompt queued mid-turn, which leaves no prompt record), or
+        at an interrupt. A turn that ends neither way (a local command such as /model, a killed
+        process) ends at its last record before the next turn starts. The opener says what
+        started it: "human" (a prompt or command), "notification" (a background task finished)
+        or None (unknown).
+        """
+        t = self.open_turn
+        if rtype == "system" and rec.get("subtype") == "turn_duration":
+            dur = rec.get("durationMs")
+            start = ts - dur if is_number(dur) and dur >= 0 else (t[0] if t else None)
+            if start is not None:
+                self._end_turn(start, ts, t[2] if t else None)
+            self.open_turn = None
+            return
+        if rtype == "user":
+            kind = classify_user(rec)
+            if kind in ("prompt", "command", "notification"):
+                if t is not None:
+                    self._end_turn(t[0], t[1], t[2])
+                self.open_turn = [ts, ts, "notification" if kind == "notification" else "human"]
+                return
+            if kind == "interrupt" and t is not None:
+                self._end_turn(t[0], ts, t[2])
+                self.open_turn = None
+                return
+        if t is not None and rtype in ("user", "assistant"):
+            t[1] = max(t[1], ts)
+
+    def _end_turn(self, start: int, end: int, opener: str | None) -> None:
+        # Turns do not overlap; a durationMs reaching back past the previous end is cut there.
+        if self.turns:
+            start = max(start, self.turns[-1][1])
+        if end >= start:
+            self.turns.append([start, end, opener])
 
     def _feed_user(self, rec: dict, ts: int | None) -> None:
         if ts is not None:
@@ -817,6 +881,42 @@ class SessionAcc:
             else:
                 segs[-1][1] = t
         return segs
+
+    def work_spans(self, gap_ms: int) -> dict:
+        """When Claude worked and when it waited for you, as [start, end] spans, oldest first.
+
+        Working: the main thread's turns, cut to the activity segments so it never exceeds the
+        active time (a long silent tool call is not counted, as in segments). The gap before a
+        turn that a finished background task started counts as working too: the session was
+        busy with its own background work. Waiting: the gap between the end of a turn
+        (finished or interrupted) and your next prompt or command. Gaps longer than `gap_ms`
+        count as neither, as active time splits there. Subagents run inside their parent's turn
+        and are not counted again. A turn still running counts up to its latest record.
+        """
+        turns = [*self.turns, *([self.open_turn] if self.open_turn else [])]
+        working: list[list[int]] = []
+        waiting: list[list[int]] = []
+        for i, (start, end, opener) in enumerate(turns):
+            prev = turns[i - 1][1] if i else None
+            if prev is not None and 0 < start - prev <= gap_ms:
+                if opener == "human":
+                    waiting.append([prev, start])
+                elif opener == "notification":
+                    working.append([prev, start])
+            if end > start:
+                working.append([start, end])
+        return {"working": clip_spans(sorted(working), self.segments(gap_ms)), "waiting": waiting}
+
+    def work_stats(self, gap_ms: int) -> dict:
+        """work_spans and their totals, with the median time you took to reply."""
+        spans = self.work_spans(gap_ms)
+        replies = [b - a for a, b in spans["waiting"]]
+        return {
+            **spans,
+            "working_ms": sum(b - a for a, b in spans["working"]),
+            "waiting_ms": sum(replies),
+            "reply_median_ms": round(median(replies)) if replies else None,
+        }
 
     def marks(self) -> list[tuple]:
         """Timestamped events drawn on the calendar bars, oldest first.

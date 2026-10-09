@@ -1,5 +1,6 @@
 // Week or day calendar: activity segments as bars, laid out in lanes like Google Calendar.
 import { colorFor, legendItems, multiSource, openDay, rangeDays, searchSnippet, state } from "./app.js";
+import { concurrencyColumn } from "./concurrency.js";
 import { dayTotalLabel, renderSummary, summarize } from "./summary.js";
 import {
   MARK_KINDS, compactDetail, MIN_HOUR_PX, STATUS_LABELS, addDays, fmtCost, fmtDuration, fmtTime, h, ratingBadge, tagChips,
@@ -63,8 +64,9 @@ export function renderCalendar(container, visible, { onSelect, onOpenEvent, onTo
     if (t >= weekStartMs && t < weekEndMs) maxDensity = Math.max(maxDensity, n);
   }
 
-  const cols = `56px repeat(${days.length}, minmax(90px, 1fr))`;
   const isWeek = days.length > 1;
+  // The day view adds a column with the number of sessions active at once.
+  const cols = `56px repeat(${days.length}, minmax(90px, 1fr))${isWeek ? "" : " 64px"}`;
   const head = h("div", { class: "cal-head", style: { gridTemplateColumns: cols } },
     h("div", {}),
     ...days.map((d, i) => h("div", {
@@ -130,6 +132,15 @@ export function renderCalendar(container, visible, { onSelect, onOpenEvent, onTo
       col.append(h("div", { class: "now-line", style: { top: `${(now - dayStart) * scale}px` } }));
     }
     body.append(col);
+  }
+
+  if (!isWeek) {
+    const dayStart = days[0].getTime();
+    const dayEnd = addDays(days[0], 1).getTime();
+    const conc = concurrencyColumn(inWeek, dayStart, dayEnd, (24 * hourPx) / (dayEnd - dayStart));
+    for (let hr = 1; hr < 24; hr++) conc.col.append(h("div", { class: "hour-line", style: { top: `${hr * hourPx}px` } }));
+    head.append(conc.head);
+    body.append(conc.col);
   }
 
   container.replaceChildren(head, body);

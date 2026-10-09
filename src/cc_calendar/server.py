@@ -87,6 +87,8 @@ def summary(
         "start": s.start,
         "end": s.end,
         "segments": s.segments(gap_ms),
+        # working, waiting (spans), working_ms, waiting_ms, reply_median_ms
+        **s.work_stats(gap_ms),
         "density": s.density(),
         "cost_density": s.cost_density(),
         "marks": s.marks(),

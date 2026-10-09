@@ -10,6 +10,9 @@
       minutes by default).
     - Overlapping sessions sit side by side.
     - Click a date in the week view to open that day on its own.
+    - The day view adds a **Parallel** column: a step line of how many sessions were active (had
+      a drawn bar) at each moment, with the day's peak above it. Hover the line for the count and
+      the time; hover the header for how long two or more ran at once.
     - Zoom with the − / + buttons or ++ctrl++ / ++cmd++ + mouse wheel; **Reset** goes back to the
       default.
 - **Month and year views**: a month calendar and a GitHub-style yearly heatmap, with one cell
@@ -64,12 +67,44 @@
       ranges, and a range still in progress is compared with the whole previous one. "Copy
       report" then adds a line with the change in the totals.
     - A session's cost is split across days by when its requests ran.
+- **Working vs waiting**: the Summary table splits active time into **Working**, the time Claude
+  spent on its turns, and **Waiting**, the time it waited for your next prompt. **Reply** is the
+  median of those waits: how long you took to answer. The detail pane shows the same for one
+  session. The rules:
+    - A turn runs from your prompt to Claude Code's turn-end record, which also says when the turn
+      started (so a prompt you queued while Claude was working starts its own turn). An interrupt
+      (Esc) ends a turn too. A turn without either, such as a local command like `/model` or a
+      process that was killed, ends at its last log record. A turn still running counts up to
+      its latest record.
+    - Working time is cut to the drawn bars, like active time: a tool call that ran longer than
+      the **Split after** threshold without writing anything is not counted.
+    - Waiting is the gap from the end of a turn to your next prompt or command. A gap longer than
+      the **Split after** threshold counts as neither working nor waiting: you were away, and
+      active time splits there too.
+    - A gap that ends with a background task's result (a background agent or shell finishing)
+      counts as working: the session was busy with its own work, not waiting for you. A gap
+      before a turn that neither you nor a background task started counts as neither.
+    - Subagents run inside their parent's turn and are not counted again. A continued session's
+      copy of the session it continues is not counted.
+    - A range counts the parts of the spans inside it; Reply counts the waits that ended in it.
 - **Markdown report**: "Copy report" copies the displayed range as Markdown. The report covers:
     - active time and cost per project
     - each session's title and tags (notes are left out)
     - the commits made in the range
 
     Issue and PR numbers such as `#12` become links to the repository's `origin` remote.
+- **Retrospective prompt**: "Copy retrospective" copies the displayed range as Markdown to paste
+  into Claude, ending with a request to draft a Keep / Problem / Try retrospective. It covers:
+    - totals (active time, cost, sessions, commits, pull requests, cost per commit), the change
+      from the previous day, week, month or year, and the count per rating
+    - the top projects, with their change; projects active only in the previous range are named
+    - the most expensive sessions, with their time, cost and commits in the range
+    - sessions with a cost but no commit, pull request or edited file
+    - friction: interrupts, API errors, prompts sent while Claude was working and failed tool
+      calls in total, and the sessions with the most
+
+    Lists stop at five entries. It follows the current filters, leaves notes out like the report,
+    and cc-calendar sends nothing anywhere: you paste it yourself.
 - **Tool usage**: the Tools pane aggregates tool calls in the displayed range:
     - most used tools, with error counts and rates
     - calls made inside subagents
