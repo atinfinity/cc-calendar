@@ -96,6 +96,7 @@ def summary(
         "cost_basis": s.cost_basis(),
         "cache_hit": cache_hit,
         "cache_saved": round(cache_saved, 4),
+        "idle_recache": round(s.idle_recache_cost(), 4),  # estimate, see SessionAcc.idle_recaches
         **s.context_stats(),  # context_avg, context_peak, context_over, context_bloated
         "model": models[0] if models else None,
         "effort": s.effort(),
@@ -107,6 +108,7 @@ def summary(
         "pr_list": [{"number": pr.get("number"), "url": pr["url"]} for pr in s.prs.values()],
         "files_changed": len(s.files),
         **s.lines_changed(),
+        "friction": s.friction(),
         "repo_url": gitinfo.repo_url(s.cwd),
         "continued_in": s.continued_in,
         "continued_from": continued_from,
@@ -130,6 +132,7 @@ def detail(
                 owner = p
         if owner is not None:
             owner["commits"].append(c.get("sha") or c.get("subject"))
+    recaches = s.idle_recaches()
     out.update(
         {
             "cwd": s.cwd,
@@ -138,6 +141,8 @@ def detail(
             "compactions": s.compactions,
             "permission_mode": s.permission_mode,
             "context_pct": s.context_pct(),
+            "idle_recache_requests": len(recaches),
+            "idle_recache_tokens": sum(n for _, n, _ in recaches),
             "context": s.context_chart(),
             "checks": checks,
             "prompts": prompts,

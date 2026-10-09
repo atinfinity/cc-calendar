@@ -16,6 +16,7 @@ from .pricing import (
     context_window,
     cost_parts,
     estimate_cost,
+    recache_cost,
 )
 
 INTERRUPT_PREFIX = "[Request interrupted"
@@ -75,6 +76,11 @@ CUMULATIVE_MARGIN_USD = 1.0
 # Totals in a cost record that cover only the Claude Code process that wrote it. A resumed
 # session's last record starts again from zero, so these say nothing about its earlier runs.
 RUN_COST_KEYS = (*CUMULATIVE_COST_KEYS, "totalDuration")
+# Prompt cache lifetimes. A request's usage says which one its cache writes got; without that,
+# the API's default of 5 minutes is assumed.
+CACHE_TTL_5M_MS = 5 * 60 * 1000
+CACHE_TTL_1H_MS = 60 * 60 * 1000
+
 # A session ran on a bloated context when at least BLOAT_REQUESTS of its requests each resent
 # more than BLOAT_TOKENS. Sessions on a 200k-token window compact on their own before that, so
 # only a larger window lets the context grow past it, and every request then costs a few times
@@ -268,6 +274,51 @@ class Usage:
         )
 
 
+def cache_ttl_ms(usage: dict) -> int | None:
+    """Lifetime of the cache entries a request wrote, or None when it wrote none or says not."""
+    cc = usage.get("cache_creation")
+    if not isinstance(cc, dict):
+        return None
+    if cc.get("ephemeral_1h_input_tokens"):
+        return CACHE_TTL_1H_MS
+    if cc.get("ephemeral_5m_input_tokens"):
+        return CACHE_TTL_5M_MS
+    return None
+
+
+def idle_recaches(usages: list[Usage], resets: list[int] | tuple = ()) -> list[list]:
+    """Requests of one thread (the main session or one subagent) that rewrote the cache after
+    it expired: [ts, tokens, estimated USD] each, oldest first.
+
+    A request counts when it came more than the cache lifetime after the thread's previous
+    request on the same model, with no compaction (`resets`) in between. Only the part of its
+    cache write that the previous request's cache covered counts, and only what writing it cost
+    over reading it, which is what a warm cache would have charged.
+    """
+    out: list[list] = []
+    ttl = CACHE_TTL_5M_MS
+    prev: Usage | None = None
+    for u in sorted((u for u in usages if u.ts is not None), key=lambda u: u.ts):
+        if (
+            prev is not None
+            and u.model == prev.model
+            and u.ts - prev.ts > ttl
+            and not any(prev.ts < r <= u.ts for r in resets)
+        ):
+            cached = prev.usage.get("cache_read_input_tokens", 0) + prev.usage.get(
+                "cache_creation_input_tokens", 0
+            )
+            tokens = min(
+                u.usage.get("cache_creation_input_tokens", 0),
+                max(0, cached - u.usage.get("cache_read_input_tokens", 0)),
+            )
+            if tokens > 0:
+                out.append([u.ts, tokens, recache_cost(u.model, tokens)])
+        ttl = cache_ttl_ms(u.usage) or ttl
+        prev = u
+    return out
+
+
 @dataclass
 class SubagentAcc:
     agent_id: str
@@ -342,6 +393,8 @@ class SessionAcc:
     last_turn_end_ts: int | None = None
     last_prompt_ts: int | None = None
     last_interrupt_ts: int | None = None
+    interrupts: int = 0  # times the user stopped Claude with Esc
+    queued_prompts: int = 0  # prompts typed while Claude was working, read mid-turn
     pending_background: int = 0
     compactions: list[dict] = field(default_factory=list)  # {ts, trigger, pre, post}
     efforts: dict[str, str] = field(default_factory=dict)  # API request id -> effort level
@@ -446,6 +499,10 @@ class SessionAcc:
             if att.get("type") == "queued_command" and isinstance(prompt, str):
                 if "<task-notification>" in prompt:
                     self._feed_notification(prompt)
+                elif att.get("commandMode") == "prompt" and isinstance(att.get("origin"), dict):
+                    # A prompt typed while Claude was working, which it read before its turn ended.
+                    if att["origin"].get("kind") == "human":
+                        self.queued_prompts += 1
         elif rtype == "ai-title":
             self.ai_title = rec.get("aiTitle") or self.ai_title
         elif rtype == "agent-name":
@@ -485,6 +542,7 @@ class SessionAcc:
                 self.density_events.append(ts)
         elif kind == "interrupt":
             self.last_interrupt_ts = ts
+            self.interrupts += 1
         elif kind == "notification":
             self._feed_notification(content_text(content))
         elif kind == "tool_result":
@@ -686,6 +744,25 @@ class SessionAcc:
         out += [(t, "error") for t in self.api_errors]
         return sorted(out, key=lambda m: (m[0], m[1]))
 
+    def friction(self) -> dict[str, int]:
+        """Signs that the session went badly, counted side by side.
+
+        Tool calls and errors are the main session's: a subagent's failures are its own retries,
+        which the user does not see. `total` adds up the events, as a sort key.
+        """
+        calls = [c for c in self.tool_calls if c[3] is None]
+        out = {
+            "interrupts": self.interrupts,
+            "api_errors": len(self.api_errors),
+            "queued_prompts": self.queued_prompts,
+            "tool_calls": len(calls),
+            "tool_errors": sum(1 for c in calls if c[2]),
+        }
+        out["total"] = (
+            out["interrupts"] + out["api_errors"] + out["queued_prompts"] + out["tool_errors"]
+        )
+        return out
+
     def effort_mix(self) -> dict[str, int]:
         """API requests per effort level, highest level first."""
         return effort_mix(self.efforts.values())
@@ -797,6 +874,18 @@ class SessionAcc:
         usages = self.all_usages()
         saved = sum(cache_savings(u.model, u.usage) for u in usages)
         return cache_hit_rate([u.usage for u in usages]), saved
+
+    def idle_recaches(self) -> list[list]:
+        """Requests that rewrote an expired cache, subagents included: [ts, tokens, USD]."""
+        resets = [c["ts"] for c in self.compactions]
+        out = idle_recaches(list(self.usages.values()), resets)
+        for sa in self.subagents.values():
+            out += idle_recaches(list(sa.usages.values()))
+        return sorted(out)
+
+    def idle_recache_cost(self) -> float:
+        """Estimated USD lost to re-caching after idle gaps (see idle_recaches)."""
+        return sum(c for _, _, c in self.idle_recaches())
 
     def tokens(self) -> int:
         return sum(u.total for u in self.usages.values()) + sum(

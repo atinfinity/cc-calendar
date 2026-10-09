@@ -90,6 +90,15 @@ export function cacheTitle(hit, saved) {
   return `Cache reads are ${fmtPct(hit)} of input tokens. Caching ${effect} compared with no caching (cache write premium included).`;
 }
 
+// Idle re-cache (see SessionAcc.idle_recaches): what it is and how to avoid it.
+export const IDLE_RECACHE_HINT = "Estimate. The prompt cache expires after 5 minutes without a request (1 hour when Claude Code asks for it), "
+  + "so the first request after a longer break writes the context to the cache again. This counts what that cost over reading it from a warm cache, subagents included. "
+  + "/clear or /compact before a long break makes that rewrite small.";
+
+export function idleRecacheTitle(requests, tokens) {
+  return `${requests} request${requests > 1 ? "s" : ""} after a break rewrote ${fmtTokens(tokens)} tokens to the cache.\n${IDLE_RECACHE_HINT}`;
+}
+
 export function fmtDuration(ms) {
   if (ms == null || ms < 0) return "–";
   const m = Math.round(ms / 60000);

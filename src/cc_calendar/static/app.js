@@ -1,7 +1,7 @@
 // Entry point: state, data loading, filters, list view, live updates.
 import { renderCalendar } from "./calendar.js";
 import { renderCostsPane } from "./costspane.js";
-import { renderDetail } from "./detail.js";
+import { frictionParts, renderDetail } from "./detail.js";
 import { exportSessions } from "./export.js";
 import { EMPTY_FILTER, activeFilterCount, matchesListFilter, renderListFilters } from "./listfilter.js";
 import { bindNotifyToggle, checkTransitions } from "./notify.js";
@@ -45,6 +45,7 @@ export const state = {
   sort: prefs.get("listSort", { key: "start", dir: "desc" }),
   listFilter: { ...EMPTY_FILTER, ...prefs.get("listFilter", {}) }, // list view only
   showSummary: prefs.get("summary", false),
+  compareRanges: prefs.get("compareRanges", false), // Summary: compare with the previous range
   showTools: prefs.get("tools", false),
   showCosts: prefs.get("costs", false),
   showRequests: prefs.get("requests", false),
@@ -560,6 +561,7 @@ const LIST_COLUMNS = [
   ["cost", "Cost", (s) => s.cost, "desc", true],
   ["cache", "Cache", (s) => s.cache_hit, "asc", true],
   ["percommit", "$/commit", (s) => costPer(s.cost, (s.commit_list || []).length), "desc", true],
+  ["friction", "Friction", (s) => s.friction.total, "desc", true],
   ["ctxavg", "Avg ctx", (s) => s.context_avg, "desc", true],
   ["ctxpeak", "Peak ctx", (s) => s.context_peak, "desc", true],
 ];
@@ -617,7 +619,8 @@ function renderList(visible) {
     const sorted = state.sort.key === key;
     return h("th", {
       class: ["sortable", numeric ? "num" : "", sorted ? "sorted" : ""].join(" ").trim(),
-      title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : key === "percommit" ? "Sort by cost per commit" : key === "ctxavg" ? "Sort by average context per request" : key === "ctxpeak" ? "Sort by peak context" : `Sort by ${label.toLowerCase()}`,
+      title: key === "status" ? "Sort by status" : key === "cache" ? "Sort by cache hit rate" : key === "percommit" ? "Sort by cost per commit"
+        : key === "friction" ? "Sort by friction: interrupts, API errors, queued prompts and failed tool calls added up" : key === "ctxavg" ? "Sort by average context per request" : key === "ctxpeak" ? "Sort by peak context" : `Sort by ${label.toLowerCase()}`,
       onclick: () => setSort(key),
     }, label, sorted ? (state.sort.dir === "asc" ? " ▲" : " ▼") : "");
   });
@@ -650,6 +653,7 @@ function renderList(visible) {
           h("td", { class: "num" + (s.cache_hit != null && s.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(s.cache_hit, s.cache_saved) },
             fmtPct(s.cache_hit)),
           h("td", { class: "num", title: outputTitle(s) }, fmtCost(costPer(s.cost, (s.commit_list || []).length), s.cost_estimated)),
+          h("td", { class: "num", title: frictionParts(s.friction).map(([, text]) => text).join(" · ") }, s.friction.total),
           h("td", { class: "num" }, s.context_avg == null ? "–" : fmtTokens(s.context_avg)),
           h("td", { class: "num" + (s.context_bloated ? " warn" : ""), title: s.context_bloated ? bloatTitle(s) : null },
             s.context_peak == null ? "–" : fmtTokens(s.context_peak)),
@@ -779,7 +783,8 @@ function bind() {
   };
   $("copy-report").onclick = async () => {
     const btn = $("copy-report");
-    const ok = await copyText(buildReport(filtered(), rangeDays(), $("range-label").textContent));
+    const ok = await copyText(buildReport(filtered(), rangeDays(), $("range-label").textContent,
+      state.compareRanges ? state.span : null));
     btn.textContent = ok ? "Copied ✓" : "Copy failed";
     clearTimeout(btn.timer);
     btn.timer = setTimeout(() => { btn.textContent = "Copy report"; }, 1500);

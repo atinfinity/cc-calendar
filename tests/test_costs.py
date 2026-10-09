@@ -3,7 +3,7 @@ from conftest import BASE, LogBuilder, basic_session
 
 from cc_calendar.costs import cost_breakdown
 from cc_calendar.parser import DENSITY_BUCKET_MS, SessionAcc
-from cc_calendar.pricing import cost_parts, estimate_cost
+from cc_calendar.pricing import PRICES, cost_parts, estimate_cost
 
 T0 = int(BASE.timestamp() * 1000)
 MIN = 60_000
@@ -87,3 +87,42 @@ def test_recorded_cost_is_split_by_the_estimate():
     assert d["recorded"] == 1 and not d["estimated"]
     total = sum(sum(m["cost"]) for m in d["models"])
     assert total == pytest.approx(estimate * 2, abs=1e-3)
+
+
+def test_usage_splits_main_thread_and_subagents():
+    s = session_with_subagent()
+    d = cost_breakdown([s], [(T0, T0 + HOUR), (T0 + HOUR, T0 + 3 * HOUR)])
+    rows = {(u["model"], u["agent"]): u for u in d["usage"]}
+    assert set(rows) == {("claude-sonnet-5-5", False), ("claude-haiku-4-5", True)}
+    main = rows["claude-sonnet-5-5", False]
+    assert main["tokens"] == [1100, 600, 2000, 2000]
+    assert main["scaled"] == main["tokens"]  # estimated: no scaling
+    assert main["cost"] == pytest.approx(sum(d["models"][0]["cost"]), abs=1e-3)
+    assert sum(u["cost"] for u in d["usage"]) == pytest.approx(s.cost()[0], abs=1e-3)
+    # Only the range's requests count.
+    d = cost_breakdown([s], [(T0 + HOUR, T0 + 3 * HOUR)])
+    assert [(u["model"], u["agent"], u["tokens"]) for u in d["usage"]] == [
+        ("claude-sonnet-5-5", False, [100, 100, 0, 1000])
+    ]
+
+
+def test_usage_reprices_on_the_recorded_footing():
+    b = basic_session()
+    estimate = feed(b).cost()[0]
+    b.meta("cost-state", totalCostUSD=round(estimate * 2, 6))
+    d = cost_breakdown([feed(b)], [(T0, T0 + HOUR)])
+    (u,) = d["usage"]
+    assert u["scaled"] == pytest.approx([2 * n for n in u["tokens"]], abs=0.01)
+    assert u["cost"] == pytest.approx(estimate * 2, abs=1e-3)
+    # Re-pricing at the same model's rates gives back the recorded cost.
+    rates = next(p["rates"] for p in d["prices"] if p["model"] == "claude-sonnet-5-5")
+    repriced = sum(n * r / 1e6 for n, r in zip(u["scaled"], rates, strict=True))
+    assert repriced == pytest.approx(u["cost"], abs=1e-3)
+
+
+def test_prices_list_every_model_in_the_table():
+    d = cost_breakdown([], [(T0, T0 + HOUR)])
+    assert d["usage"] == []
+    assert [p["model"] for p in d["prices"]] == [m for m, _ in PRICES]
+    sonnet = next(p for p in d["prices"] if p["model"] == "claude-sonnet-5-5")
+    assert sonnet["rates"] == pytest.approx([2.0, 10.0, 2.5, 0.2])

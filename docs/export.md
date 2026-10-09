@@ -35,6 +35,7 @@ CSV and JSON carry the same fields, in this order.
 | `cost_usd` | number | Cost in US dollars, four decimal places |
 | `cost_estimated` | boolean | `true` when the cost is estimated from token usage (shown with `~` in the app) |
 | `cache_hit_rate` | number or null | Cache reads as a share of all input-side tokens (input, cache writes and cache reads), from 0 to 1 |
+| `idle_recache_usd` | number | Estimated cost of rewriting the prompt cache after idle gaps, four decimal places. See [Idle re-cache](features.md#time-cost-and-usage) |
 | `model` | string or null | Model used for the most requests |
 | `effort` | string or null | Effort level most requests ran at: `max`, `xhigh`, `high`, `medium` or `low` |
 | `claude_code_version` | string or null | Claude Code version recorded in the log (the latest one if it changed) |
@@ -44,6 +45,12 @@ CSV and JSON carry the same fields, in this order.
 | `lines_added` | integer or null | Lines added, from Claude Code's cost record (a continued session's own share); `null` when the session wrote none or its share is unknown |
 | `lines_removed` | integer or null | Lines removed, as for `lines_added` |
 | `cost_per_commit` | number or null | `cost_usd` divided by `commits`, four decimal places; `null` without commits |
+| `interrupts` | integer | Times you stopped Claude with Esc |
+| `api_errors` | integer | API requests that failed (overloaded, rate limited, connection lost and the like) |
+| `queued_prompts` | integer | Prompts you sent while Claude was still working, which it read before its turn ended |
+| `tool_calls` | integer | Tool calls in the main session; subagents' calls are not counted |
+| `tool_errors` | integer | Of `tool_calls`, those that returned an error, including commands that exited non-zero and tool uses you rejected |
+| `friction` | integer | `interrupts` + `api_errors` + `queued_prompts` + `tool_errors`, as in the Friction column |
 | `context_avg` | integer or null | Average context per main-thread request, in tokens: input, cache writes and cache reads. Subagents are not included. `null` without requests |
 | `context_peak` | integer or null | Largest context of a single request, as for `context_avg` |
 | `context_bloated` | boolean | `true` when at least 20 requests each resent more than 200k tokens. See [Context size](features.md#sessions-in-detail) |
@@ -94,6 +101,7 @@ JSON wraps the records in an object that identifies the format:
       "cost_usd": 3.4354,
       "cost_estimated": true,
       "cache_hit_rate": 0.9712,
+      "idle_recache_usd": 0.1825,
       "model": "claude-sonnet-5-5",
       "effort": "high",
       "claude_code_version": "2.1.0",
@@ -103,6 +111,12 @@ JSON wraps the records in an object that identifies the format:
       "lines_added": 182,
       "lines_removed": 40,
       "cost_per_commit": 1.7177,
+      "interrupts": 1,
+      "api_errors": 0,
+      "queued_prompts": 2,
+      "tool_calls": 84,
+      "tool_errors": 5,
+      "friction": 8,
       "context_avg": 104512,
       "context_peak": 166830,
       "context_bloated": false,
@@ -134,4 +148,4 @@ CSV has no version field. Read columns by their header names, not by position.
 | --- | --- | --- |
 | 1 | 0.3.0 | First version |
 | 1 | 0.4.0 | Added `source`, `tags` and `note` |
-| 1 | Unreleased | Added `rating`, `context_avg`, `context_peak` and `context_bloated` |
+| 1 | Unreleased | Added `rating`, `idle_recache_usd`, and `interrupts`, `api_errors`, `queued_prompts`, `tool_calls`, `tool_errors` and `friction`, and `context_avg`, `context_peak` and `context_bloated` |

@@ -1,7 +1,7 @@
 // Right-hand detail pane for one session.
 import {
   STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, compactDetail, costTitle, fmtEffortMix, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
-  shortModel, statusColor,
+  idleRecacheTitle, shortModel, statusColor,
 } from "./util.js";
 import { notesCard } from "./notes.js";
 import { copyText } from "./report.js";
@@ -14,6 +14,21 @@ const CHECKS = [
   ["committed", "Working tree clean",
     "The repository has no uncommitted changes. This is its current state, not the state when the session ended"],
 ];
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// Friction signals side by side: [key, text, hint]. The tool error rate is the main session's.
+export function frictionParts(f) {
+  const rate = f.tool_calls ? ` (${fmtPct(f.tool_errors / f.tool_calls)})` : "";
+  return [
+    ["interrupts", plural(f.interrupts, "interrupt"), "Times you stopped Claude with Esc"],
+    ["api_errors", plural(f.api_errors, "API error"), "Requests that failed, e.g. overloaded, rate limited or a lost connection"],
+    ["queued_prompts", plural(f.queued_prompts, "queued prompt"),
+      "Prompts you sent while Claude was still working, which it read before its turn ended"],
+    ["tool_errors", `${f.tool_errors} of ${plural(f.tool_calls, "tool call")} failed${rate}`,
+      "Tool calls that returned an error, including commands that exited non-zero and tool uses you rejected. Subagents' tool calls are not counted"],
+  ];
+}
 
 // Quote for POSIX shells unless the text is plainly safe.
 export function shellQuote(text) {
@@ -94,6 +109,8 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
       h("span", { class: "stat", title: costTitle(d) }, fmtCost(d.cost, d.cost_estimated)),
       d.cache_hit == null ? null : h("span", { class: "stat" + (d.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(d.cache_hit, d.cache_saved) },
         `cache ${fmtPct(d.cache_hit)}`),
+      d.idle_recache_requests ? h("span", { class: "stat", title: idleRecacheTitle(d.idle_recache_requests, d.idle_recache_tokens) },
+        `idle re-cache ${fmtCost(d.idle_recache, true)}`) : null,
       ctx,
       ...d.models.map((m) => h("span", { class: "stat" }, shortModel(m))),
       fmtEffortMix(d.efforts) ? h("span", { class: "stat", title: "Effort level: share of API requests" }, `effort ${fmtEffortMix(d.efforts)}`) : null,
@@ -120,6 +137,10 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
     return h("span", { class: `check-pill ${cls}`, title }, `${mark} ${label}`);
   }))));
 
+  // Most sessions have some failed tool calls, so only interrupts and API errors stand out.
+  const f = d.friction;
+  parts.push(card("Friction", h("div", { class: "stats" }, frictionParts(f).map(([key, text, hint]) =>
+    h("span", { class: "stat" + (f[key] && (key === "interrupts" || key === "api_errors") ? " warn" : ""), title: hint }, text)))));
   parts.push(contextCard(d));
 
   // Outcomes

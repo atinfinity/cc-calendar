@@ -114,6 +114,9 @@ the logs it covers.
   shaded by active time, cost or commits (switch with "Shade by"). Month cells list the day's busiest
   projects; the year view adds per-month totals. Click a day to open it in the day view, or a
   month total to open that month.
+- **Monthly budget** — the month view shows the spend so far, the daily average and the projected
+  month-end total, against a monthly budget and an optional plan price ("API equivalent $X vs
+  plan $Y") kept in the browser. Rough estimates, not billing data.
 - **Time and cost totals** — each date shows that day's active time and cost, and the Summary
   table breaks the displayed range down by project. Active time is the drawn bars; a session's cost
   is split across days by when its requests ran. Totals follow the current filters.
@@ -121,6 +124,9 @@ the logs it covers.
   cost per commit; the list has a **$/commit** column and an **Output** filter, so **No output**
   plus a minimum cost finds sessions that cost a lot and produced nothing. The project page adds
   cost per commit and per changed line.
+- **Compare with previous** — the Summary table can show each project's active time, cost,
+  sessions, commits and pull requests next to the previous day, week, month or year, with the
+  change. Projects active in only one of the two ranges are marked new or absent.
 - **Markdown report** — "Copy report" copies the displayed day, week, month or year as Markdown:
   active time and cost per project, each session's title and tags (not notes) and the commits made in the range. Ready
   to paste into a standup note or a daily report; it follows the current filters. Issue and PR
@@ -133,6 +139,10 @@ the logs it covers.
   under their own model. The week and month views add a row per day, so a spike can be traced to
   one token type. It follows the current filters; sessions with Claude Code's own cost record are
   split by the estimate's proportions.
+- **What-if cost** — the Costs pane's What if section re-prices the range as if one model (or
+  all) had run on another, for the main thread, subagents or both, next to the actual cost and
+  the difference. Token counts stay the same, so it is a rough estimate: another model or effort
+  level would write different amounts.
 - **Most expensive requests** — the Top requests pane ranks the prompts sent in the displayed
   range by the cost of the requests that ran until the next prompt, subagents included, with
   project, session, time and tokens. Click a row to open the transcript at that prompt. It follows
@@ -143,6 +153,13 @@ the logs it covers.
 - **Cache efficiency** — each session shows its cache hit rate (cache reads as a share of input
   tokens) and roughly how much caching saved. Sort the list by Cache to find sessions with poor
   reuse; rates below 90% are highlighted (Claude Code usually reuses well over 90%).
+- **Idle re-cache** — the prompt cache expires after a break (5 minutes, or 1 hour when Claude
+  Code asks for it), so the next request writes the whole context again. The detail pane and the
+  Costs pane estimate what that cost, subagents included. `/clear` or `/compact` before a long
+  break is cheaper.
+- **Friction** — the detail pane counts interrupts, API errors, prompts sent while Claude was
+  still working, and failed tool calls with their error rate. The list's **Friction** column adds
+  them up, so sorting by it brings the roughest sessions to the top.
 - **Event marks** — marks on each bar show when prompts, commits, compactions and API errors
   happened, and the tooltip counts them for that block. Click a mark (or a request or commit time
   in the detail pane) to open the transcript at that point; the transcript has ‹ › buttons to step
@@ -192,8 +209,8 @@ the logs it covers.
   every session, and its commit history with links to the repository.
 - **Export** — download the sessions shown in the list view as CSV or JSON, in the current filter
   and sort order: start, end, active time, project, source directory, branch, status, prompts,
-  tokens, cost, cache hit rate, model, effort, Claude Code version, commits, pull requests, files changed, lines added and removed, cost per
-  commit, average and peak context, tags and note. Times are
+  tokens, cost, cache hit rate, idle re-cache cost, model, effort, Claude Code version, commits, pull requests, files changed, lines added and removed, cost per
+  commit, friction counts, average and peak context, tags and note. Times are
   ISO 8601 with your UTC offset. See the [export format](https://atinfinity.github.io/cc-calendar/export/).
 - **Keyboard shortcuts** — `←` / `→` previous / next range, `t` today, `d` / `w` / `m` / `y` span,
   `c` / `l` calendar / list, `/` search, `j` / `k` next / previous session, `Enter` open its

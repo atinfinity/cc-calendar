@@ -134,6 +134,10 @@ a { color: var(--accent); }
 .summary tfoot td { font-weight: 600; border-bottom: none; border-top: 1px solid var(--border-strong); }
 .summary .dot { margin-right: 6px; }
 .summary .note { margin-top: 6px; }
+.summary .summary-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.summary .delta { color: var(--muted); padding-left: 2px; }
+.summary .range-mark { margin-left: 6px; padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 8px; font-size: 10px; color: var(--muted); }
+.summary tr.absent td { color: var(--muted); }
 .summary .rating-summary { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
 .cal-body { display: grid; position: relative; }
 .gutter { position: relative; }
@@ -436,6 +440,18 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .month-total { min-height: 1.3em; font-size: 11px; }
 .month-project { display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .month-project .dot { flex: none; }
+.budget { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.budget button { padding: 1px 8px; font-size: 12px; }
+.budget input[type="number"] { width: 72px; margin-left: 2px; }
+.budget-edit { display: inline-flex; gap: 10px; }
+.budget-bar { position: relative; display: inline-block; width: 120px; height: 8px; border-radius: 4px; background: var(--bg-soft); border: 1px solid var(--border); overflow: hidden; }
+.budget-bar i { position: absolute; left: 0; top: 0; bottom: 0; }
+.budget-bar .projected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.budget-bar .spent { background: var(--accent); }
+.budget-bar.over .spent, .budget-bar.over .projected { background: var(--interrupted); }
+.budget-bar.over .projected { opacity: 0.35; }
+.budget-over { color: var(--interrupted); }
+.budget-note { margin-left: auto; font-style: italic; }
 .year { padding: 16px 14px; }
 .year-grid { display: grid; grid-auto-rows: 14px; gap: 3px; font-size: 10px; color: var(--muted); }
 .year-month { white-space: nowrap; overflow: visible; }
@@ -464,6 +480,11 @@ pre { background: var(--code-bg); border-radius: 6px; padding: 8px 10px; overflo
 .cost-out { background: var(--accent); }
 .cost-write { background: #e0a100; }
 .cost-read { background: #9aa4b2; }
+.what-if { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.what-if-pick select { margin: 0 2px; }
+.what-if-result { margin-top: 6px; }
+.what-if-less { color: var(--done); font-weight: 600; }
+.what-if-more { color: var(--interrupted); font-weight: 600; }
 
 /* Most expensive requests pane */
 .requests-pane tbody tr { cursor: pointer; }

@@ -34,6 +34,7 @@ export function sessionRecords(rows) {
     cost_usd: round(s.cost, 4),
     cost_estimated: Boolean(s.cost_estimated),
     cache_hit_rate: round(s.cache_hit, 4),
+    idle_recache_usd: round(s.idle_recache ?? 0, 4),
     model: s.model || null,
     effort: s.effort || null,
     claude_code_version: s.version || null,
@@ -43,6 +44,12 @@ export function sessionRecords(rows) {
     lines_added: s.lines_added ?? null,
     lines_removed: s.lines_removed ?? null,
     cost_per_commit: round(costPer(s.cost, (s.commit_list || []).length), 4),
+    interrupts: s.friction.interrupts,
+    api_errors: s.friction.api_errors,
+    queued_prompts: s.friction.queued_prompts,
+    tool_calls: s.friction.tool_calls,
+    tool_errors: s.friction.tool_errors,
+    friction: s.friction.total,
     context_avg: s.context_avg ?? null,
     context_peak: s.context_peak ?? null,
     context_bloated: Boolean(s.context_bloated),
@@ -69,8 +76,10 @@ export function toCSV(records, fields) {
 export const EXPORT_FIELDS = [
   "id", "title", "project", "project_path", "source", "branch", "status", "rating", "start", "end",
   "active_minutes", "span_minutes", "prompts", "tokens", "cost_usd", "cost_estimated",
-  "cache_hit_rate", "model", "effort", "claude_code_version", "commits", "pull_requests", "files_changed", "lines_added", "lines_removed",
-  "cost_per_commit", "context_avg", "context_peak", "context_bloated", "tags", "note",
+  "cache_hit_rate", "idle_recache_usd", "model", "effort", "claude_code_version", "commits", "pull_requests", "files_changed", "lines_added", "lines_removed",
+  "cost_per_commit", "interrupts", "api_errors", "queued_prompts", "tool_calls", "tool_errors", "friction",
+  "context_avg", "context_peak", "context_bloated",
+  "tags", "note",
 ];
 
 // Bump when a field is renamed, removed or changes meaning; adding fields does not need it.

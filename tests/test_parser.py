@@ -197,6 +197,42 @@ def test_background_tasks():
     assert s.background["bg1"]["summary"] == "exit 1"
 
 
+def test_friction_counts():
+    b = LogBuilder("s")
+    b.prompt(0, "go")
+    b.tool_use(1, "t1", "Bash", {"command": "make"}, msg_id="m1")
+    b.tool_result(2, "t1", "Exit code 2", is_error=True)
+    b.tool_use(3, "t2", "Read", {"file_path": "/a"}, msg_id="m2")
+    b.tool_result(4, "t2", "contents")
+    b.assistant(5, [{"type": "text", "text": "API Error"}], msg_id="e1", model="<synthetic>")
+    # A prompt typed mid-turn, read by Claude before the turn ended.
+    queued = {"type": "queued_command", "commandMode": "prompt", "prompt": "also add tests"}
+    b.meta("attachment", uuid="q1", attachment={**queued, "origin": {"kind": "human"}})
+    # Messages from other agents and background task results are not the user's prompts.
+    b.meta("attachment", uuid="q2", attachment={**queued, "origin": {"kind": "peer"}})
+    note = "<task-notification><task-id>bg</task-id></task-notification>"
+    b.meta("attachment", uuid="q3", attachment={**queued, "prompt": note})
+    b.interrupt(6)
+    b.prompt(7, "try again")
+    b.interrupt(8)
+    s = feed(b)
+    # Subagent tool calls are left out of the session's own counts.
+    agent = LogBuilder("s")
+    agent.tool_use(3, "g1", "Grep", {"pattern": "x"}, msg_id="x1")
+    agent.tool_result(4, "g1", "no such file", is_error=True)
+    for r in agent.records:
+        s.feed_subagent("a1", "agent-a1.jsonl", r)
+    assert s.friction() == {
+        "interrupts": 2,
+        "api_errors": 1,
+        "queued_prompts": 1,
+        "tool_calls": 2,
+        "tool_errors": 1,
+        "total": 5,
+    }
+    assert feed(basic_session()).friction()["total"] == 0
+
+
 def test_pending_background_agents_mean_interrupted():
     b = LogBuilder("s")
     b.prompt(0, "go")
