@@ -1,6 +1,6 @@
 // Right-hand detail pane for one session.
 import {
-  STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, compactDetail, fmtEffortMix, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
+  STATUS_HINTS, STATUS_LABELS, CACHE_LOW, cacheTitle, compactDetail, costTitle, fmtEffortMix, fmtAgo, fmtCost, fmtDateTime, fmtDuration, fmtPct, fmtTime, fmtTokens, h,
   shortModel, statusColor,
 } from "./util.js";
 import { notesCard } from "./notes.js";
@@ -90,7 +90,7 @@ export function renderDetail(pane, d, { onClose, onOpenLog, onSelect, onOpenProj
     h("div", { class: "stats" },
       h("span", { class: "stat" }, `${d.prompt_count} prompts`),
       h("span", { class: "stat", title: "Input + output + cache tokens, including subagents" }, `${fmtTokens(d.tokens)} tok`),
-      h("span", { class: "stat", title: d.cost_estimated ? "Estimated from token usage" : "From Claude Code's cost record" }, fmtCost(d.cost, d.cost_estimated)),
+      h("span", { class: "stat", title: costTitle(d) }, fmtCost(d.cost, d.cost_estimated)),
       d.cache_hit == null ? null : h("span", { class: "stat" + (d.cache_hit < CACHE_LOW ? " warn" : ""), title: cacheTitle(d.cache_hit, d.cache_saved) },
         `cache ${fmtPct(d.cache_hit)}`),
       ctx,

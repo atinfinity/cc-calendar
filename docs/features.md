@@ -64,6 +64,13 @@
     Cost comes from Claude Code's own cost record when the session wrote one. Otherwise it is
     estimated from token usage and a built-in price table, and shown with a `~` prefix.
 
+    A continued session's cost record is cumulative: it starts from the previous session's
+    totals. So its cost, and its line counts, are its own share: its record minus the previous
+    session's last record, following chains of continuations. When that share cannot be told
+    (the previous session's log or cost record is gone, or the record is below the previous
+    session's), its cost is estimated from its own token usage and its line counts are not
+    shown. The cost tooltip says which applies.
+
     Treat all costs as rough figures, not billing data. The price table uses Anthropic API list
     prices as of when it was last updated. It does not know about subscription plans, discounts or
     price changes.

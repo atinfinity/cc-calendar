@@ -49,6 +49,8 @@ def test_sessions(client):
     assert by_id["s-next"]["continued_from"] == "s-prev"
     assert by_id["s-prev"]["continued_in"] == "s-next"
     assert by_id["s-next"]["cost"] == 1.25 and by_id["s-next"]["cost_estimated"] is False
+    assert by_id["s-next"]["cost_basis"] == "continued"
+    assert by_id["s-basic"]["cost_basis"] == "estimate"
     assert "readme" in basic["search"].lower()
     assert basic["version"] == "2.1.0"  # Claude Code version from the log
     assert data["version"] == __version__
@@ -66,6 +68,14 @@ def test_session_detail(client):
     sub = client.get("/api/sessions/s-sub").json()
     assert [a["id"] for a in sub["subagents"]] == ["a1"]
     assert sub["subagents"][0]["has_log"] is True
+    # A continuation shows its own share of the cumulative cost record.
+    nxt = client.get("/api/sessions/s-next").json()
+    assert nxt["cost"] == 1.25 and nxt["continued_from"] == "s-prev"
+    assert nxt["cost_state"] == {
+        "totalDuration": 1000,
+        "totalLinesAdded": 3,
+        "totalLinesRemoved": 1,
+    }
     assert client.get("/api/sessions/nope").status_code == 404
 
 

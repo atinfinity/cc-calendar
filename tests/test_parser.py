@@ -160,11 +160,13 @@ def test_pending_background_agents_mean_interrupted():
 def test_continued_copy_is_skipped():
     prev = LogBuilder("old")
     prev.prompt(0, "first")
+    prev.meta("cost-state", totalCostUSD=2.5)
     nxt = LogBuilder("new")
     nxt.records.extend(prev.records)
     nxt.prompt(10, "second")
     s = feed(nxt)
     assert [p["text"] for p in s.prompts] == ["second"]
+    assert s.cost_state is None and s.copied_from == "old"
 
 
 def test_duplicate_uuids_are_ignored():

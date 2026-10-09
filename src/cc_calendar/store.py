@@ -47,6 +47,7 @@ class Store:
         # is indexed, and `sessions` holds the one with the newest activity.
         self.copies: dict[str, dict[str, SessionAcc]] = {}  # sid -> dir name -> session
         self.sessions: dict[str, SessionAcc] = {}
+        self.previous: dict[str, str] = {}  # sid -> the session it continues (`continued-in`)
         self.files: dict[Path, FileState] = {}
         self.lock = threading.RLock()
 
@@ -65,6 +66,9 @@ class Store:
                     self.update_file(path)
                 for path in sorted(projects.glob("*/*/subagents/*.jsonl")):
                     self.update_file(path)
+            # A continuation may have been read before its predecessor.
+            for sid in list(self.sessions):
+                self._link(sid)
             if self.index is not None:
                 # Forget transcripts Claude Code has deleted since the last run.
                 keep = {str(p) for p in self.files}
@@ -100,6 +104,7 @@ class Store:
                 return self._update(d, kind, sid, agent_id, path)
             finally:
                 self._pick(sid)
+                self._link(sid)
 
     def _update(
         self, d: ClaudeDir, kind: str, sid: str, agent_id: str | None, path: Path
@@ -157,6 +162,30 @@ class Store:
             return
         ordered = [copies[d.name] for d in self.dirs if d.name in copies]
         self.sessions[sid] = max(ordered, key=lambda s: s.end if s.end is not None else -1)
+
+    def _link(self, sid: str) -> None:
+        """Hand a session, and the session it continues in, their predecessor's cost record.
+
+        A continuation's cost record is cumulative, so it needs the record it started from.
+        """
+        s = self.sessions.get(sid)
+        if s is None:
+            return
+        if s.continued_in:
+            self.previous[s.continued_in] = sid
+            nxt = self.sessions.get(s.continued_in)
+            if nxt is not None:
+                self._set_predecessor(nxt)
+        self._set_predecessor(s)
+
+    def _set_predecessor(self, s: SessionAcc) -> None:
+        prev = self.previous.get(s.session_id)
+        if prev is None and s.copied_from is not None and s.copied_from not in self.sessions:
+            # Its log starts with a copy of a session whose own log Claude Code has deleted.
+            prev = s.copied_from
+        p = self.sessions.get(prev) if prev else None
+        s.predecessor = prev
+        s.prior_cost_state = p.cost_state if p else None
 
     def also_in(self, sid: str) -> list[str]:
         """Names of the other directories that hold a copy of the shown session."""

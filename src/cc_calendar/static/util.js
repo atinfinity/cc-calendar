@@ -62,6 +62,19 @@ export function fmtCost(cost, estimated) {
   return estimated ? "~" + s : s;
 }
 
+// Where a session's cost comes from (`cost_basis`, see SessionAcc.cost_basis).
+const COST_BASES = {
+  record: "From Claude Code's cost record",
+  continued: "From Claude Code's cost record, minus the previous session's: a continued session's record carries over its total",
+  estimate: "Estimated from token usage, including subagents",
+  no_previous: "Estimated from token usage, including subagents: this session continues one whose log or cost record is gone, so its own share of Claude Code's cumulative cost record is unknown",
+  negative: "Estimated from token usage, including subagents: Claude Code's cost record is below the previous session's, so its own share is unknown",
+};
+
+export function costTitle(d) {
+  return COST_BASES[d.cost_basis] || (d.cost_estimated ? COST_BASES.estimate : COST_BASES.record);
+}
+
 // Below this cache hit rate a session is flagged as reusing its cache poorly.
 export const CACHE_LOW = 0.9;
 

@@ -27,6 +27,14 @@ def compact_info(rec: dict) -> dict:
     }
 
 
+def is_number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def as_count(v: Any) -> int | None:
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
 def compact_extra(c: dict) -> dict:
     return {k: c[k] for k in ("trigger", "pre", "post") if c.get(k) is not None}
 
@@ -46,6 +54,8 @@ TASK_SUMMARY_RE = re.compile(r"<summary>(.*?)</summary>", re.S)
 COMMAND_NAME_RE = re.compile(r"<command-name>(.*?)</command-name>", re.S)
 COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
 DENSITY_BUCKET_MS = 10 * 60 * 1000
+# Totals in a cost record that a continuation carries over from its predecessor.
+CUMULATIVE_COST_KEYS = ("totalCostUSD", "totalLinesAdded", "totalLinesRemoved", "totalAPIDuration")
 
 
 def parse_ts(value: Any) -> int | None:
@@ -216,6 +226,11 @@ class SessionAcc:
     last_prompt: str | None = None
     cost_state: dict | None = None
     continued_in: str | None = None
+    copied_from: str | None = None  # session whose records this log starts with a copy of
+    # Set by the store: the session this one continues (also when its log is gone) and that
+    # session's last cost record, whose totals this session's record starts from.
+    predecessor: str | None = None
+    prior_cost_state: dict | None = None
     permission_mode: str | None = None
     last_stop_reason: str | None = None
     last_assistant_ts: int | None = None
@@ -244,6 +259,7 @@ class SessionAcc:
         sid = rec.get("sessionId")
         # A continued session may begin with a verbatim copy of its predecessor.
         if sid is not None and sid != self.session_id:
+            self.copied_from = sid
             return
         uuid = rec.get("uuid")
         if uuid:
@@ -559,10 +575,53 @@ class SessionAcc:
             s.tokens() for s in self.subagents.values()
         )
 
+    def own_cost_state(self) -> dict | None:
+        """The cost record with its cumulative totals cut down to this session's own share.
+
+        A continuation's record starts from its predecessor's final totals, so those are
+        subtracted. Totals that cannot be told that way (the predecessor's record is gone, or
+        the cost is below its) are None.
+        """
+        cs = self.cost_state
+        if cs is None or self.predecessor is None:
+            return cs
+        prior = self.prior_cost_state or {}
+        out = dict(cs)
+        for k in CUMULATIVE_COST_KEYS:
+            v, p = cs.get(k), prior.get(k)
+            out[k] = v - p if is_number(v) and is_number(p) and v >= p else None
+        if out["totalCostUSD"] is None:
+            out.update(dict.fromkeys(CUMULATIVE_COST_KEYS))
+        return out
+
+    def cost_basis(self) -> str:
+        """Where cost() comes from.
+
+        "record": Claude Code's cost record; "continued": this continuation's share of its
+        cumulative record. Estimated from tokens: "estimate" (no record), "no_previous" (the
+        predecessor's log or record is gone) or "negative" (the record is below the
+        predecessor's).
+        """
+        cs = self.cost_state
+        if not cs or not is_number(cs.get("totalCostUSD")):
+            return "estimate"
+        if self.predecessor is None:
+            return "record"
+        prior = self.prior_cost_state
+        if not prior or not is_number(prior.get("totalCostUSD")):
+            return "no_previous"
+        return "negative" if cs["totalCostUSD"] < prior["totalCostUSD"] else "continued"
+
+    def own_lines(self) -> tuple[int | None, int | None]:
+        """(lines added, lines removed) in this session, from its own share of the cost
+        record; None when unknown."""
+        cs = self.own_cost_state() or {}
+        return as_count(cs.get("totalLinesAdded")), as_count(cs.get("totalLinesRemoved"))
+
     def cost(self) -> tuple[float, bool]:
         """(cost USD, estimated?)"""
-        if self.cost_state and isinstance(self.cost_state.get("totalCostUSD"), (int, float)):
-            return float(self.cost_state["totalCostUSD"]), False
+        if self.cost_basis() in ("record", "continued"):
+            return float(self.own_cost_state()["totalCostUSD"]), False
         est = sum(estimate_cost(u.model, u.usage) for u in self.usages.values())
         est += sum(s.cost() for s in self.subagents.values())
         return est, True
