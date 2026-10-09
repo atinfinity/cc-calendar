@@ -135,4 +135,7 @@ def main(argv: list[str] | None = None) -> None:
     config = uvicorn.Config(
         app, host=HOST, port=port, log_level="warning", timeout_graceful_shutdown=3
     )
-    Server(config, app.state.broadcaster).run()
+    try:
+        Server(config, app.state.broadcaster).run()
+    except KeyboardInterrupt:
+        pass  # uvicorn re-raises Ctrl+C once it has shut down; uvicorn.run() hides it too
