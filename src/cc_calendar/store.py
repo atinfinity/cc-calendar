@@ -186,6 +186,7 @@ class Store:
         p = self.sessions.get(prev) if prev else None
         s.predecessor = prev
         s.prior_cost_state = p.cost_state if p else None
+        s.prior_usage_ids = frozenset(p.usages) if p else frozenset()
 
     def also_in(self, sid: str) -> list[str]:
         """Names of the other directories that hold a copy of the shown session."""

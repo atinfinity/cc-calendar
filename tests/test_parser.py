@@ -233,6 +233,71 @@ def test_cumulative_record_without_predecessor():
     assert s.own_cost_state()["totalDuration"] == 1000
 
 
+RESUMED_AT = T0 + 1439 * MIN
+
+
+def resumed_session() -> tuple[SessionAcc, float, float]:
+    """A session run on day one, then resumed with `claude --resume` a day later.
+
+    Its cost record covers only the second run. -> (session, estimate before, estimate after)
+    """
+    b = LogBuilder("s-resumed")
+    b.prompt(0, "Start")
+    b.assistant(1, [{"type": "text", "text": "a"}], msg_id="r1", output_tokens=400_000)
+    b.assistant(30, [{"type": "text", "text": "b"}], msg_id="r2", output_tokens=2000)
+    b.prompt(1440, "Resume")
+    b.assistant(1441, [{"type": "text", "text": "c"}], msg_id="r3", output_tokens=1000)
+    b.meta("cost-state", **cost_totals(0, 7, 2), startTime=RESUMED_AT)
+    s = feed(b)
+    # A subagent of the first run.
+    agent = LogBuilder("s-resumed")
+    agent.assistant(2, [], msg_id="x1", model="claude-haiku-4-5", output_tokens=500)
+    for r in agent.records:
+        s.feed_subagent("a1", "agent-a1.jsonl", r)
+    before = sum(estimate_cost(u.model, u.usage) for u in s.all_usages() if u.ts < RESUMED_AT)
+    after = estimate_cost(s.usages["r3"].model, s.usages["r3"].usage)
+    s.cost_state["totalCostUSD"] = after * 1.2
+    return s, before, after
+
+
+def test_resumed_session_adds_earlier_runs():
+    s, before, after = resumed_session()
+    assert s.cost_basis() == "resumed"
+    assert {u.model for u in s.earlier_usages()} == {"claude-sonnet-5-5", "claude-haiku-4-5"}
+    cost, estimated = s.cost()
+    assert estimated and cost == pytest.approx(after * 1.2 + before)
+    # Its totals cover only the last run, so they are not shown as the session's.
+    assert s.own_lines() == (None, None)
+    assert s.own_cost_state()["totalDuration"] is None
+
+
+def test_resumed_cost_density():
+    s, before, after = resumed_session()
+    density = s.cost_density()
+    assert sum(density.values()) == pytest.approx(s.cost()[0], abs=1e-5)
+    start = RESUMED_AT // DENSITY_BUCKET_MS
+    # Earlier days get their estimate, the last run the record's cost.
+    assert sum(c for b, c in density.items() if b < start) == pytest.approx(before, abs=1e-5)
+    assert sum(c for b, c in density.items() if b >= start) == pytest.approx(after * 1.2)
+
+
+def test_record_covering_earlier_runs_is_not_resumed():
+    # Far above the last run's own usage: the record already counts the earlier runs.
+    s, before, after = resumed_session()
+    s.cost_state["totalCostUSD"] = (before + after) * 1.2
+    assert s.cost_basis() == "record"
+    assert s.cost() == ((before + after) * 1.2, False)
+
+
+def test_single_run_with_start_time_is_a_record():
+    b = basic_session()
+    b.meta("cost-state", **cost_totals(0.5, 3, 1), startTime=T0 - 5000)
+    s = feed(b)
+    assert s.earlier_usages() == []
+    assert s.cost() == (0.5, False) and s.cost_basis() == "record"
+    assert s.own_lines() == (3, 1)
+
+
 def test_pricing():
     assert price_for("claude-sonnet-5-5").input == 2
     assert price_for("claude-opus-4-7[1m]").input == 5

@@ -196,7 +196,9 @@ Screenshots show fictional demo data.
 Cost comes from Claude Code's own cost record when the session wrote one. Otherwise it is estimated
 from token usage and a built-in price table, and shown with a `~` prefix. A continued session
 counts only its own share of the cost record, which carries over the previous session's total.
-It also leaves out the copy of the previous session that its log starts with.
+It also leaves out the copy of the previous session that its log starts with. A resumed session's
+cost record covers only its last run, so its earlier runs are estimated and added, with a `~`
+prefix.
 
 Treat all costs as rough figures, not billing data. The price table in
 `src/cc_calendar/pricing.py` uses Anthropic API list prices as of when it was last updated. It does
