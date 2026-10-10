@@ -1,4 +1,4 @@
-"""The Japanese docs in docs-ja/ mirror the English pages in docs/."""
+"""The Japanese docs in docs/ja/ mirror the English pages in docs/."""
 
 import re
 from pathlib import Path
@@ -7,7 +7,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 EN = ROOT / "docs"
-JA = ROOT / "docs-ja"
+JA = EN / "ja"
 PAGES = sorted(p.name for p in EN.glob("*.md"))
 
 FENCE = re.compile(r"^```.*?^```|`[^`\n]+`", re.S | re.M)
@@ -45,3 +45,14 @@ def test_same_images_and_links(page):
     en, ja = body(EN / page), body(JA / page)
     assert IMAGE.findall(ja) == ["../" + src for src in IMAGE.findall(en)]
     assert LINK.findall(ja) == LINK.findall(en)
+
+
+ALL = [d / p for d in (EN, JA) for p in PAGES]
+
+
+@pytest.mark.parametrize("path", ALL, ids=[str(p.relative_to(ROOT)) for p in ALL])
+def test_images_resolve_from_the_page(path):
+    # GitHub shows the Markdown files as they are, so the paths must work from the page too
+    for src in IMAGE.findall(body(path)):
+        if "://" not in src:
+            assert (path.parent / src).is_file(), src

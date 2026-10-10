@@ -88,3 +88,7 @@ lang = "en"
 name = "日本語"
 link = "/cc-calendar/ja/"
 lang = "ja"
+
+# The Japanese pages in docs/ja build separately, with zensical.ja.toml
+[project.plugins.exclude]
+glob = ["ja/*"]

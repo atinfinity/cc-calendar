@@ -31,8 +31,8 @@ Preview it locally:
 uv run --group docs zensical serve
 ```
 
-The Japanese pages live in `docs-ja/` and are built with `zensical.ja.toml` into `site/ja`, served
-at `/cc-calendar/ja/`. When you change an English page, update the matching `docs-ja/` page in the
+The Japanese pages live in `docs/ja/` and are built with `zensical.ja.toml` into `site/ja`, served
+at `/cc-calendar/ja/`. When you change an English page, update the matching `docs/ja/` page in the
 same pull request. Keep its `{ #anchor }` heading ids identical to the English slugs, and reference
 images as `../images/…`; `tests/test_docs.py` checks both. To build both sites locally:
 

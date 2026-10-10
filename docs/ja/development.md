@@ -31,8 +31,8 @@ uv run --with playwright python scripts/screenshots.py
 uv run --group docs zensical serve
 ```
 
-日本語のページは `docs-ja/` にあり、`zensical.ja.toml` で `site/ja` にビルドされ、`/cc-calendar/ja/` で
-公開されます。英語のページを変更したときは、同じプルリクエストで対応する `docs-ja/` のページも更新してください。
+日本語のページは `docs/ja/` にあり、`zensical.ja.toml` で `site/ja` にビルドされ、`/cc-calendar/ja/` で
+公開されます。英語のページを変更したときは、同じプルリクエストで対応する `docs/ja/` のページも更新してください。
 見出しの `{ #anchor }` ID は英語のスラッグと同一に保ち、画像は `../images/…` で参照します（どちらも `tests/test_docs.py` で検査します）。
 両方のサイトをローカルでビルドするには次のようにします。
 
