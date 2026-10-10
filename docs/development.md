@@ -31,6 +31,16 @@ Preview it locally:
 uv run --group docs zensical serve
 ```
 
+The Japanese pages live in `docs/ja/` and are built with `zensical.ja.toml` into `site/ja`, served
+at `/cc-calendar/ja/`. When you change an English page, update the matching `docs/ja/` page in the
+same pull request. Keep its `{ #anchor }` heading ids identical to the English slugs, and reference
+images as `../images/…`; `tests/test_docs.py` checks both. To build both sites locally:
+
+```sh
+uv run --group docs zensical build --clean
+uv run --group docs zensical build -f zensical.ja.toml
+```
+
 ## Releasing
 
 Pushing a version tag publishes the package to [PyPI](https://pypi.org/project/cc-calendar/)

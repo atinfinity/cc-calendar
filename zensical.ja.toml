@@ -2,29 +2,30 @@
 # Preview locally with `uv run --group docs zensical serve`.
 [project]
 site_name = "cc-calendar"
-site_url = "https://atinfinity.github.io/cc-calendar/"
+site_url = "https://atinfinity.github.io/cc-calendar/ja/"
 site_description = "A Google Calendar-style view of your Claude Code sessions"
 site_author = "atinfinity"
 copyright = "Copyright &copy; 2026 atinfinity · MIT License"
 repo_url = "https://github.com/atinfinity/cc-calendar"
 repo_name = "atinfinity/cc-calendar"
-edit_uri = "edit/main/docs/"
-docs_dir = "docs"
-extra_css = ["stylesheets/extra.css"]
-extra_javascript = ["javascripts/language.js"]
+edit_uri = "edit/main/docs/ja/"
+docs_dir = "docs/ja"
+site_dir = "site/ja"
+extra_css = ["../stylesheets/extra.css"]
+extra_javascript = ["../javascripts/language.js"]
 nav = [
-  { "Home" = "index.md" },
-  { "Getting started" = "getting-started.md" },
-  { "Features" = "features.md" },
-  { "Export format" = "export.md" },
-  { "Privacy" = "privacy.md" },
-  { "Development" = "development.md" },
+  { "ホーム" = "index.md" },
+  { "はじめに" = "getting-started.md" },
+  { "機能" = "features.md" },
+  { "エクスポート形式" = "export.md" },
+  { "プライバシー" = "privacy.md" },
+  { "開発" = "development.md" },
 ]
 
 [project.theme]
-language = "en"
-favicon = "assets/favicon.svg"
-logo = "assets/logo.svg"
+language = "ja"
+favicon = "../assets/favicon.svg"
+logo = "../assets/logo.svg"
 features = [
   "content.code.copy",
   "content.action.edit",
@@ -88,7 +89,3 @@ lang = "en"
 name = "日本語"
 link = "/cc-calendar/ja/"
 lang = "ja"
-
-# The Japanese pages in docs/ja build separately, with zensical.ja.toml
-[project.plugins.exclude]
-glob = ["ja/*"]
