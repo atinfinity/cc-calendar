@@ -4,9 +4,9 @@ name: Docs
 on:
   push:
     branches: [main]
-    paths: ["docs/**", "zensical.toml", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "docs-ja/**", "zensical.toml", "zensical.ja.toml", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
   pull_request:
-    paths: ["docs/**", "zensical.toml", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "docs-ja/**", "zensical.toml", "zensical.ja.toml", "pyproject.toml", "uv.lock", ".github/workflows/docs.yml"]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked --only-group docs
       - run: uv run --no-sync zensical build --clean --strict
+      # The Japanese pages build into site/ja, next to the English site
+      - run: uv run --no-sync zensical build -f zensical.ja.toml --strict
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
