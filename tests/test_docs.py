@@ -23,7 +23,7 @@ def slugify(text: str) -> str:
 
 
 def body(path: Path) -> str:
-    return FENCE.sub("", path.read_text())
+    return FENCE.sub("", path.read_text(encoding="utf-8"))
 
 
 def en_anchors(text: str) -> list[str]:
