@@ -31,7 +31,7 @@
     - Click **Budget** to set a monthly budget. A bar then shows the spend and the projection
       against it, and turns red when the projection is over budget.
     - Set a **Plan price** (such as your subscription's monthly price) to compare: "API equivalent
-      \$X vs plan \$Y".
+      $X vs plan $Y".
     - Both are kept in this browser's local storage. The figures follow the current filters.
     - These are rough estimates from the logs at API list prices, not billing data.
 
@@ -39,7 +39,7 @@
 
 - **Colors** by project, status, model, effort (the level most requests ran at), source (with
   several config directories), tag or cost
-  (< \$1 / \$1–5 / \$5–20 / \$20–50 / ≥ \$50).
+  (< $1 / $1–5 / $5–20 / $20–50 / ≥ $50).
     - **Tag** colors a session by its first tag, so put the main one first. Sessions without tags
       are gray. The button shows once any session has a tag.
 - **Event marks** on each bar show when prompts, commits, compactions and API errors happened.
@@ -233,7 +233,7 @@
     ends in the middle of a turn.
 
     In that case, nothing in the log may name the session it continues. So a cost record more
-    than 3 times the session's own token estimate, and at least \$1 above it, is also taken to be
+    than 3 times the session's own token estimate, and at least $1 above it, is also taken to be
     cumulative and treated the same way. Ordinary records stay well below that.
 
     A session resumed with `claude --resume` keeps its log, but its cost record covers only the
